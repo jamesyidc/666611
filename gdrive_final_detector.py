@@ -222,20 +222,30 @@ def step4_get_latest_data(file_info, fixed_file_id):
         if response.status_code == 200:
             content = response.text
             
-            # 提取文件内容的时间戳
+            # 先尝试从文件内容提取时间戳
             timestamp_match = re.search(r'(\d{4}-\d{2}-\d{2}) (\d{2}:\d{2}:\d{2})', content)
             if timestamp_match:
                 file_timestamp = f"{timestamp_match.group(1)} {timestamp_match.group(2)}"
-                log(f"   文件内容时间戳: {file_timestamp}")
-                
-                return {
-                    'latest_filename': latest_filename,
-                    'content': content,
-                    'file_timestamp': file_timestamp
-                }
+                log(f"   ✅ 从文件内容提取时间戳: {file_timestamp}")
             else:
-                log(f"   ❌ 无法提取时间戳")
-                return None
+                # 如果文件内容没有时间戳，从文件名提取
+                # 文件名格式: 2025-12-25_2327.txt -> 2025-12-25 23:27:00
+                filename_match = re.search(r'(\d{4}-\d{2}-\d{2})_(\d{2})(\d{2})\.txt', latest_filename)
+                if filename_match:
+                    date_str = filename_match.group(1)
+                    hour = filename_match.group(2)
+                    minute = filename_match.group(3)
+                    file_timestamp = f"{date_str} {hour}:{minute}:00"
+                    log(f"   ✅ 从文件名提取时间戳: {file_timestamp}")
+                else:
+                    log(f"   ❌ 无法从文件名或内容提取时间戳")
+                    return None
+            
+            return {
+                'latest_filename': latest_filename,
+                'content': content,
+                'file_timestamp': file_timestamp
+            }
         else:
             log(f"   ❌ 下载失败，状态码: {response.status_code}")
             return None
