@@ -259,11 +259,12 @@
             let html = '';
             
             sequences.forEach(seq => {
-                const hasBias = seq.bias !== undefined;
-                const biasClass = hasBias ? (seq.bias === '偏多' ? 'bias-bullish' : 'bias-bearish') : '';
-                const change1Class = hasBias && seq.change_1day_diff > 0 ? 'trend-increase' : 'trend-decrease';
-                const change3Class = hasBias && seq.change_3day_diff > 0 ? 'trend-increase' : 'trend-decrease';
-                const change7Class = hasBias && seq.change_7day_diff > 0 ? 'trend-increase' : 'trend-decrease';
+                const hasChange = seq.sequence_change_percent !== undefined;
+                const biasClass = hasChange && seq.bias ? (seq.bias === '偏多' ? 'bias-bullish' : 'bias-bearish') : '';
+                const changeClass = hasChange && seq.sequence_change_percent >= 0 ? 'trend-increase' : 'trend-decrease';
+                const diff1Class = hasChange && seq.diff_1day >= 0 ? 'trend-increase' : 'trend-decrease';
+                const diff3Class = hasChange && seq.diff_3day >= 0 ? 'trend-increase' : 'trend-decrease';
+                const diff7Class = hasChange && seq.diff_7day >= 0 ? 'trend-increase' : 'trend-decrease';
                 
                 html += `
                     <div class="table-row">
@@ -271,13 +272,13 @@
                         <div class="table-cell">${seq.time.substring(11, 16)}</div>
                         <div class="table-cell">$${seq.price.toFixed(2)}</div>
                         <div class="table-cell">${seq.sar.toFixed(4)}</div>
-                        <div class="table-cell">${hasBias ? seq.change_rate.toFixed(6) + '%' : '-'}</div>
-                        <div class="table-cell ${hasBias ? change1Class : ''}">${hasBias ? (seq.change_1day_diff >= 0 ? '+' : '') + seq.change_1day_diff.toFixed(6) + '%' : '-'}</div>
-                        <div class="table-cell">${hasBias ? seq.avg_1day.toFixed(6) + '%' : '-'}</div>
-                        <div class="table-cell ${hasBias ? change3Class : ''}">${hasBias ? (seq.change_3day_diff >= 0 ? '+' : '') + seq.change_3day_diff.toFixed(6) + '%' : '-'}</div>
-                        <div class="table-cell">${hasBias ? seq.avg_3day.toFixed(6) + '%' : '-'}</div>
-                        <div class="table-cell ${hasBias ? change7Class : ''}">${hasBias ? (seq.change_7day_diff >= 0 ? '+' : '') + seq.change_7day_diff.toFixed(6) + '%' : '-'}</div>
-                        <div class="table-cell ${biasClass}">${hasBias ? seq.bias : '-'}</div>
+                        <div class="table-cell ${hasChange ? changeClass : ''}">${hasChange ? seq.sequence_change_percent.toFixed(4) + '%' : '-'}</div>
+                        <div class="table-cell ${hasChange ? diff1Class : ''}">${hasChange ? (seq.diff_1day >= 0 ? '+' : '') + seq.diff_1day.toFixed(4) + '%' : '-'}</div>
+                        <div class="table-cell">${hasChange ? seq.avg_1day.toFixed(6) + '%' : '-'}</div>
+                        <div class="table-cell ${hasChange ? diff3Class : ''}">${hasChange ? (seq.diff_3day >= 0 ? '+' : '') + seq.diff_3day.toFixed(4) + '%' : '-'}</div>
+                        <div class="table-cell">${hasChange ? seq.avg_3day.toFixed(6) + '%' : '-'}</div>
+                        <div class="table-cell ${hasChange ? diff7Class : ''}">${hasChange ? (seq.diff_7day >= 0 ? '+' : '') + seq.diff_7day.toFixed(4) + '%' : '-'}</div>
+                        <div class="table-cell ${biasClass}">${hasChange && seq.bias ? seq.bias : '-'}</div>
                     </div>
                 `;
             });
