@@ -36,8 +36,8 @@ SAR_AF_INCREMENT = 0.02  # 加速因子增量
 SAR_AF_MAX = 0.2  # 最大加速因子
 
 # 数据保留期限
-DATA_RETENTION_DAYS = 7
-MIN_KLINES = 576  # 最少保留K线数量 (7天 * 24小时 * 12个5分钟 = 2016, 但我们至少需要576)
+DATA_RETENTION_DAYS = 16
+MIN_KLINES = 4608  # 最少保留K线数量 (16天 * 24小时 * 12个5分钟 = 4608)
 
 # 异常阈值
 ANOMALY_THRESHOLD = 30.0  # 偏离平均值30%以上为异常
@@ -160,27 +160,61 @@ def init_database():
     return True
 
 # ==================== 数据获取 ====================
-def fetch_kline_data(symbol, limit=2100):
+def fetch_kline_data(symbol, limit=5000):
     """
     从OKX获取5分钟K线数据
-    limit=2100 表示 2100根5分钟K线 = 7.29天的数据（超过7天要求）
+    由于OKX API单次最多返回300根K线，需要分批获取
+    limit=5000 表示目标获取5000根5分钟K线 = 17.36天的数据（超过16天要求）
     """
     url = "https://www.okx.com/api/v5/market/candles"
-    params = {
-        'instId': f'{symbol}-USDT-SWAP',
-        'bar': '5m',
-        'limit': limit
-    }
+    all_klines = []
+    after = None  # 用于分页
+    
+    # 由于OKX限制，每次最多300根，需要循环获取
+    max_iterations = (limit // 300) + 1
     
     try:
-        response = requests.get(url, params=params, timeout=15)
-        if response.status_code == 200:
-            data = response.json()
-            if data.get('code') == '0' and data.get('data'):
-                klines = data['data']
-                klines.reverse()  # 从旧到新排序
-                return klines
-        return None
+        for i in range(max_iterations):
+            params = {
+                'instId': f'{symbol}-USDT-SWAP',
+                'bar': '5m',
+                'limit': 300
+            }
+            
+            if after:
+                params['after'] = after
+            
+            response = requests.get(url, params=params, timeout=15)
+            if response.status_code == 200:
+                data = response.json()
+                if data.get('code') == '0' and data.get('data'):
+                    klines = data['data']
+                    
+                    if not klines:
+                        break
+                    
+                    all_klines.extend(klines)
+                    
+                    # 检查是否已达到目标数量
+                    if len(all_klines) >= limit:
+                        break
+                    
+                    # 设置下一次请求的after参数（最旧的K线时间戳）
+                    after = klines[-1][0]
+                    
+                    # 短暂延迟避免API限流
+                    time.sleep(0.2)
+                else:
+                    break
+            else:
+                break
+        
+        # 反转顺序（从旧到新）
+        if all_klines:
+            all_klines.reverse()
+        
+        return all_klines[:limit] if len(all_klines) > limit else all_klines
+        
     except Exception as e:
         print(f"    ✗ 获取{symbol} K线数据失败: {e}")
         return None
@@ -651,7 +685,7 @@ def collect_symbol_data(symbol):
     print(f"  正在处理 {symbol}...")
     
     # 1. 获取K线数据
-    klines = fetch_kline_data(symbol, limit=2100)
+    klines = fetch_kline_data(symbol, limit=5000)
     if not klines:
         print(f"    ✗ 获取K线数据失败")
         return False

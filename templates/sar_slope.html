@@ -314,7 +314,7 @@
                         html += `<td>${item.current_sequence}</td>`;
                         html += `<td>${item.last_kline_time}</td>`;
                         html += `<td>${item.total_klines}</td>`;
-                        html += `<td><button class="symbol-btn" onclick="viewSymbol('${item.symbol}')">详情</button></td>`;
+                        html += `<td><a href="/sar-slope/${item.symbol}" class="symbol-btn">查看详情</a></td>`;
                         html += '</tr>';
                     });
                     

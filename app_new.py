@@ -10272,6 +10272,11 @@ def sar_slope():
     """SAR斜率系统主页面"""
     return render_template('sar_slope.html')
 
+@app.route('/sar-slope/<symbol>')
+def sar_slope_detail(symbol):
+    """SAR斜率单币详细追踪页面"""
+    return render_template('sar_slope_detail.html', symbol=symbol.upper())
+
 @app.route('/api/sar-slope/status')
 def sar_slope_status():
     """获取所有币种的SAR状态"""
@@ -10313,7 +10318,7 @@ def sar_slope_status():
 def sar_slope_symbol_data(symbol):
     """获取单个币种的详细SAR数据"""
     try:
-        limit = request.args.get('limit', 100, type=int)
+        limit = request.args.get('limit', 500, type=int)
         
         conn = sqlite3.connect('/home/user/webapp/sar_slope_data.db')
         cursor = conn.cursor()
@@ -10343,6 +10348,28 @@ def sar_slope_symbol_data(symbol):
                 'duration': row[9]
             })
         
+        # 获取变化率数据
+        cursor.execute('''
+            SELECT sequence_num, prev_sar, current_sar, change_value, 
+                   change_percent, kline_time, position
+            FROM sar_consecutive_changes
+            WHERE symbol = ?
+            ORDER BY id DESC
+            LIMIT ?
+        ''', (symbol, limit))
+        
+        changes = []
+        for row in cursor.fetchall():
+            changes.append({
+                'sequence': row[0],
+                'prev_sar': row[1],
+                'current_sar': row[2],
+                'change_value': row[3],
+                'change_percent': row[4],
+                'time': row[5],
+                'position': row[6]
+            })
+        
         # 获取平均值
         cursor.execute('''
             SELECT position, period_type, avg_change_percent, sample_count
@@ -10367,7 +10394,7 @@ def sar_slope_symbol_data(symbol):
             FROM sar_anomaly_alerts
             WHERE symbol = ?
             ORDER BY created_at DESC
-            LIMIT 20
+            LIMIT 100
         ''', (symbol,))
         
         alerts = []
@@ -10390,7 +10417,7 @@ def sar_slope_symbol_data(symbol):
             FROM sar_conversion_points
             WHERE symbol = ?
             ORDER BY timestamp DESC
-            LIMIT 10
+            LIMIT 50
         ''', (symbol,))
         
         conversions = []
@@ -10411,6 +10438,7 @@ def sar_slope_symbol_data(symbol):
             'success': True,
             'symbol': symbol,
             'sar_data': sar_data,
+            'changes': changes,
             'averages': averages,
             'alerts': alerts,
             'conversions': conversions
