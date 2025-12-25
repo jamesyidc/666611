@@ -11425,19 +11425,26 @@ def sar_slope_current_cycle(symbol):
                     current_value = changes[0] if len(changes) > 0 else 0
                     avg_1day = sum(changes) / len(changes)
                     avg_3day = sum(changes[:min(864, len(changes))]) / min(864, len(changes)) if len(changes) > 0 else 0
+                    avg_7day = sum(changes[:min(2016, len(changes))]) / min(2016, len(changes)) if len(changes) > 0 else 0
                     
-                    change_1day_percent = ((current_value - avg_1day) / avg_1day * 100) if avg_1day != 0 else 0
+                    # 计算绝对差值（不是百分比）
+                    change_1day_diff = current_value - avg_1day
+                    change_3day_diff = current_value - avg_3day
+                    change_7day_diff = current_value - avg_7day
                     
-                    # 判断偏向
+                    # 判断偏向（基于差值方向）
                     if current_position == 'long':
-                        bias = '偏多' if change_1day_percent < 0 else '偏空'
+                        bias = '偏多' if change_1day_diff < 0 else '偏空'
                     else:
-                        bias = '偏空' if change_1day_percent < 0 else '偏多'
+                        bias = '偏空' if change_1day_diff < 0 else '偏多'
                     
                     seq_data['change_rate'] = round(current_value, 6)
                     seq_data['avg_1day'] = round(avg_1day, 6)
                     seq_data['avg_3day'] = round(avg_3day, 6)
-                    seq_data['change_1day_percent'] = round(change_1day_percent, 2)
+                    seq_data['avg_7day'] = round(avg_7day, 6)
+                    seq_data['change_1day_diff'] = round(change_1day_diff, 6)
+                    seq_data['change_3day_diff'] = round(change_3day_diff, 6)
+                    seq_data['change_7day_diff'] = round(change_7day_diff, 6)
                     seq_data['bias'] = bias
             
             sequences_with_changes.append(seq_data)
