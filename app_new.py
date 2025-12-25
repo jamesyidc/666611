@@ -11515,11 +11515,11 @@ def sar_slope_current_cycle(symbol):
         raw_sequences = []
         rows = cursor.fetchall()  # 从新到旧
         for row in rows:  # 不反转，保持最新的在前
-            seq, close, time, open_p, high, low, sar, pos = row
+            seq, close, kline_time, open_p, high, low, sar, pos = row
             raw_sequences.append({
                 'sequence': seq,
                 'price': round(close, 2),
-                'time': time,
+                'time': kline_time,
                 'open': round(open_p, 2),
                 'high': round(high, 2),
                 'low': round(low, 2),
