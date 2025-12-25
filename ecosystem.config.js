@@ -118,7 +118,7 @@ module.exports = {
     // Google Drive自动触发器
     {
       name: 'gdrive-auto-trigger',
-      script: 'gdrive_auto_trigger.py',
+      script: 'gdrive_auto_trigger_daemon.py',
       interpreter: 'python3',
       cwd: '/home/user/webapp',
       instances: 1,
