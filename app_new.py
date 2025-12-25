@@ -11522,6 +11522,25 @@ def sar_slope_current_cycle(symbol):
                 'position': pos  # 记录该条数据的position（long/short）
             })
         
+        # 【性能优化】一次性批量查询所有历史数据，避免在循环中重复查询
+        # 获取所有需要的历史平均数据
+        cursor.execute('''
+            SELECT position, sequence_num, change_percent
+            FROM sar_consecutive_changes
+            WHERE symbol = ?
+            ORDER BY id DESC
+            LIMIT 4320
+        ''', (symbol.upper(),))
+        
+        # 构建历史数据字典：{(position, seq_num): [change_percent, ...]}
+        historical_data_dict = {}
+        for row in cursor.fetchall():
+            pos, seq_num, change_pct = row
+            key = (pos, seq_num)
+            if key not in historical_data_dict:
+                historical_data_dict[key] = []
+            historical_data_dict[key].append(change_pct)
+        
         # 计算每个序列相对于前一个序列的变化率
         # 注意：现在raw_sequences[0]是最新的，raw_sequences[-1]是最早的
         sequences_with_changes = []
@@ -11573,17 +11592,9 @@ def sar_slope_current_cycle(symbol):
                     result_data['sequence_change_percent'] = round(seq_change_percent, 4)
                     result_data['sar_diff'] = round(sar_absolute_diff, 4)  # SAR值的绝对差值
                     
-                    # 获取该序列对应的历史平均值（用于对比）
-                    # 从sar_consecutive_changes表获取同序列号的历史数据
-                    cursor.execute('''
-                        SELECT change_percent
-                        FROM sar_consecutive_changes
-                        WHERE symbol = ? AND position = ? AND sequence_num = ?
-                        ORDER BY id DESC
-                        LIMIT 288
-                    ''', (symbol.upper(), row_position, seq_num))
-                    
-                    historical_changes = [r[0] for r in cursor.fetchall()]
+                    # 【性能优化】从预加载的字典中获取历史数据，而不是重复查询数据库
+                    lookup_key = (row_position, seq_num)
+                    historical_changes = historical_data_dict.get(lookup_key, [])[:288]  # 最多取288条（1天）
                     if historical_changes:
                         avg_1day = sum(historical_changes) / len(historical_changes)
                         avg_3day = sum(historical_changes[:min(864, len(historical_changes))]) / min(864, len(historical_changes)) if len(historical_changes) >= 1 else avg_1day
