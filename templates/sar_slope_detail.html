@@ -3,8 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>{{ symbol }} - SAR斜率详细追踪</title>
-    <script src="https://cdn.jsdelivr.net/npm/echarts@5.4.3/dist/echarts.min.js"></script>
+    <title>{{symbol}} - SAR 持续时间段统计</title>
     <style>
         * {
             margin: 0;
@@ -14,13 +13,13 @@
         
         body {
             font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', sans-serif;
-            background: linear-gradient(135deg, #1e2139 0%, #2a2d47 100%);
+            background: #1e2139;
             color: #fff;
             padding: 20px;
         }
         
         .container {
-            max-width: 1800px;
+            max-width: 1600px;
             margin: 0 auto;
         }
         
@@ -28,14 +27,14 @@
             display: flex;
             justify-content: space-between;
             align-items: center;
-            margin-bottom: 20px;
+            margin-bottom: 30px;
+            padding-bottom: 20px;
+            border-bottom: 2px solid rgba(59, 125, 255, 0.3);
         }
         
         h1 {
-            font-size: 36px;
-            background: linear-gradient(135deg, #00d4ff 0%, #3b7dff 100%);
-            -webkit-background-clip: text;
-            -webkit-text-fill-color: transparent;
+            font-size: 28px;
+            color: #00d4ff;
         }
         
         .back-btn {
@@ -43,176 +42,45 @@
             border: 1px solid rgba(59, 125, 255, 0.4);
             color: #00d4ff;
             padding: 10px 20px;
-            border-radius: 8px;
+            border-radius: 6px;
             cursor: pointer;
-            font-size: 14px;
             text-decoration: none;
-            transition: all 0.3s;
+            font-size: 14px;
         }
         
         .back-btn:hover {
             background: rgba(59, 125, 255, 0.3);
         }
         
-        .stats-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-            gap: 15px;
+        .status-bar {
+            display: flex;
+            gap: 20px;
             margin-bottom: 30px;
+            padding: 15px;
+            background: rgba(42, 45, 71, 0.6);
+            border-radius: 8px;
         }
         
-        .stat-card {
-            background: rgba(59, 125, 255, 0.1);
-            border: 1px solid rgba(59, 125, 255, 0.3);
-            border-radius: 10px;
-            padding: 20px;
-            text-align: center;
+        .status-item {
+            flex: 1;
         }
         
-        .stat-value {
-            font-size: 32px;
-            font-weight: bold;
+        .status-label {
+            font-size: 12px;
+            color: #8b92b8;
             margin-bottom: 5px;
         }
         
-        .stat-value.long {
-            color: #00ff88;
-        }
-        
-        .stat-value.short {
-            color: #ff4757;
-        }
-        
-        .stat-label {
-            font-size: 13px;
-            color: #8b92b8;
-        }
-        
-        .chart-section {
-            background: rgba(42, 45, 71, 0.6);
-            border-radius: 10px;
-            padding: 20px;
-            margin-bottom: 20px;
-        }
-        
-        .chart-title {
+        .status-value {
             font-size: 18px;
             font-weight: bold;
-            margin-bottom: 15px;
             color: #00d4ff;
-        }
-        
-        .chart-container {
-            width: 100%;
-            height: 400px;
-        }
-        
-        .data-section {
-            background: rgba(42, 45, 71, 0.6);
-            border-radius: 10px;
-            padding: 20px;
-            margin-bottom: 20px;
-        }
-        
-        .section-title {
-            font-size: 18px;
-            font-weight: bold;
-            margin-bottom: 15px;
-            color: #00d4ff;
-        }
-        
-        .table-container {
-            overflow-x: auto;
-            max-height: 500px;
-            overflow-y: auto;
-        }
-        
-        table {
-            width: 100%;
-            border-collapse: collapse;
-        }
-        
-        th {
-            background: rgba(59, 125, 255, 0.2);
-            padding: 12px;
-            text-align: left;
-            font-size: 13px;
-            color: #00d4ff;
-            border-bottom: 2px solid rgba(59, 125, 255, 0.3);
-            position: sticky;
-            top: 0;
-            z-index: 10;
-        }
-        
-        td {
-            padding: 10px 12px;
-            font-size: 13px;
-            border-bottom: 1px solid rgba(139, 146, 184, 0.1);
-        }
-        
-        tr:hover {
-            background: rgba(59, 125, 255, 0.05);
-        }
-        
-        .position-long {
-            color: #00ff88;
-            font-weight: bold;
-        }
-        
-        .position-short {
-            color: #ff4757;
-            font-weight: bold;
-        }
-        
-        .alert-warning {
-            color: #ffa502;
-        }
-        
-        .alert-high {
-            color: #ff6348;
-        }
-        
-        .alert-critical {
-            color: #ff0000;
-            font-weight: bold;
-        }
-        
-        .extreme-badge {
-            background: #ffd700;
-            color: #000;
-            padding: 2px 8px;
-            border-radius: 4px;
-            font-size: 11px;
-            font-weight: bold;
-        }
-        
-        .loading {
-            text-align: center;
-            padding: 40px;
-            color: #8b92b8;
-            font-size: 16px;
-        }
-        
-        .refresh-btn {
-            background: #3b7dff;
-            border: none;
-            color: #fff;
-            padding: 10px 20px;
-            border-radius: 8px;
-            cursor: pointer;
-            font-size: 14px;
-            transition: all 0.3s;
-        }
-        
-        .refresh-btn:hover {
-            background: #2a5fd6;
         }
         
         .tabs {
             display: flex;
             gap: 10px;
             margin-bottom: 20px;
-            flex-wrap: wrap;
         }
         
         .tab {
@@ -220,21 +88,14 @@
             border: 1px solid rgba(59, 125, 255, 0.3);
             color: #00d4ff;
             padding: 10px 20px;
-            border-radius: 8px;
+            border-radius: 6px;
             cursor: pointer;
-            transition: all 0.3s;
             font-size: 14px;
-        }
-        
-        .tab:hover {
-            background: rgba(59, 125, 255, 0.2);
-            border-color: rgba(59, 125, 255, 0.5);
         }
         
         .tab.active {
             background: #3b7dff;
             color: #fff;
-            border-color: #3b7dff;
         }
         
         .tab-content {
@@ -245,502 +106,209 @@
             display: block;
         }
         
-        .avg-grid {
-            display: grid;
-            grid-template-columns: repeat(2, 1fr);
-            gap: 15px;
-            margin-bottom: 20px;
+        .duration-section {
+            margin-bottom: 30px;
         }
         
-        .avg-card {
-            background: rgba(59, 125, 255, 0.08);
-            border: 1px solid rgba(59, 125, 255, 0.2);
+        .section-title {
+            font-size: 20px;
+            color: #00d4ff;
+            margin-bottom: 15px;
+            padding-bottom: 10px;
+            border-bottom: 1px solid rgba(59, 125, 255, 0.3);
+        }
+        
+        .duration-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+            gap: 15px;
+        }
+        
+        .duration-card {
+            background: rgba(42, 45, 71, 0.6);
+            border: 1px solid rgba(59, 125, 255, 0.3);
             border-radius: 8px;
             padding: 15px;
         }
         
-        .avg-title {
-            font-size: 14px;
-            color: #8b92b8;
-            margin-bottom: 10px;
-        }
-        
-        .avg-value {
-            font-size: 24px;
+        .duration-header {
+            font-size: 16px;
             font-weight: bold;
             color: #00d4ff;
+            margin-bottom: 12px;
+            padding-bottom: 8px;
+            border-bottom: 1px solid rgba(139, 146, 184, 0.2);
         }
         
-        .avg-samples {
-            font-size: 12px;
+        .duration-row {
+            display: flex;
+            justify-content: space-between;
+            padding: 6px 0;
+            font-size: 13px;
+        }
+        
+        .duration-label {
             color: #8b92b8;
-            margin-top: 5px;
+        }
+        
+        .duration-value {
+            color: #d0d4e8;
+            font-weight: 500;
+        }
+        
+        .loading {
+            text-align: center;
+            padding: 50px;
+            font-size: 18px;
+            color: #8b92b8;
+        }
+        
+        .error {
+            text-align: center;
+            padding: 30px;
+            background: rgba(255, 68, 68, 0.1);
+            border: 1px solid rgba(255, 68, 68, 0.3);
+            border-radius: 8px;
+            color: #ff4444;
         }
     </style>
 </head>
 <body>
     <div class="container">
         <div class="header">
-            <h1>📊 {{ symbol }} - SAR斜率详细追踪</h1>
-            <div>
-                <button class="refresh-btn" onclick="loadAllData()">🔄 刷新数据</button>
-                <a href="/sar-slope" class="back-btn">← 返回列表</a>
-            </div>
+            <h1 id="pageTitle">加载中...</h1>
+            <a href="/sar-slope" class="back-btn">← 返回列表</a>
         </div>
         
-        <div class="stats-grid" id="stats-grid">
-            <div class="stat-card">
-                <div class="stat-value" id="current-position">-</div>
-                <div class="stat-label">当前状态</div>
+        <div id="statusBar" class="status-bar" style="display: none;">
+            <div class="status-item">
+                <div class="status-label">当前状态</div>
+                <div class="status-value" id="currentStatus">-</div>
             </div>
-            <div class="stat-card">
-                <div class="stat-value" id="current-sequence">-</div>
-                <div class="stat-label">当前序列</div>
+            <div class="status-item">
+                <div class="status-label">序列号</div>
+                <div class="status-value" id="currentSequence">-</div>
             </div>
-            <div class="stat-card">
-                <div class="stat-value" id="total-klines">-</div>
-                <div class="stat-label">K线数据量</div>
-            </div>
-            <div class="stat-card">
-                <div class="stat-value" id="total-conversions">-</div>
-                <div class="stat-label">多空转换次数</div>
-            </div>
-            <div class="stat-card">
-                <div class="stat-value" id="total-alerts">-</div>
-                <div class="stat-label">异常告警数</div>
-            </div>
-            <div class="stat-card">
-                <div class="stat-value" id="last-update">-</div>
-                <div class="stat-label">最后更新</div>
-            </div>
-        </div>
-        
-        <div class="chart-section">
-            <div class="chart-title">📈 SAR值趋势图（最近500根K线）</div>
-            <div id="sar-chart" class="chart-container"></div>
-        </div>
-        
-        <div class="chart-section">
-            <div class="chart-title">📊 变化率分布图</div>
-            <div id="change-chart" class="chart-container"></div>
-        </div>
-        
-        <div class="data-section">
-            <div class="section-title">📋 周期平均值统计</div>
-            <div class="avg-grid" id="averages-grid">
-                <div class="loading">加载中...</div>
+            <div class="status-item">
+                <div class="status-label">最后更新</div>
+                <div class="status-value" id="lastUpdate">-</div>
             </div>
         </div>
         
         <div class="tabs">
-            <div class="tab active" onclick="switchTab('raw')">📊 原始数据</div>
-            <div class="tab" onclick="switchTab('changes')">📈 变化率记录</div>
-            <div class="tab" onclick="switchTab('alerts')">⚠️ 异常告警</div>
-            <div class="tab" onclick="switchTab('conversions')">🔄 多空转换</div>
+            <div class="tab active" onclick="switchTab('long')">多头持续时间统计</div>
+            <div class="tab" onclick="switchTab('short')">空头持续时间统计</div>
         </div>
         
-        <div id="raw-tab" class="tab-content active">
-            <div class="data-section">
-                <div class="section-title">原始SAR数据（最近200条）</div>
-                <div class="table-container">
-                    <div id="raw-table" class="loading">加载中...</div>
-                </div>
-            </div>
-        </div>
+        <div id="loading" class="loading">正在加载数据...</div>
+        <div id="error" class="error" style="display: none;"></div>
         
-        <div id="changes-tab" class="tab-content">
-            <div class="data-section">
-                <div class="section-title">连续变化率记录（最近200条）</div>
-                <div class="table-container">
-                    <div id="changes-table" class="loading">加载中...</div>
-                </div>
-            </div>
-        </div>
-        
-        <div id="alerts-tab" class="tab-content">
-            <div class="data-section">
-                <div class="section-title">异常告警记录</div>
-                <div class="table-container">
-                    <div id="alerts-table" class="loading">加载中...</div>
-                </div>
-            </div>
-        </div>
-        
-        <div id="conversions-tab" class="tab-content">
-            <div class="data-section">
-                <div class="section-title">多空转换历史</div>
-                <div class="table-container">
-                    <div id="conversions-table" class="loading">加载中...</div>
-                </div>
-            </div>
-        </div>
+        <div id="longContent" class="tab-content active"></div>
+        <div id="shortContent" class="tab-content"></div>
     </div>
-    
+
     <script>
-        const symbol = '{{ symbol }}';
-        let symbolData = null;
-        let sarChart = null;
-        let changeChart = null;
+        const symbol = window.location.pathname.split('/').pop();
         
-        function switchTab(tabName) {
-            document.querySelectorAll('.tab-content').forEach(el => {
-                el.classList.remove('active');
-            });
-            document.querySelectorAll('.tab').forEach(el => {
-                el.classList.remove('active');
-            });
-            
-            document.getElementById(tabName + '-tab').classList.add('active');
-            event.target.classList.add('active');
-        }
-        
-        async function loadSymbolData() {
+        async function loadData() {
             try {
-                const response = await fetch(`/api/sar-slope/symbol/${symbol}?limit=500`);
+                const response = await fetch(`/api/sar-slope/duration-signal/${symbol}`);
                 const data = await response.json();
                 
-                if (data.success) {
-                    symbolData = data;
-                    
-                    // 更新统计卡片
-                    const currentPos = symbolData.sar_data[0].position;
-                    const posClass = currentPos === 'long' ? 'long' : 'short';
-                    const posText = currentPos === 'long' ? '多头' : '空头';
-                    
-                    document.getElementById('current-position').innerHTML = `<span class="${posClass}">${posText}</span>`;
-                    document.getElementById('current-sequence').textContent = symbolData.sar_data[0].sequence;
-                    document.getElementById('total-klines').textContent = symbolData.sar_data.length;
-                    document.getElementById('total-conversions').textContent = symbolData.conversions.length;
-                    document.getElementById('total-alerts').textContent = symbolData.alerts.length;
-                    document.getElementById('last-update').textContent = symbolData.sar_data[0].kline_time.substring(11, 16);
-                    
-                    // 渲染图表
-                    renderSarChart();
-                    renderChangeChart();
-                    
-                    // 渲染平均值
-                    renderAverages();
-                    
-                    // 渲染表格
-                    renderRawDataTable();
-                    renderChangesTable();
-                    renderAlertsTable();
-                    renderConversionsTable();
+                if (!data.success) {
+                    throw new Error(data.error || '加载失败');
                 }
+                
+                document.getElementById('loading').style.display = 'none';
+                document.getElementById('pageTitle').textContent = `${symbol} - SAR 持续时间段统计`;
+                
+                // 显示当前状态
+                const statusBar = document.getElementById('statusBar');
+                statusBar.style.display = 'flex';
+                document.getElementById('currentStatus').textContent = data.current_status.position === 'long' ? '多头' : '空头';
+                document.getElementById('currentSequence').textContent = data.current_status.sequence;
+                
+                // 分组数据
+                const longSignals = data.signals.filter(s => s.position === 'long');
+                const shortSignals = data.signals.filter(s => s.position === 'short');
+                
+                renderDurationList('longContent', longSignals, 'long');
+                renderDurationList('shortContent', shortSignals, 'short');
+                
             } catch (error) {
-                console.error('Error loading symbol data:', error);
+                console.error('Error:', error);
+                document.getElementById('loading').style.display = 'none';
+                document.getElementById('error').style.display = 'block';
+                document.getElementById('error').textContent = '加载失败: ' + error.message;
             }
         }
         
-        function renderSarChart() {
-            if (!sarChart) {
-                sarChart = echarts.init(document.getElementById('sar-chart'));
+        function renderDurationList(containerId, signals, position) {
+            const container = document.getElementById(containerId);
+            
+            if (signals.length === 0) {
+                container.innerHTML = '<div class="loading">暂无数据</div>';
+                return;
             }
             
-            const data = symbolData.sar_data.slice().reverse().slice(-500);
-            const times = data.map(d => d.kline_time.substring(5, 16));
-            const sarValues = data.map(d => d.sar);
-            const prices = data.map(d => d.close);
+            // 按持续时间排序
+            signals.sort((a, b) => a.duration_minutes - b.duration_minutes);
             
-            const option = {
-                backgroundColor: 'transparent',
-                tooltip: {
-                    trigger: 'axis',
-                    axisPointer: { type: 'cross' },
-                    backgroundColor: 'rgba(42, 45, 71, 0.9)',
-                    borderColor: '#3b7dff',
-                    textStyle: { color: '#fff' }
-                },
-                legend: {
-                    data: ['SAR值', '收盘价'],
-                    textStyle: { color: '#8b92b8' },
-                    top: 10
-                },
-                grid: {
-                    left: '3%',
-                    right: '4%',
-                    bottom: '3%',
-                    containLabel: true
-                },
-                xAxis: {
-                    type: 'category',
-                    data: times,
-                    axisLine: { lineStyle: { color: '#8b92b8' } },
-                    axisLabel: { color: '#8b92b8' }
-                },
-                yAxis: {
-                    type: 'value',
-                    axisLine: { lineStyle: { color: '#8b92b8' } },
-                    axisLabel: { color: '#8b92b8' },
-                    splitLine: { lineStyle: { color: 'rgba(139, 146, 184, 0.1)' } }
-                },
-                series: [
-                    {
-                        name: 'SAR值',
-                        type: 'line',
-                        data: sarValues,
-                        smooth: true,
-                        lineStyle: { color: '#00d4ff', width: 2 },
-                        itemStyle: { color: '#00d4ff' }
-                    },
-                    {
-                        name: '收盘价',
-                        type: 'line',
-                        data: prices,
-                        smooth: true,
-                        lineStyle: { color: '#ffa502', width: 2 },
-                        itemStyle: { color: '#ffa502' }
-                    }
-                ]
-            };
-            
-            sarChart.setOption(option);
-        }
-        
-        function renderChangeChart() {
-            if (!changeChart) {
-                changeChart = echarts.init(document.getElementById('change-chart'));
-            }
-            
-            // 从原始数据计算变化率
-            const data = symbolData.sar_data.slice().reverse();
-            const changes = [];
-            for (let i = 1; i < Math.min(data.length, 500); i++) {
-                const prev = data[i-1];
-                const curr = data[i];
-                if (prev.position === curr.position) {
-                    const changePercent = Math.abs((curr.sar - prev.sar) / prev.sar * 100);
-                    changes.push({
-                        time: curr.kline_time.substring(5, 16),
-                        value: changePercent,
-                        position: curr.position
-                    });
-                }
-            }
-            
-            const times = changes.map(d => d.time);
-            const values = changes.map(d => d.value);
-            const colors = changes.map(d => d.position === 'long' ? '#00ff88' : '#ff4757');
-            
-            const option = {
-                backgroundColor: 'transparent',
-                tooltip: {
-                    trigger: 'axis',
-                    backgroundColor: 'rgba(42, 45, 71, 0.9)',
-                    borderColor: '#3b7dff',
-                    textStyle: { color: '#fff' },
-                    formatter: function(params) {
-                        const p = params[0];
-                        return `${p.name}<br/>变化率: ${p.value.toFixed(6)}%`;
-                    }
-                },
-                grid: {
-                    left: '3%',
-                    right: '4%',
-                    bottom: '3%',
-                    containLabel: true
-                },
-                xAxis: {
-                    type: 'category',
-                    data: times,
-                    axisLine: { lineStyle: { color: '#8b92b8' } },
-                    axisLabel: { color: '#8b92b8', interval: 20 }
-                },
-                yAxis: {
-                    type: 'value',
-                    name: '变化率 (%)',
-                    axisLine: { lineStyle: { color: '#8b92b8' } },
-                    axisLabel: { color: '#8b92b8' },
-                    splitLine: { lineStyle: { color: 'rgba(139, 146, 184, 0.1)' } }
-                },
-                series: [{
-                    type: 'bar',
-                    data: values,
-                    itemStyle: {
-                        color: function(params) {
-                            return colors[params.dataIndex];
-                        }
-                    }
-                }]
-            };
-            
-            changeChart.setOption(option);
-        }
-        
-        function renderAverages() {
-            const averages = symbolData.averages;
-            let html = '';
-            
-            ['long', 'short'].forEach(pos => {
-                if (averages[pos]) {
-                    const posText = pos === 'long' ? '多头' : '空头';
-                    const posClass = pos === 'long' ? 'long' : 'short';
-                    
-                    ['1day', '3day', '7day', '15day'].forEach(period => {
-                        if (averages[pos][period]) {
-                            const avg = averages[pos][period];
-                            const periodText = period.replace('day', '天');
-                            
-                            html += `
-                                <div class="avg-card">
-                                    <div class="avg-title">${posText} - ${periodText}平均</div>
-                                    <div class="avg-value ${posClass}">${avg.avg.toFixed(6)}%</div>
-                                    <div class="avg-samples">样本数: ${avg.samples}</div>
+            const html = `
+                <div class="duration-section">
+                    <div class="section-title">${position === 'long' ? '多头' : '空头'}持续时间段统计 (共 ${signals.length} 个时间段)</div>
+                    <div class="duration-grid">
+                        ${signals.map(signal => `
+                            <div class="duration-card">
+                                <div class="duration-header">持续 ${signal.duration_minutes} 分钟</div>
+                                <div class="duration-row">
+                                    <span class="duration-label">1天平均:</span>
+                                    <span class="duration-value">${signal.averages['1day'].toFixed(6)}%</span>
                                 </div>
-                            `;
-                        }
-                    });
-                }
-            });
+                                <div class="duration-row">
+                                    <span class="duration-label">3天平均:</span>
+                                    <span class="duration-value">${signal.averages['3day'].toFixed(6)}%</span>
+                                </div>
+                                <div class="duration-row">
+                                    <span class="duration-label">7天平均:</span>
+                                    <span class="duration-value">${signal.averages['7day'] ? signal.averages['7day'].toFixed(6) + '%' : '-'}</span>
+                                </div>
+                                <div class="duration-row">
+                                    <span class="duration-label">15天平均:</span>
+                                    <span class="duration-value">${signal.averages['15day'] ? signal.averages['15day'].toFixed(6) + '%' : '-'}</span>
+                                </div>
+                                <div class="duration-row" style="margin-top: 10px; padding-top: 10px; border-top: 1px solid rgba(139, 146, 184, 0.2);">
+                                    <span class="duration-label">1天样本数:</span>
+                                    <span class="duration-value">${signal.sample_counts['1day']}</span>
+                                </div>
+                                <div class="duration-row">
+                                    <span class="duration-label">3天样本数:</span>
+                                    <span class="duration-value">${signal.sample_counts['3day']}</span>
+                                </div>
+                            </div>
+                        `).join('')}
+                    </div>
+                </div>
+            `;
             
-            document.getElementById('averages-grid').innerHTML = html || '<p>暂无数据</p>';
+            container.innerHTML = html;
         }
         
-        function renderRawDataTable() {
-            const data = symbolData.sar_data.slice(0, 200);
+        function switchTab(tab) {
+            // 切换 tab 样式
+            document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+            event.target.classList.add('active');
             
-            let html = '<table><thead><tr>';
-            html += '<th>时间</th><th>状态</th><th>序列</th><th>持续</th><th>SAR值</th><th>开盘</th><th>最高</th><th>最低</th><th>收盘</th>';
-            html += '</tr></thead><tbody>';
-            
-            data.forEach(item => {
-                const posClass = item.position === 'long' ? 'position-long' : 'position-short';
-                const posText = item.position === 'long' ? '多头' : '空头';
-                
-                html += '<tr>';
-                html += `<td>${item.kline_time}</td>`;
-                html += `<td class="${posClass}">${posText}</td>`;
-                html += `<td>${item.sequence}</td>`;
-                html += `<td>${item.duration}分钟</td>`;
-                html += `<td>${item.sar.toFixed(6)}</td>`;
-                html += `<td>${item.open.toFixed(4)}</td>`;
-                html += `<td>${item.high.toFixed(4)}</td>`;
-                html += `<td>${item.low.toFixed(4)}</td>`;
-                html += `<td>${item.close.toFixed(4)}</td>`;
-                html += '</tr>';
-            });
-            
-            html += '</tbody></table>';
-            document.getElementById('raw-table').innerHTML = html;
+            // 切换内容
+            document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+            document.getElementById(tab + 'Content').classList.add('active');
         }
         
-        function renderChangesTable() {
-            // 从原始数据计算变化率
-            const data = symbolData.sar_data.slice().reverse();
-            const changes = [];
-            
-            for (let i = 1; i < Math.min(data.length, 200); i++) {
-                const prev = data[i-1];
-                const curr = data[i];
-                if (prev.position === curr.position) {
-                    changes.push({
-                        time: curr.kline_time,
-                        position: curr.position,
-                        sequence: curr.sequence,
-                        prevSar: prev.sar,
-                        currSar: curr.sar,
-                        change: curr.sar - prev.sar,
-                        changePercent: Math.abs((curr.sar - prev.sar) / prev.sar * 100)
-                    });
-                }
-            }
-            
-            let html = '<table><thead><tr>';
-            html += '<th>时间</th><th>状态</th><th>序列</th><th>前一SAR</th><th>当前SAR</th><th>变化值</th><th>变化率</th>';
-            html += '</tr></thead><tbody>';
-            
-            changes.reverse().forEach(item => {
-                const posClass = item.position === 'long' ? 'position-long' : 'position-short';
-                const posText = item.position === 'long' ? '多头' : '空头';
-                
-                html += '<tr>';
-                html += `<td>${item.time}</td>`;
-                html += `<td class="${posClass}">${posText}</td>`;
-                html += `<td>${item.sequence}</td>`;
-                html += `<td>${item.prevSar.toFixed(6)}</td>`;
-                html += `<td>${item.currSar.toFixed(6)}</td>`;
-                html += `<td>${item.change.toFixed(6)}</td>`;
-                html += `<td>${item.changePercent.toFixed(6)}%</td>`;
-                html += '</tr>';
-            });
-            
-            html += '</tbody></table>';
-            document.getElementById('changes-table').innerHTML = html;
-        }
+        // 加载数据
+        loadData();
         
-        function renderAlertsTable() {
-            const alerts = symbolData.alerts;
-            
-            let html = '<table><thead><tr>';
-            html += '<th>时间</th><th>状态</th><th>序列</th><th>SAR值</th><th>变化率</th><th>偏离度</th><th>级别</th><th>极值</th>';
-            html += '</tr></thead><tbody>';
-            
-            alerts.forEach(item => {
-                const posClass = item.position === 'long' ? 'position-long' : 'position-short';
-                const posText = item.position === 'long' ? '多头' : '空头';
-                
-                let levelClass = 'alert-warning';
-                if (item.level === 'high') levelClass = 'alert-high';
-                if (item.level === 'critical') levelClass = 'alert-critical';
-                
-                html += '<tr>';
-                html += `<td>${item.time}</td>`;
-                html += `<td class="${posClass}">${posText}</td>`;
-                html += `<td>${item.sequence}</td>`;
-                html += `<td>${item.sar.toFixed(6)}</td>`;
-                html += `<td>${item.change_percent.toFixed(6)}%</td>`;
-                html += `<td>${item.deviation.toFixed(2)}%</td>`;
-                html += `<td class="${levelClass}">${item.level.toUpperCase()}</td>`;
-                html += `<td>${item.is_extreme ? '<span class="extreme-badge">极值</span>' : '-'}</td>`;
-                html += '</tr>';
-            });
-            
-            html += '</tbody></table>';
-            document.getElementById('alerts-table').innerHTML = html || '<p>暂无异常告警</p>';
-        }
-        
-        function renderConversionsTable() {
-            const conversions = symbolData.conversions;
-            
-            let html = '<table><thead><tr>';
-            html += '<th>时间</th><th>转换</th><th>SAR值</th><th>转换价格</th><th>上次持续</th>';
-            html += '</tr></thead><tbody>';
-            
-            conversions.forEach(item => {
-                const fromClass = item.from_position === 'long' ? 'position-long' : 'position-short';
-                const toClass = item.to_position === 'long' ? 'position-long' : 'position-short';
-                const fromText = item.from_position === 'long' ? '多' : '空';
-                const toText = item.to_position === 'long' ? '多' : '空';
-                
-                html += '<tr>';
-                html += `<td>${item.time}</td>`;
-                html += `<td><span class="${fromClass}">${fromText}</span> → <span class="${toClass}">${toText}</span></td>`;
-                html += `<td>${item.sar.toFixed(6)}</td>`;
-                html += `<td>${item.price.toFixed(4)}</td>`;
-                html += `<td>${item.prev_duration}分钟</td>`;
-                html += '</tr>';
-            });
-            
-            html += '</tbody></table>';
-            document.getElementById('conversions-table').innerHTML = html;
-        }
-        
-        function loadAllData() {
-            loadSymbolData();
-        }
-        
-        window.onload = () => {
-            loadAllData();
-            
-            // 每30秒自动刷新
-            setInterval(loadAllData, 30000);
-        };
-        
-        // 响应式图表
-        window.addEventListener('resize', () => {
-            if (sarChart) sarChart.resize();
-            if (changeChart) changeChart.resize();
-        });
+        // 每30秒自动刷新
+        setInterval(loadData, 30000);
     </script>
 </body>
 </html>
