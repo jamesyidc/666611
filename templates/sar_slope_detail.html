@@ -19,7 +19,7 @@
         }
         
         .container {
-            max-width: 1600px;
+            max-width: 1800px;
             margin: 0 auto;
         }
         
@@ -53,8 +53,9 @@
         }
         
         .status-bar {
-            display: flex;
-            gap: 20px;
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
             margin-bottom: 30px;
             padding: 15px;
             background: rgba(42, 45, 71, 0.6);
@@ -62,7 +63,7 @@
         }
         
         .status-item {
-            flex: 1;
+            text-align: center;
         }
         
         .status-label {
@@ -77,83 +78,69 @@
             color: #00d4ff;
         }
         
-        .tabs {
-            display: flex;
+        .data-table {
+            width: 100%;
+            background: rgba(42, 45, 71, 0.6);
+            border-radius: 8px;
+            overflow: hidden;
+        }
+        
+        .table-header {
+            display: grid;
+            grid-template-columns: 80px 100px 120px 120px 120px 120px 120px 100px 100px;
             gap: 10px;
-            margin-bottom: 20px;
-        }
-        
-        .tab {
-            background: rgba(59, 125, 255, 0.1);
-            border: 1px solid rgba(59, 125, 255, 0.3);
+            padding: 15px;
+            background: rgba(59, 125, 255, 0.2);
+            font-weight: bold;
+            font-size: 13px;
             color: #00d4ff;
-            padding: 10px 20px;
-            border-radius: 6px;
-            cursor: pointer;
-            font-size: 14px;
-        }
-        
-        .tab.active {
-            background: #3b7dff;
-            color: #fff;
-        }
-        
-        .tab-content {
-            display: none;
-        }
-        
-        .tab-content.active {
-            display: block;
-        }
-        
-        .duration-section {
-            margin-bottom: 30px;
-        }
-        
-        .section-title {
-            font-size: 20px;
-            color: #00d4ff;
-            margin-bottom: 15px;
-            padding-bottom: 10px;
             border-bottom: 1px solid rgba(59, 125, 255, 0.3);
         }
         
-        .duration-grid {
+        .table-row {
             display: grid;
-            grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
-            gap: 15px;
-        }
-        
-        .duration-card {
-            background: rgba(42, 45, 71, 0.6);
-            border: 1px solid rgba(59, 125, 255, 0.3);
-            border-radius: 8px;
-            padding: 15px;
-        }
-        
-        .duration-header {
-            font-size: 16px;
-            font-weight: bold;
-            color: #00d4ff;
-            margin-bottom: 12px;
-            padding-bottom: 8px;
-            border-bottom: 1px solid rgba(139, 146, 184, 0.2);
-        }
-        
-        .duration-row {
-            display: flex;
-            justify-content: space-between;
-            padding: 6px 0;
+            grid-template-columns: 80px 100px 120px 120px 120px 120px 120px 100px 100px;
+            gap: 10px;
+            padding: 12px 15px;
             font-size: 13px;
+            border-bottom: 1px solid rgba(139, 146, 184, 0.1);
+            transition: background 0.2s;
         }
         
-        .duration-label {
-            color: #8b92b8;
+        .table-row:hover {
+            background: rgba(59, 125, 255, 0.1);
         }
         
-        .duration-value {
+        .table-cell {
             color: #d0d4e8;
-            font-weight: 500;
+        }
+        
+        .position-long {
+            color: #00ff00;
+            font-weight: bold;
+        }
+        
+        .position-short {
+            color: #ff4444;
+            font-weight: bold;
+        }
+        
+        .trend-increase {
+            color: #ff4444;
+        }
+        
+        .trend-decrease {
+            color: #00ff00;
+        }
+        
+        .bias-bullish {
+            color: #00ff00;
+            font-weight: bold;
+        }
+        
+        .bias-bearish {
+            color: #ff4444;
+            font-weight: bold;
         }
         
         .loading {
@@ -180,31 +167,27 @@
             <a href="/sar-slope" class="back-btn">← 返回列表</a>
         </div>
         
-        <div id="statusBar" class="status-bar" style="display: none;">
-            <div class="status-item">
-                <div class="status-label">当前状态</div>
-                <div class="status-value" id="currentStatus">-</div>
-            </div>
-            <div class="status-item">
-                <div class="status-label">序列号</div>
-                <div class="status-value" id="currentSequence">-</div>
-            </div>
-            <div class="status-item">
-                <div class="status-label">最后更新</div>
-                <div class="status-value" id="lastUpdate">-</div>
-            </div>
-        </div>
-        
-        <div class="tabs">
-            <div class="tab active" onclick="switchTab('long')">多头持续时间统计</div>
-            <div class="tab" onclick="switchTab('short')">空头持续时间统计</div>
-        </div>
+        <div id="statusBar" class="status-bar" style="display: none;"></div>
         
         <div id="loading" class="loading">正在加载数据...</div>
         <div id="error" class="error" style="display: none;"></div>
         
-        <div id="longContent" class="tab-content active"></div>
-        <div id="shortContent" class="tab-content"></div>
+        <div id="dataTable" style="display: none;">
+            <div class="data-table">
+                <div class="table-header">
+                    <div>序号</div>
+                    <div>方向</div>
+                    <div>当前值</div>
+                    <div>1天平均</div>
+                    <div>3天平均</div>
+                    <div>7天平均</div>
+                    <div>15天平均</div>
+                    <div>与1天差值%</div>
+                    <div>偏向</div>
+                </div>
+                <div id="tableBody"></div>
+            </div>
+        </div>
     </div>
 
     <script>
@@ -212,7 +195,7 @@
         
         async function loadData() {
             try {
-                const response = await fetch(`/api/sar-slope/duration-signal/${symbol}`);
+                const response = await fetch(`/api/sar-slope/transition-analysis/${symbol}`);
                 const data = await response.json();
                 
                 if (!data.success) {
@@ -222,18 +205,8 @@
                 document.getElementById('loading').style.display = 'none';
                 document.getElementById('pageTitle').textContent = `${symbol} - SAR 持续时间段统计`;
                 
-                // 显示当前状态
-                const statusBar = document.getElementById('statusBar');
-                statusBar.style.display = 'flex';
-                document.getElementById('currentStatus').textContent = data.current_status.position === 'long' ? '多头' : '空头';
-                document.getElementById('currentSequence').textContent = data.current_status.sequence;
-                
-                // 分组数据
-                const longSignals = data.signals.filter(s => s.position === 'long');
-                const shortSignals = data.signals.filter(s => s.position === 'short');
-                
-                renderDurationList('longContent', longSignals, 'long');
-                renderDurationList('shortContent', shortSignals, 'short');
+                renderStatusBar(data);
+                renderDataTable(data);
                 
             } catch (error) {
                 console.error('Error:', error);
@@ -243,65 +216,134 @@
             }
         }
         
-        function renderDurationList(containerId, signals, position) {
-            const container = document.getElementById(containerId);
+        function renderStatusBar(data) {
+            const statusBar = document.getElementById('statusBar');
+            const status = data.current_status;
+            const analysis = data.analysis;
             
-            if (signals.length === 0) {
-                container.innerHTML = '<div class="loading">暂无数据</div>';
-                return;
-            }
-            
-            // 按持续时间排序
-            signals.sort((a, b) => a.duration_minutes - b.duration_minutes);
-            
-            const html = `
-                <div class="duration-section">
-                    <div class="section-title">${position === 'long' ? '多头' : '空头'}持续时间段统计 (共 ${signals.length} 个时间段)</div>
-                    <div class="duration-grid">
-                        ${signals.map(signal => `
-                            <div class="duration-card">
-                                <div class="duration-header">持续 ${signal.duration_minutes} 分钟</div>
-                                <div class="duration-row">
-                                    <span class="duration-label">1天平均:</span>
-                                    <span class="duration-value">${signal.averages['1day'].toFixed(6)}%</span>
-                                </div>
-                                <div class="duration-row">
-                                    <span class="duration-label">3天平均:</span>
-                                    <span class="duration-value">${signal.averages['3day'].toFixed(6)}%</span>
-                                </div>
-                                <div class="duration-row">
-                                    <span class="duration-label">7天平均:</span>
-                                    <span class="duration-value">${signal.averages['7day'] ? signal.averages['7day'].toFixed(6) + '%' : '-'}</span>
-                                </div>
-                                <div class="duration-row">
-                                    <span class="duration-label">15天平均:</span>
-                                    <span class="duration-value">${signal.averages['15day'] ? signal.averages['15day'].toFixed(6) + '%' : '-'}</span>
-                                </div>
-                                <div class="duration-row" style="margin-top: 10px; padding-top: 10px; border-top: 1px solid rgba(139, 146, 184, 0.2);">
-                                    <span class="duration-label">1天样本数:</span>
-                                    <span class="duration-value">${signal.sample_counts['1day']}</span>
-                                </div>
-                                <div class="duration-row">
-                                    <span class="duration-label">3天样本数:</span>
-                                    <span class="duration-value">${signal.sample_counts['3day']}</span>
-                                </div>
-                            </div>
-                        `).join('')}
+            let html = `
+                <div class="status-item">
+                    <div class="status-label">当前状态</div>
+                    <div class="status-value ${status.position === 'long' ? 'position-long' : 'position-short'}">
+                        ${status.position === 'long' ? '多头' : '空头'}
                     </div>
+                </div>
+                <div class="status-item">
+                    <div class="status-label">序列号</div>
+                    <div class="status-value">${status.sequence}</div>
+                </div>
+                <div class="status-item">
+                    <div class="status-label">最后更新</div>
+                    <div class="status-value">${status.last_update}</div>
                 </div>
             `;
             
-            container.innerHTML = html;
+            // 显示当前方向的偏向
+            if (status.position === 'long' && analysis.long) {
+                html += `
+                    <div class="status-item">
+                        <div class="status-label">多头信号</div>
+                        <div class="status-value ${analysis.long.bias.type === 'bullish' ? 'bias-bullish' : 'bias-bearish'}">
+                            ${analysis.long.bias.type_cn}
+                        </div>
+                    </div>
+                `;
+            } else if (status.position === 'short' && analysis.short) {
+                html += `
+                    <div class="status-item">
+                        <div class="status-label">空头信号</div>
+                        <div class="status-value ${analysis.short.bias.type === 'bullish' ? 'bias-bullish' : 'bias-bearish'}">
+                            ${analysis.short.bias.type_cn}
+                        </div>
+                    </div>
+                `;
+            }
+            
+            statusBar.innerHTML = html;
+            statusBar.style.display = 'grid';
         }
         
-        function switchTab(tab) {
-            // 切换 tab 样式
-            document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
-            event.target.classList.add('active');
+        function renderDataTable(data) {
+            const tableBody = document.getElementById('tableBody');
+            const analysis = data.analysis;
             
-            // 切换内容
-            document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
-            document.getElementById(tab + 'Content').classList.add('active');
+            let rows = [];
+            let index = 1;
+            
+            // 添加多头数据
+            if (analysis.long) {
+                const long = analysis.long;
+                const comp1day = long.period_comparisons['1day'];
+                const comp3day = long.period_comparisons['3day'];
+                const comp7day = long.period_comparisons['7day'];
+                const comp15day = long.period_comparisons['15day'];
+                
+                rows.push({
+                    index: index++,
+                    position: 'long',
+                    position_cn: '多头',
+                    current_value: long.current_value,
+                    avg_1day: comp1day.period_average,
+                    avg_3day: comp3day.period_average,
+                    avg_7day: comp7day.period_average,
+                    avg_15day: comp15day.period_average,
+                    diff_percent: comp1day.difference_percent,
+                    trend: comp1day.trend,
+                    bias: long.bias.type_cn,
+                    bias_type: long.bias.type,
+                    time: long.current_time
+                });
+            }
+            
+            // 添加空头数据
+            if (analysis.short) {
+                const short = analysis.short;
+                const comp1day = short.period_comparisons['1day'];
+                const comp3day = short.period_comparisons['3day'];
+                const comp7day = short.period_comparisons['7day'];
+                const comp15day = short.period_comparisons['15day'];
+                
+                rows.push({
+                    index: index++,
+                    position: 'short',
+                    position_cn: '空头',
+                    current_value: short.current_value,
+                    avg_1day: comp1day.period_average,
+                    avg_3day: comp3day.period_average,
+                    avg_7day: comp7day.period_average,
+                    avg_15day: comp15day.period_average,
+                    diff_percent: comp1day.difference_percent,
+                    trend: comp1day.trend,
+                    bias: short.bias.type_cn,
+                    bias_type: short.bias.type,
+                    time: short.current_time
+                });
+            }
+            
+            // 渲染表格行
+            let html = '';
+            rows.forEach(row => {
+                const trendClass = row.diff_percent > 0 ? 'trend-increase' : 'trend-decrease';
+                const biasClass = row.bias_type === 'bullish' ? 'bias-bullish' : 'bias-bearish';
+                const positionClass = row.position === 'long' ? 'position-long' : 'position-short';
+                
+                html += `
+                    <div class="table-row" title="${row.time}">
+                        <div class="table-cell">${row.index}</div>
+                        <div class="table-cell ${positionClass}">${row.position_cn}</div>
+                        <div class="table-cell">${row.current_value.toFixed(6)}%</div>
+                        <div class="table-cell">${row.avg_1day.toFixed(6)}%</div>
+                        <div class="table-cell">${row.avg_3day.toFixed(6)}%</div>
+                        <div class="table-cell">${row.avg_7day.toFixed(6)}%</div>
+                        <div class="table-cell">${row.avg_15day.toFixed(6)}%</div>
+                        <div class="table-cell ${trendClass}">${row.diff_percent > 0 ? '+' : ''}${row.diff_percent.toFixed(2)}%</div>
+                        <div class="table-cell ${biasClass}">${row.bias}</div>
+                    </div>
+                `;
+            });
+            
+            tableBody.innerHTML = html;
+            document.getElementById('dataTable').style.display = 'block';
         }
         
         // 加载数据
