@@ -11467,14 +11467,29 @@ def sar_slope_current_cycle(symbol):
                     result_data['avg_3day'] = round(avg_3day, 6)
                     result_data['avg_7day'] = round(avg_7day, 6)
                     
-                    # 计算差值（当前序列变化率 - 平均值）
-                    diff_1day = seq_change_percent - avg_1day
-                    diff_3day = seq_change_percent - avg_3day
-                    diff_7day = seq_change_percent - avg_7day
+                    # 计算相对变化百分比：(当前 - 平均) / 平均 × 100
+                    # 例: 当前0.0613%, 平均0.083284%, 变化 = (0.0613-0.083284)/0.083284*100 = -26.40%
+                    if avg_1day != 0:
+                        change_1day_percent = ((seq_change_percent - avg_1day) / avg_1day) * 100
+                    else:
+                        change_1day_percent = 0
                     
-                    result_data['diff_1day'] = round(diff_1day, 4)
-                    result_data['diff_3day'] = round(diff_3day, 4)
-                    result_data['diff_7day'] = round(diff_7day, 4)
+                    if avg_3day != 0:
+                        change_3day_percent = ((seq_change_percent - avg_3day) / avg_3day) * 100
+                    else:
+                        change_3day_percent = 0
+                    
+                    if avg_7day != 0:
+                        change_7day_percent = ((seq_change_percent - avg_7day) / avg_7day) * 100
+                    else:
+                        change_7day_percent = 0
+                    
+                    # 同时保留绝对差值（用于偏向判断）
+                    diff_1day = seq_change_percent - avg_1day
+                    
+                    result_data['change_1day_percent'] = round(change_1day_percent, 2)
+                    result_data['change_3day_percent'] = round(change_3day_percent, 2)
+                    result_data['change_7day_percent'] = round(change_7day_percent, 2)
                     
                     # 判断偏向
                     if current_position == 'long':
