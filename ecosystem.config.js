@@ -197,6 +197,21 @@ module.exports = {
       autorestart: true,
       watch: false,
       max_memory_restart: '200M'
+    },
+    
+    // SAR斜率系统采集器
+    {
+      name: 'sar-slope-collector',
+      script: 'sar_slope_collector_daemon.py',
+      interpreter: 'python3',
+      cwd: '/home/user/webapp',
+      instances: 1,
+      autorestart: true,
+      watch: false,
+      max_memory_restart: '300M',
+      error_file: '/home/user/webapp/logs/sar-slope-error.log',
+      out_file: '/home/user/webapp/logs/sar-slope-out.log',
+      log_date_format: 'YYYY-MM-DD HH:mm:ss'
     }
   ]
 };

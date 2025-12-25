@@ -10266,6 +10266,267 @@ def fund_monitor_history_page():
     """资金监控异常历史查询页面"""
     return render_template('fund_monitor_history.html')
 
+# ==================== SAR斜率系统路由 ====================
+@app.route('/sar-slope')
+def sar_slope():
+    """SAR斜率系统主页面"""
+    return render_template('sar_slope.html')
+
+@app.route('/api/sar-slope/status')
+def sar_slope_status():
+    """获取所有币种的SAR状态"""
+    try:
+        conn = sqlite3.connect('/home/user/webapp/sar_slope_data.db')
+        cursor = conn.cursor()
+        
+        cursor.execute('''
+            SELECT symbol, last_kline_time, total_klines,
+                   current_position, current_sequence, updated_at
+            FROM system_status
+            ORDER BY symbol
+        ''')
+        
+        rows = cursor.fetchall()
+        conn.close()
+        
+        status_list = []
+        for row in rows:
+            status_list.append({
+                'symbol': row[0],
+                'last_kline_time': row[1],
+                'total_klines': row[2],
+                'current_position': row[3],
+                'current_sequence': row[4],
+                'updated_at': row[5]
+            })
+        
+        return jsonify({
+            'success': True,
+            'data': status_list,
+            'count': len(status_list)
+        })
+    
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)})
+
+@app.route('/api/sar-slope/symbol/<symbol>')
+def sar_slope_symbol_data(symbol):
+    """获取单个币种的详细SAR数据"""
+    try:
+        limit = request.args.get('limit', 100, type=int)
+        
+        conn = sqlite3.connect('/home/user/webapp/sar_slope_data.db')
+        cursor = conn.cursor()
+        
+        # 获取原始SAR数据
+        cursor.execute('''
+            SELECT timestamp, kline_time, open_price, high_price, low_price, 
+                   close_price, sar_value, position, position_sequence, duration_minutes
+            FROM sar_raw_data
+            WHERE symbol = ?
+            ORDER BY timestamp DESC
+            LIMIT ?
+        ''', (symbol, limit))
+        
+        sar_data = []
+        for row in cursor.fetchall():
+            sar_data.append({
+                'timestamp': row[0],
+                'kline_time': row[1],
+                'open': row[2],
+                'high': row[3],
+                'low': row[4],
+                'close': row[5],
+                'sar': row[6],
+                'position': row[7],
+                'sequence': row[8],
+                'duration': row[9]
+            })
+        
+        # 获取平均值
+        cursor.execute('''
+            SELECT position, period_type, avg_change_percent, sample_count
+            FROM sar_period_averages
+            WHERE symbol = ?
+        ''', (symbol,))
+        
+        averages = {}
+        for row in cursor.fetchall():
+            pos = row[0]
+            if pos not in averages:
+                averages[pos] = {}
+            averages[pos][row[1]] = {
+                'avg': row[2],
+                'samples': row[3]
+            }
+        
+        # 获取最近异常
+        cursor.execute('''
+            SELECT position, sequence_num, sar_value, change_percent,
+                   deviation_percent, alert_level, is_extreme_point, kline_time
+            FROM sar_anomaly_alerts
+            WHERE symbol = ?
+            ORDER BY created_at DESC
+            LIMIT 20
+        ''', (symbol,))
+        
+        alerts = []
+        for row in cursor.fetchall():
+            alerts.append({
+                'position': row[0],
+                'sequence': row[1],
+                'sar': row[2],
+                'change_percent': row[3],
+                'deviation': row[4],
+                'level': row[5],
+                'is_extreme': row[6],
+                'time': row[7]
+            })
+        
+        # 获取转换点
+        cursor.execute('''
+            SELECT timestamp, kline_time, from_position, to_position,
+                   conversion_sar, conversion_price, previous_duration
+            FROM sar_conversion_points
+            WHERE symbol = ?
+            ORDER BY timestamp DESC
+            LIMIT 10
+        ''', (symbol,))
+        
+        conversions = []
+        for row in cursor.fetchall():
+            conversions.append({
+                'timestamp': row[0],
+                'time': row[1],
+                'from_position': row[2],
+                'to_position': row[3],
+                'sar': row[4],
+                'price': row[5],
+                'prev_duration': row[6]
+            })
+        
+        conn.close()
+        
+        return jsonify({
+            'success': True,
+            'symbol': symbol,
+            'sar_data': sar_data,
+            'averages': averages,
+            'alerts': alerts,
+            'conversions': conversions
+        })
+    
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)})
+
+@app.route('/api/sar-slope/alerts')
+def sar_slope_alerts():
+    """获取所有异常告警"""
+    try:
+        limit = request.args.get('limit', 50, type=int)
+        symbol = request.args.get('symbol', None)
+        
+        conn = sqlite3.connect('/home/user/webapp/sar_slope_data.db')
+        cursor = conn.cursor()
+        
+        if symbol:
+            cursor.execute('''
+                SELECT symbol, position, sequence_num, sar_value,
+                       change_percent, deviation_percent, alert_level,
+                       is_extreme_point, extreme_type, kline_time
+                FROM sar_anomaly_alerts
+                WHERE symbol = ?
+                ORDER BY created_at DESC
+                LIMIT ?
+            ''', (symbol, limit))
+        else:
+            cursor.execute('''
+                SELECT symbol, position, sequence_num, sar_value,
+                       change_percent, deviation_percent, alert_level,
+                       is_extreme_point, extreme_type, kline_time
+                FROM sar_anomaly_alerts
+                ORDER BY created_at DESC
+                LIMIT ?
+            ''', (limit,))
+        
+        alerts = []
+        for row in cursor.fetchall():
+            alerts.append({
+                'symbol': row[0],
+                'position': row[1],
+                'sequence': row[2],
+                'sar': row[3],
+                'change_percent': row[4],
+                'deviation': row[5],
+                'level': row[6],
+                'is_extreme': row[7],
+                'extreme_type': row[8],
+                'time': row[9]
+            })
+        
+        conn.close()
+        
+        return jsonify({
+            'success': True,
+            'data': alerts,
+            'count': len(alerts)
+        })
+    
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)})
+
+@app.route('/api/sar-slope/conversions')
+def sar_slope_conversions():
+    """获取多空转换点"""
+    try:
+        limit = request.args.get('limit', 50, type=int)
+        symbol = request.args.get('symbol', None)
+        
+        conn = sqlite3.connect('/home/user/webapp/sar_slope_data.db')
+        cursor = conn.cursor()
+        
+        if symbol:
+            cursor.execute('''
+                SELECT symbol, timestamp, kline_time, from_position, to_position,
+                       conversion_sar, conversion_price, previous_duration
+                FROM sar_conversion_points
+                WHERE symbol = ?
+                ORDER BY timestamp DESC
+                LIMIT ?
+            ''', (symbol, limit))
+        else:
+            cursor.execute('''
+                SELECT symbol, timestamp, kline_time, from_position, to_position,
+                       conversion_sar, conversion_price, previous_duration
+                FROM sar_conversion_points
+                ORDER BY timestamp DESC
+                LIMIT ?
+            ''', (limit,))
+        
+        conversions = []
+        for row in cursor.fetchall():
+            conversions.append({
+                'symbol': row[0],
+                'timestamp': row[1],
+                'time': row[2],
+                'from_position': row[3],
+                'to_position': row[4],
+                'sar': row[5],
+                'price': row[6],
+                'prev_duration': row[7]
+            })
+        
+        conn.close()
+        
+        return jsonify({
+            'success': True,
+            'data': conversions,
+            'count': len(conversions)
+        })
+    
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)})
+
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=5000, debug=False)
 

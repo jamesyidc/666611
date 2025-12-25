@@ -65,3 +65,50 @@
 2025-12-25 02:14:26,789 - INFO - ✅ 成功获取 27/27 个币种价格（从 OKX API）
 2025-12-25 02:15:03,129 - INFO - ✅ 成功获取 27/27 个币种价格（从 OKX API）
 2025-12-25 02:15:39,484 - INFO - ✅ 成功获取 27/27 个币种价格（从 OKX API）
+2025-12-25 02:16:15,825 - INFO - ✅ 成功获取 27/27 个币种价格（从 OKX API）
+2025-12-25 02:16:47,449 - WARNING - ⚠️  获取 dogecoin 价格失败: 429 Client Error: Too Many Requests for url: https://www.okx.com/api/v5/market/ticker?instId=DOGE-USDT-SWAP
+2025-12-25 02:16:47,689 - WARNING - ⚠️  获取 sui 价格失败: 429 Client Error: Too Many Requests for url: https://www.okx.com/api/v5/market/ticker?instId=SUI-USDT-SWAP
+2025-12-25 02:16:49,623 - WARNING - ⚠️  获取 chainlink 价格失败: 429 Client Error: Too Many Requests for url: https://www.okx.com/api/v5/market/ticker?instId=LINK-USDT-SWAP
+2025-12-25 02:16:52,174 - INFO - ✅ 成功获取 24/27 个币种价格（从 OKX API）
+2025-12-25 02:17:28,469 - INFO - ✅ 成功获取 27/27 个币种价格（从 OKX API）
+2025-12-25 02:17:32,092 - INFO - ✅ 数据库初始化完成
+2025-12-25 02:17:32,092 - INFO - 🚀 加密货币指数采集器启动，采集间隔: 300秒 (5分钟)
+2025-12-25 02:17:32,092 - INFO - 📊 执行首次指数采集...
+2025-12-25 02:17:32,094 - INFO - ✅ 加载今日基准价格（2025-12-25）: 27 个币种
+2025-12-25 02:17:38,536 - INFO - ✅ 成功获取 27/27 个币种价格（从 OKX API）
+2025-12-25 02:18:14,889 - INFO - ✅ 成功获取 27/27 个币种价格（从 OKX API）
+2025-12-25 02:18:51,164 - INFO - ✅ 成功获取 27/27 个币种价格（从 OKX API）
+2025-12-25 02:19:27,461 - INFO - ✅ 成功获取 27/27 个币种价格（从 OKX API）
+2025-12-25 02:20:03,733 - INFO - ✅ 成功获取 27/27 个币种价格（从 OKX API）
+2025-12-25 02:20:39,997 - INFO - ✅ 成功获取 27/27 个币种价格（从 OKX API）
+2025-12-25 02:21:16,560 - INFO - ✅ 成功获取 27/27 个币种价格（从 OKX API）
+2025-12-25 02:21:48,881 - WARNING - ⚠️  获取 the-open-network 价格失败: 429 Client Error: Too Many Requests for url: https://www.okx.com/api/v5/market/ticker?instId=TON-USDT-SWAP
+2025-12-25 02:21:52,871 - INFO - ✅ 成功获取 26/27 个币种价格（从 OKX API）
+2025-12-25 02:22:29,123 - INFO - ✅ 成功获取 27/27 个币种价格（从 OKX API）
+2025-12-25 02:22:33,015 - INFO - ✅ 数据库初始化完成
+2025-12-25 02:22:33,015 - INFO - 🚀 加密货币指数采集器启动，采集间隔: 300秒 (5分钟)
+2025-12-25 02:22:33,015 - INFO - 📊 执行首次指数采集...
+2025-12-25 02:22:33,016 - INFO - ✅ 加载今日基准价格（2025-12-25）: 27 个币种
+2025-12-25 02:22:39,646 - INFO - ✅ 成功获取 27/27 个币种价格（从 OKX API）
+2025-12-25 02:23:14,607 - WARNING - ⚠️  获取 near 价格失败: 429 Client Error: Too Many Requests for url: https://www.okx.com/api/v5/market/ticker?instId=NEAR-USDT-SWAP
+2025-12-25 02:23:16,032 - INFO - ✅ 成功获取 26/27 个币种价格（从 OKX API）
+2025-12-25 02:23:49,853 - WARNING - ⚠️  获取 chainlink 价格失败: 429 Client Error: Too Many Requests for url: https://www.okx.com/api/v5/market/ticker?instId=LINK-USDT-SWAP
+2025-12-25 02:23:50,083 - WARNING - ⚠️  获取 crypto-com-chain 价格失败: 429 Client Error: Too Many Requests for url: https://www.okx.com/api/v5/market/ticker?instId=CRO-USDT-SWAP
+2025-12-25 02:23:51,958 - WARNING - ⚠️  获取 stacks 价格失败: 429 Client Error: Too Many Requests for url: https://www.okx.com/api/v5/market/ticker?instId=STX-USDT-SWAP
+2025-12-25 02:23:52,188 - WARNING - ⚠️  获取 lido-dao 价格失败: 429 Client Error: Too Many Requests for url: https://www.okx.com/api/v5/market/ticker?instId=LDO-USDT-SWAP
+2025-12-25 02:23:52,425 - INFO - ✅ 成功获取 23/27 个币种价格（从 OKX API）
+2025-12-25 02:24:28,292 - WARNING - ⚠️  获取 stacks 价格失败: 429 Client Error: Too Many Requests for url: https://www.okx.com/api/v5/market/ticker?instId=STX-USDT-SWAP
+2025-12-25 02:24:28,759 - INFO - ✅ 成功获取 26/27 个币种价格（从 OKX API）
+2025-12-25 02:25:05,079 - INFO - ✅ 成功获取 27/27 个币种价格（从 OKX API）
+2025-12-25 02:25:41,444 - INFO - ✅ 成功获取 27/27 个币种价格（从 OKX API）
+2025-12-25 02:26:17,737 - INFO - ✅ 成功获取 27/27 个币种价格（从 OKX API）
+2025-12-25 02:26:54,004 - INFO - ✅ 成功获取 27/27 个币种价格（从 OKX API）
+2025-12-25 02:27:30,458 - INFO - ✅ 成功获取 27/27 个币种价格（从 OKX API）
+2025-12-25 02:27:33,845 - INFO - ✅ 数据库初始化完成
+2025-12-25 02:27:33,845 - INFO - 🚀 加密货币指数采集器启动，采集间隔: 300秒 (5分钟)
+2025-12-25 02:27:33,845 - INFO - 📊 执行首次指数采集...
+2025-12-25 02:27:33,846 - INFO - ✅ 加载今日基准价格（2025-12-25）: 27 个币种
+2025-12-25 02:27:40,148 - INFO - ✅ 成功获取 27/27 个币种价格（从 OKX API）
+2025-12-25 02:28:16,443 - INFO - ✅ 成功获取 27/27 个币种价格（从 OKX API）
+2025-12-25 02:28:52,873 - INFO - ✅ 成功获取 27/27 个币种价格（从 OKX API）
+2025-12-25 02:29:29,318 - INFO - ✅ 成功获取 27/27 个币种价格（从 OKX API）
