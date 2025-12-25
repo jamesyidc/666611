@@ -515,6 +515,12 @@ def calculate_period_averages(symbol):
     - 3天: 最近 864 条记录 (3 * 24 * 12)
     - 7天: 最近 2016 条记录 (7 * 24 * 12)
     - 15天: 最近 4320 条记录 (15 * 24 * 12)
+    
+    同时计算按序列号分组的平均值（用户需求）：
+    - 空头01->空头02 的全天平均值
+    - 空头02->空头03 的全天平均值
+    - 多头01->多头02 的全天平均值
+    等等
     """
     conn = sqlite3.connect(DB_PATH)
     cursor = conn.cursor()
@@ -523,7 +529,7 @@ def calculate_period_averages(symbol):
     cursor.execute('DELETE FROM sar_period_averages WHERE symbol = ?', (symbol,))
     
     for position in ['long', 'short']:
-        # 获取所有变化率数据（按时间升序）
+        # 1. 计算整体周期平均值
         cursor.execute('''
             SELECT change_percent
             FROM sar_consecutive_changes
@@ -558,6 +564,38 @@ def calculate_period_averages(symbol):
                     (symbol, position, period_type, avg_change_percent, sample_count)
                     VALUES (?, ?, ?, ?, ?)
                 ''', (symbol, position, period_type, avg_change, len(recent_changes)))
+        
+        # 2. 计算按序列号分组的平均值（新增）
+        # 获取每个序列号的所有变化率
+        cursor.execute('''
+            SELECT sequence_num, change_percent
+            FROM sar_consecutive_changes
+            WHERE symbol = ? AND position = ?
+            ORDER BY id ASC
+        ''', (symbol, position))
+        
+        sequence_data = {}
+        for row in cursor.fetchall():
+            seq_num = row[0]
+            change_pct = row[1]
+            
+            if seq_num not in sequence_data:
+                sequence_data[seq_num] = []
+            sequence_data[seq_num].append(change_pct)
+        
+        # 保存每个序列号的平均值
+        for seq_num, changes_list in sequence_data.items():
+            if changes_list:
+                avg_change = sum(changes_list) / len(changes_list)
+                
+                # 使用特殊的period_type格式: seq_01, seq_02, seq_03 等
+                period_type = f'seq_{seq_num:02d}'
+                
+                cursor.execute('''
+                    INSERT OR REPLACE INTO sar_period_averages
+                    (symbol, position, period_type, avg_change_percent, sample_count)
+                    VALUES (?, ?, ?, ?, ?)
+                ''', (symbol, position, period_type, avg_change, len(changes_list)))
     
     conn.commit()
     conn.close()

@@ -10839,6 +10839,135 @@ def sar_slope_query_symbol(symbol):
             'traceback': traceback.format_exc()
         })
 
+@app.route('/api/sar-slope/sequence-compare/<symbol>')
+def sar_slope_sequence_compare(symbol):
+    """
+    序列号对比接口 - 用户需求
+    对比当前序列号的变化率与该序列号的历史平均值
+    
+    例如：当前是空头02→空头03，变化率是0.05%
+    查询所有历史上"空头02→空头03"这一步的平均变化率是0.04%
+    得出结论：当前比平均值增加了0.01%
+    
+    参数:
+    - position: long/short (可选，不填则返回两个方向)
+    - sequence: 序列号 (可选，不填则返回所有序列号)
+    """
+    try:
+        position_filter = request.args.get('position', None)
+        sequence_filter = request.args.get('sequence', None, type=int)
+        
+        conn = sqlite3.connect('/home/user/webapp/sar_slope_data.db')
+        cursor = conn.cursor()
+        
+        result = {
+            'success': True,
+            'symbol': symbol.upper(),
+            'comparisons': []
+        }
+        
+        # 获取当前状态
+        cursor.execute('''
+            SELECT current_position, current_sequence
+            FROM system_status
+            WHERE symbol = ?
+        ''', (symbol.upper(),))
+        
+        status = cursor.fetchone()
+        if not status:
+            return jsonify({'success': False, 'error': 'Symbol not found'})
+        
+        result['current_status'] = {
+            'position': status[0],
+            'sequence': status[1]
+        }
+        
+        # 获取当前最新的变化率
+        cursor.execute('''
+            SELECT sequence_num, change_percent, kline_time, position
+            FROM sar_consecutive_changes
+            WHERE symbol = ?
+            ORDER BY id DESC
+            LIMIT 50
+        ''', (symbol.upper(),))
+        
+        recent_changes = cursor.fetchall()
+        
+        # 获取序列号平均值
+        cursor.execute('''
+            SELECT position, period_type, avg_change_percent, sample_count
+            FROM sar_period_averages
+            WHERE symbol = ? AND period_type LIKE 'seq_%'
+            ORDER BY position, period_type
+        ''', (symbol.upper(),))
+        
+        seq_averages = {}
+        for row in cursor.fetchall():
+            pos = row[0]
+            period = row[1]  # 格式: seq_01, seq_02, seq_03
+            seq_num = int(period.split('_')[1])
+            
+            if pos not in seq_averages:
+                seq_averages[pos] = {}
+            
+            seq_averages[pos][seq_num] = {
+                'avg': row[2],
+                'samples': row[3]
+            }
+        
+        # 对比分析
+        for change in recent_changes:
+            seq_num = change[0]
+            current_change = change[1]
+            kline_time = change[2]
+            pos = change[3]
+            
+            # 过滤条件
+            if position_filter and pos != position_filter:
+                continue
+            if sequence_filter and seq_num != sequence_filter:
+                continue
+            
+            # 获取该序列号的历史平均值
+            if pos in seq_averages and seq_num in seq_averages[pos]:
+                avg_data = seq_averages[pos][seq_num]
+                avg_change = avg_data['avg']
+                samples = avg_data['samples']
+                
+                # 计算差异
+                difference = current_change - avg_change
+                difference_percent = (difference / avg_change * 100) if avg_change != 0 else 0
+                
+                # 判断增加还是减小
+                trend = 'increase' if difference > 0 else 'decrease' if difference < 0 else 'equal'
+                
+                result['comparisons'].append({
+                    'position': pos,
+                    'sequence': seq_num,
+                    'time': kline_time,
+                    'current_change': round(current_change, 6),
+                    'average_change': round(avg_change, 6),
+                    'difference': round(difference, 6),
+                    'difference_percent': round(difference_percent, 2),
+                    'trend': trend,
+                    'sample_count': samples,
+                    'description': f'{"多头" if pos == "long" else "空头"}{seq_num:02d}→{seq_num+1:02d}'
+                })
+        
+        result['total_comparisons'] = len(result['comparisons'])
+        
+        conn.close()
+        
+        return jsonify(result)
+    
+    except Exception as e:
+        import traceback
+        return jsonify({
+            'success': False,
+            'error': str(e),
+            'traceback': traceback.format_exc()
+        })
+
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=5000, debug=False)
 
