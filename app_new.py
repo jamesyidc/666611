@@ -8,6 +8,8 @@ from datetime import datetime, timedelta
 import json
 import pytz
 import os
+from functools import wraps
+import time
 
 app = Flask(__name__)
 app.config['TEMPLATES_AUTO_RELOAD'] = True
@@ -16,6 +18,96 @@ BEIJING_TZ = pytz.timezone('Asia/Shanghai')
 
 # K线图服务URL配置
 CHART_BASE_URL = "https://5000-iz6uddj6rs3xe48ilsyqq-2e1b9533.sandbox.novita.ai"
+
+# ============================================
+# 服务器端缓存系统
+# ============================================
+class ServerCache:
+    """服务器端内存缓存，存储计算结果"""
+    def __init__(self):
+        self.cache = {}
+        self.timestamps = {}
+        
+    def get(self, key, max_age=60):
+        """
+        获取缓存数据
+        key: 缓存键
+        max_age: 最大缓存时间（秒），默认60秒
+        """
+        if key not in self.cache:
+            return None
+        
+        # 检查是否过期
+        if time.time() - self.timestamps.get(key, 0) > max_age:
+            # 过期，删除缓存
+            del self.cache[key]
+            del self.timestamps[key]
+            return None
+        
+        return self.cache[key]
+    
+    def set(self, key, value):
+        """设置缓存数据"""
+        self.cache[key] = value
+        self.timestamps[key] = time.time()
+    
+    def clear(self, key=None):
+        """清除缓存"""
+        if key:
+            if key in self.cache:
+                del self.cache[key]
+            if key in self.timestamps:
+                del self.timestamps[key]
+        else:
+            self.cache.clear()
+            self.timestamps.clear()
+    
+    def get_stats(self):
+        """获取缓存统计信息"""
+        return {
+            'total_keys': len(self.cache),
+            'keys': list(self.cache.keys())
+        }
+
+# 创建全局缓存实例
+server_cache = ServerCache()
+
+def cached_response(max_age=60):
+    """
+    缓存装饰器 - 在服务器端缓存API响应
+    max_age: 缓存有效期（秒）
+    """
+    def decorator(f):
+        @wraps(f)
+        def decorated_function(*args, **kwargs):
+            # 生成缓存键
+            cache_key = f"{f.__name__}:{':'.join(map(str, args))}"
+            
+            # 尝试从缓存获取
+            cached_data = server_cache.get(cache_key, max_age=max_age)
+            if cached_data is not None:
+                # 创建响应副本并添加缓存标记
+                response_data = cached_data.copy()
+                response_data['_from_server_cache'] = True
+                response_data['_cache_age_seconds'] = int(time.time() - server_cache.timestamps.get(cache_key, 0))
+                return jsonify(response_data)
+            
+            # 执行原函数获取结果
+            result = f(*args, **kwargs)
+            
+            # 提取并缓存JSON数据
+            if hasattr(result, 'json') and callable(result.json):
+                try:
+                    data = result.json
+                    if isinstance(data, dict) and data.get('success'):
+                        server_cache.set(cache_key, data)
+                except:
+                    pass
+            
+            return result
+        
+        return decorated_function
+    return decorator
 
 # 主页面HTML - 完全仿照参考设计
 MAIN_HTML = """
@@ -10280,6 +10372,14 @@ def sar_slope_detail(symbol):
 @app.route('/api/sar-slope/status')
 def sar_slope_status():
     """获取所有币种的SAR状态"""
+    # 检查服务器端缓存
+    cache_key = "sar_slope_status:all"
+    cached_data = server_cache.get(cache_key, max_age=30)
+    if cached_data:
+        cached_data['_from_server_cache'] = True
+        cached_data['_cache_age'] = int(time.time() - server_cache.timestamps.get(cache_key, 0))
+        return jsonify(cached_data)
+    
     try:
         conn = sqlite3.connect('/home/user/webapp/sar_slope_data.db')
         cursor = conn.cursor()
@@ -10305,11 +10405,16 @@ def sar_slope_status():
                 'updated_at': row[5]
             })
         
-        return jsonify({
+        result = {
             'success': True,
             'data': status_list,
             'count': len(status_list)
-        })
+        }
+        
+        # 保存到服务器端缓存
+        server_cache.set(cache_key, result)
+        
+        return jsonify(result)
     
     except Exception as e:
         return jsonify({'success': False, 'error': str(e)})
@@ -11363,6 +11468,14 @@ def sar_slope_current_cycle(symbol):
     
     返回当前周期从序列01到当前序列的完整数据
     """
+    # 检查服务器端缓存
+    cache_key = f"sar_slope_current_cycle:{symbol.upper()}"
+    cached_data = server_cache.get(cache_key, max_age=30)
+    if cached_data:
+        cached_data['_from_server_cache'] = True
+        cached_data['_cache_age'] = int(time.time() - server_cache.timestamps.get(cache_key, 0))
+        return jsonify(cached_data)
+    
     try:
         conn = sqlite3.connect('/home/user/webapp/sar_slope_data.db')
         cursor = conn.cursor()
@@ -11567,6 +11680,9 @@ def sar_slope_current_cycle(symbol):
             'total_sequences': len(sequences_with_changes)
         }
         
+        # 保存到服务器端缓存
+        server_cache.set(cache_key, result)
+        
         conn.close()
         return jsonify(result)
     
@@ -11576,6 +11692,35 @@ def sar_slope_current_cycle(symbol):
             'success': False,
             'error': str(e),
             'traceback': traceback.format_exc()
+        })
+
+# ============================================
+# 缓存管理API
+# ============================================
+@app.route('/api/cache/stats')
+def cache_stats():
+    """获取缓存统计信息"""
+    stats = server_cache.get_stats()
+    return jsonify({
+        'success': True,
+        'cache_stats': stats,
+        'message': '服务器端缓存统计信息'
+    })
+
+@app.route('/api/cache/clear', methods=['POST'])
+def cache_clear():
+    """清除服务器端缓存"""
+    try:
+        key = request.json.get('key') if request.json else None
+        server_cache.clear(key)
+        return jsonify({
+            'success': True,
+            'message': f'缓存已清除{"（键: " + key + "）" if key else "（全部）"}'
+        })
+    except Exception as e:
+        return jsonify({
+            'success': False,
+            'error': str(e)
         })
 
 if __name__ == '__main__':
