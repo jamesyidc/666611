@@ -32,6 +32,11 @@
             border-bottom: 2px solid rgba(59, 125, 255, 0.3);
         }
         
+        .nav-buttons {
+            display: flex;
+            gap: 10px;
+        }
+        
         h1 {
             font-size: 28px;
             color: #00d4ff;
@@ -164,7 +169,10 @@
     <div class="container">
         <div class="header">
             <h1 id="pageTitle">加载中...</h1>
-            <a href="/sar-slope" class="back-btn">← 返回列表</a>
+            <div class="nav-buttons">
+                <a href="/" class="back-btn">← 返回首页</a>
+                <a href="/sar-slope" class="back-btn">← 返回列表</a>
+            </div>
         </div>
         
         <div id="statusBar" class="status-bar" style="display: none;"></div>
