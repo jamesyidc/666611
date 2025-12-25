@@ -127,6 +127,18 @@ module.exports = {
       max_memory_restart: '200M'
     },
     
+    // Google Drive文件检测器
+    {
+      name: 'gdrive-detector',
+      script: 'gdrive_final_detector.py',
+      interpreter: 'python3',
+      cwd: '/home/user/webapp',
+      instances: 1,
+      autorestart: true,
+      watch: false,
+      max_memory_restart: '200M'
+    },
+    
     // 恐慌清洗指数采集器
     {
       name: 'panic-wash-collector',
