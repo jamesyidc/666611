@@ -11186,10 +11186,25 @@ def sar_slope_transition_analysis(symbol):
         if not status:
             return jsonify({'success': False, 'error': 'Symbol not found'})
         
+        # 获取当前价格和持续时间
+        cursor.execute('''
+            SELECT close_price, duration_minutes
+            FROM sar_raw_data
+            WHERE symbol = ?
+            ORDER BY timestamp DESC
+            LIMIT 1
+        ''', (symbol.upper(),))
+        
+        price_data = cursor.fetchone()
+        current_price = price_data[0] if price_data else None
+        current_duration = price_data[1] if price_data else None
+        
         result['current_status'] = {
             'position': status[0],
             'sequence': status[1],
-            'last_update': status[2]
+            'last_update': status[2],
+            'current_price': round(current_price, 2) if current_price else None,
+            'duration_minutes': current_duration
         }
         
         # 对每个方向进行分析

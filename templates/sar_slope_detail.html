@@ -87,22 +87,22 @@
         
         .table-header {
             display: grid;
-            grid-template-columns: 80px 100px 120px 120px 120px 120px 120px 100px 100px;
-            gap: 10px;
+            grid-template-columns: 60px 80px 90px 90px 120px 100px 120px 100px 120px 100px 120px 100px 90px;
+            gap: 8px;
             padding: 15px;
             background: rgba(59, 125, 255, 0.2);
             font-weight: bold;
-            font-size: 13px;
+            font-size: 12px;
             color: #00d4ff;
             border-bottom: 1px solid rgba(59, 125, 255, 0.3);
         }
         
         .table-row {
             display: grid;
-            grid-template-columns: 80px 100px 120px 120px 120px 120px 120px 100px 100px;
-            gap: 10px;
+            grid-template-columns: 60px 80px 90px 90px 120px 100px 120px 100px 120px 100px 120px 100px 90px;
+            gap: 8px;
             padding: 12px 15px;
-            font-size: 13px;
+            font-size: 12px;
             border-bottom: 1px solid rgba(139, 146, 184, 0.1);
             transition: background 0.2s;
         }
@@ -177,12 +177,16 @@
                 <div class="table-header">
                     <div>序号</div>
                     <div>方向</div>
+                    <div>币价</div>
+                    <div>持续时间</div>
                     <div>当前值</div>
+                    <div>1天变化%</div>
                     <div>1天平均</div>
+                    <div>3天变化%</div>
                     <div>3天平均</div>
+                    <div>7天变化%</div>
                     <div>7天平均</div>
                     <div>15天平均</div>
-                    <div>与1天差值%</div>
                     <div>偏向</div>
                 </div>
                 <div id="tableBody"></div>
@@ -227,6 +231,14 @@
                     <div class="status-value ${status.position === 'long' ? 'position-long' : 'position-short'}">
                         ${status.position === 'long' ? '多头' : '空头'}
                     </div>
+                </div>
+                <div class="status-item">
+                    <div class="status-label">币价</div>
+                    <div class="status-value">$${status.current_price ? status.current_price.toFixed(2) : 'N/A'}</div>
+                </div>
+                <div class="status-item">
+                    <div class="status-label">持续时间</div>
+                    <div class="status-value">${status.duration_minutes || 0}分钟</div>
                 </div>
                 <div class="status-item">
                     <div class="status-label">序列号</div>
@@ -282,13 +294,16 @@
                     index: index++,
                     position: 'long',
                     position_cn: '多头',
+                    current_price: data.current_status.current_price,
+                    duration_minutes: data.current_status.duration_minutes,
                     current_value: long.current_value,
                     avg_1day: comp1day.period_average,
+                    change_1day: comp1day.difference_percent,
                     avg_3day: comp3day.period_average,
+                    change_3day: comp3day.difference_percent,
                     avg_7day: comp7day.period_average,
+                    change_7day: comp7day.difference_percent,
                     avg_15day: comp15day.period_average,
-                    diff_percent: comp1day.difference_percent,
-                    trend: comp1day.trend,
                     bias: long.bias.type_cn,
                     bias_type: long.bias.type,
                     time: long.current_time
@@ -307,13 +322,16 @@
                     index: index++,
                     position: 'short',
                     position_cn: '空头',
+                    current_price: data.current_status.current_price,
+                    duration_minutes: data.current_status.duration_minutes,
                     current_value: short.current_value,
                     avg_1day: comp1day.period_average,
+                    change_1day: comp1day.difference_percent,
                     avg_3day: comp3day.period_average,
+                    change_3day: comp3day.difference_percent,
                     avg_7day: comp7day.period_average,
+                    change_7day: comp7day.difference_percent,
                     avg_15day: comp15day.period_average,
-                    diff_percent: comp1day.difference_percent,
-                    trend: comp1day.trend,
                     bias: short.bias.type_cn,
                     bias_type: short.bias.type,
                     time: short.current_time
@@ -323,7 +341,9 @@
             // 渲染表格行
             let html = '';
             rows.forEach(row => {
-                const trendClass = row.diff_percent > 0 ? 'trend-increase' : 'trend-decrease';
+                const change1Class = row.change_1day > 0 ? 'trend-increase' : 'trend-decrease';
+                const change3Class = row.change_3day > 0 ? 'trend-increase' : 'trend-decrease';
+                const change7Class = row.change_7day > 0 ? 'trend-increase' : 'trend-decrease';
                 const biasClass = row.bias_type === 'bullish' ? 'bias-bullish' : 'bias-bearish';
                 const positionClass = row.position === 'long' ? 'position-long' : 'position-short';
                 
@@ -331,12 +351,16 @@
                     <div class="table-row" title="${row.time}">
                         <div class="table-cell">${row.index}</div>
                         <div class="table-cell ${positionClass}">${row.position_cn}</div>
+                        <div class="table-cell">$${row.current_price ? row.current_price.toFixed(2) : 'N/A'}</div>
+                        <div class="table-cell">${row.duration_minutes || 0}分钟</div>
                         <div class="table-cell">${row.current_value.toFixed(6)}%</div>
+                        <div class="table-cell ${change1Class}">${row.change_1day > 0 ? '+' : ''}${row.change_1day.toFixed(2)}%</div>
                         <div class="table-cell">${row.avg_1day.toFixed(6)}%</div>
+                        <div class="table-cell ${change3Class}">${row.change_3day > 0 ? '+' : ''}${row.change_3day.toFixed(2)}%</div>
                         <div class="table-cell">${row.avg_3day.toFixed(6)}%</div>
+                        <div class="table-cell ${change7Class}">${row.change_7day > 0 ? '+' : ''}${row.change_7day.toFixed(2)}%</div>
                         <div class="table-cell">${row.avg_7day.toFixed(6)}%</div>
                         <div class="table-cell">${row.avg_15day.toFixed(6)}%</div>
-                        <div class="table-cell ${trendClass}">${row.diff_percent > 0 ? '+' : ''}${row.diff_percent.toFixed(2)}%</div>
                         <div class="table-cell ${biasClass}">${row.bias}</div>
                     </div>
                 `;
