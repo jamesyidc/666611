@@ -286,7 +286,10 @@ def calculate_support_resistance(symbol: str) -> Optional[Dict]:
         # 压力线：使用位置 >= 95%（改回位置判断，符合业务需求）
         alert_scenario_1 = position_s2_r1 <= 5              # 接近支撑线2（位置判断）
         alert_scenario_2 = position_s1_r2 <= 5              # 接近支撑线1（位置判断）
-        alert_scenario_3 = position_s1_r2_upper >= 95       # 接近压力线2（位置判断）
+        # 场景3（逃顶信号）：位置>=95% 且 支撑线1和支撑线2都>=1
+        alert_scenario_3 = (position_s1_r2_upper >= 95 and 
+                           support_line_1 >= 1 and 
+                           support_line_2 >= 1)              # 接近压力线2（位置判断）+ 支撑线条件
         alert_scenario_4 = position_s1_r1 >= 95             # 接近压力线1（位置判断）
         
         # 汇总警报
