@@ -282,10 +282,16 @@ def calculate_support_resistance(symbol: str) -> Optional[Dict]:
         alert_48h_high = position_48h >= 95                # 位置 >= 95% (接近48h最高压力线)
         
         # 保留原有4种情况警报(用于兼容性)
-        # 支撑线：使用位置 <= 5%
+        # 支撑线：使用位置 <= 5%，且支撑线1和支撑线2都>=8
         # 压力线：使用位置 >= 95%（改回位置判断，符合业务需求）
-        alert_scenario_1 = position_s2_r1 <= 5              # 接近支撑线2（位置判断）
-        alert_scenario_2 = position_s1_r2 <= 5              # 接近支撑线1（位置判断）
+        # 场景1（抄底信号）：位置<=5% 且 支撑线1和支撑线2都>=8
+        alert_scenario_1 = (position_s2_r1 <= 5 and 
+                           support_line_1 >= 8 and 
+                           support_line_2 >= 8)              # 接近支撑线2（位置判断）+ 支撑线条件
+        # 场景2（抄底信号）：位置<=5% 且 支撑线1和支撑线2都>=8
+        alert_scenario_2 = (position_s1_r2 <= 5 and 
+                           support_line_1 >= 8 and 
+                           support_line_2 >= 8)              # 接近支撑线1（位置判断）+ 支撑线条件
         # 场景3（逃顶信号）：位置>=95% 且 支撑线1和支撑线2都>=1
         alert_scenario_3 = (position_s1_r2_upper >= 95 and 
                            support_line_1 >= 1 and 
