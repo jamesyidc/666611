@@ -11474,7 +11474,12 @@ def sar_slope_current_cycle(symbol):
     if cached_data:
         cached_data['_from_server_cache'] = True
         cached_data['_cache_age'] = int(time.time() - server_cache.timestamps.get(cache_key, 0))
-        return jsonify(cached_data)
+        response = jsonify(cached_data)
+        # 添加防缓存头
+        response.headers['Cache-Control'] = 'no-store, no-cache, must-revalidate, max-age=0'
+        response.headers['Pragma'] = 'no-cache'
+        response.headers['Expires'] = '0'
+        return response
     
     try:
         conn = sqlite3.connect('/home/user/webapp/sar_slope_data.db')
@@ -11695,7 +11700,12 @@ def sar_slope_current_cycle(symbol):
         server_cache.set(cache_key, result)
         
         conn.close()
-        return jsonify(result)
+        response = jsonify(result)
+        # 添加防缓存头，避免外部代理缓存旧的500错误
+        response.headers['Cache-Control'] = 'no-store, no-cache, must-revalidate, max-age=0'
+        response.headers['Pragma'] = 'no-cache'
+        response.headers['Expires'] = '0'
+        return response
     
     except Exception as e:
         import traceback
