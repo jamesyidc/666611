@@ -226,6 +226,7 @@
         function renderStatusBar(data) {
             const statusBar = document.getElementById('statusBar');
             const status = data.current_status;
+            const biasStats = data.bias_statistics;
             
             let html = `
                 <div class="status-item">
@@ -251,6 +252,27 @@
                     <div class="status-value">${status.last_update}</div>
                 </div>
             `;
+            
+            // 添加2小时偏向统计（如果有数据）
+            if (biasStats && biasStats.total_records > 0) {
+                html += `
+                    <div class="status-item" style="grid-column: 1 / -1; border-top: 1px solid rgba(255,255,255,0.1); padding-top: 15px; margin-top: 10px;">
+                        <div class="status-label">最近2小时偏向统计 (${biasStats.total_records}条数据)</div>
+                    </div>
+                    <div class="status-item">
+                        <div class="status-label">偏多次数</div>
+                        <div class="status-value bias-bullish">${biasStats.bullish_count} (${biasStats.bullish_ratio}%)</div>
+                    </div>
+                    <div class="status-item">
+                        <div class="status-label">偏空次数</div>
+                        <div class="status-value bias-bearish">${biasStats.bearish_count} (${biasStats.bearish_ratio}%)</div>
+                    </div>
+                    <div class="status-item">
+                        <div class="status-label">中性次数</div>
+                        <div class="status-value">${biasStats.neutral_count}</div>
+                    </div>
+                `;
+            }
             
             statusBar.innerHTML = html;
             statusBar.style.display = 'grid';

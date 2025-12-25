@@ -11522,6 +11522,36 @@ def sar_slope_current_cycle(symbol):
             
             sequences_with_changes.append(result_data)
         
+        # 计算最近2小时的偏多/偏空比例
+        # 2小时 = 24条数据（每5分钟一条）
+        recent_2hours = sequences_with_changes[:24]  # 取最新的24条数据
+        
+        bias_bullish_count = 0  # 偏多数量
+        bias_bearish_count = 0  # 偏空数量
+        bias_neutral_count = 0  # 中性（无偏向或"-"）
+        
+        for seq in recent_2hours:
+            if 'bias' in seq and seq['bias']:
+                if seq['bias'] == '偏多':
+                    bias_bullish_count += 1
+                elif seq['bias'] == '偏空':
+                    bias_bearish_count += 1
+                else:
+                    bias_neutral_count += 1
+            else:
+                bias_neutral_count += 1
+        
+        total_with_bias = bias_bullish_count + bias_bearish_count
+        bias_stats = {
+            'period': '2小时',
+            'total_records': len(recent_2hours),
+            'bullish_count': bias_bullish_count,
+            'bearish_count': bias_bearish_count,
+            'neutral_count': bias_neutral_count,
+            'bullish_ratio': round((bias_bullish_count / total_with_bias * 100), 2) if total_with_bias > 0 else 0,
+            'bearish_ratio': round((bias_bearish_count / total_with_bias * 100), 2) if total_with_bias > 0 else 0
+        }
+        
         result = {
             'success': True,
             'symbol': symbol.upper(),
@@ -11532,6 +11562,7 @@ def sar_slope_current_cycle(symbol):
                 'last_update': last_update,
                 'cycle_info': f"{current_position}01 → {current_position}{current_sequence:02d}"
             },
+            'bias_statistics': bias_stats,  # 新增：2小时偏向统计
             'sequences': sequences_with_changes,
             'total_sequences': len(sequences_with_changes)
         }
