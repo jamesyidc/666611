@@ -10381,7 +10381,7 @@ def sar_slope_status():
         return jsonify(cached_data)
     
     try:
-        conn = sqlite3.connect('/home/user/webapp/sar_slope_data.db')
+        conn = sqlite3.connect('/home/user/webapp/sar_slope_data.db', timeout=10.0)
         cursor = conn.cursor()
         
         cursor.execute('''
@@ -10425,7 +10425,7 @@ def sar_slope_symbol_data(symbol):
     try:
         limit = request.args.get('limit', 500, type=int)
         
-        conn = sqlite3.connect('/home/user/webapp/sar_slope_data.db')
+        conn = sqlite3.connect('/home/user/webapp/sar_slope_data.db', timeout=10.0)
         cursor = conn.cursor()
         
         # 获取原始SAR数据
@@ -10559,7 +10559,7 @@ def sar_slope_alerts():
         limit = request.args.get('limit', 50, type=int)
         symbol = request.args.get('symbol', None)
         
-        conn = sqlite3.connect('/home/user/webapp/sar_slope_data.db')
+        conn = sqlite3.connect('/home/user/webapp/sar_slope_data.db', timeout=10.0)
         cursor = conn.cursor()
         
         if symbol:
@@ -10615,7 +10615,7 @@ def sar_slope_conversions():
         limit = request.args.get('limit', 50, type=int)
         symbol = request.args.get('symbol', None)
         
-        conn = sqlite3.connect('/home/user/webapp/sar_slope_data.db')
+        conn = sqlite3.connect('/home/user/webapp/sar_slope_data.db', timeout=10.0)
         cursor = conn.cursor()
         
         if symbol:
@@ -10686,7 +10686,7 @@ def sar_slope_query_symbol(symbol):
         include_conversions = request.args.get('include_conversions', 'true').lower() == 'true'
         include_averages = request.args.get('include_averages', 'true').lower() == 'true'
         
-        conn = sqlite3.connect('/home/user/webapp/sar_slope_data.db')
+        conn = sqlite3.connect('/home/user/webapp/sar_slope_data.db', timeout=10.0)
         cursor = conn.cursor()
         
         result = {
@@ -10962,7 +10962,7 @@ def sar_slope_sequence_compare(symbol):
         position_filter = request.args.get('position', None)
         sequence_filter = request.args.get('sequence', None, type=int)
         
-        conn = sqlite3.connect('/home/user/webapp/sar_slope_data.db')
+        conn = sqlite3.connect('/home/user/webapp/sar_slope_data.db', timeout=10.0)
         cursor = conn.cursor()
         
         result = {
@@ -11094,7 +11094,7 @@ def sar_slope_duration_signal(symbol):
         position_filter = request.args.get('position', None)
         duration_filter = request.args.get('duration', None, type=int)
         
-        conn = sqlite3.connect('/home/user/webapp/sar_slope_data.db')
+        conn = sqlite3.connect('/home/user/webapp/sar_slope_data.db', timeout=10.0)
         cursor = conn.cursor()
         
         result = {
@@ -11271,7 +11271,7 @@ def sar_slope_transition_analysis(symbol):
     try:
         position_filter = request.args.get('position', None)
         
-        conn = sqlite3.connect('/home/user/webapp/sar_slope_data.db')
+        conn = sqlite3.connect('/home/user/webapp/sar_slope_data.db', timeout=10.0)
         cursor = conn.cursor()
         
         result = {
@@ -11482,7 +11482,7 @@ def sar_slope_current_cycle(symbol):
         return response
     
     try:
-        conn = sqlite3.connect('/home/user/webapp/sar_slope_data.db')
+        conn = sqlite3.connect('/home/user/webapp/sar_slope_data.db', timeout=10.0)
         cursor = conn.cursor()
         
         # 获取当前状态
