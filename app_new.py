@@ -11462,10 +11462,12 @@ def sar_slope_current_cycle(symbol):
                     avg_1day = sum(historical_changes) / len(historical_changes)
                     avg_3day = sum(historical_changes[:min(864, len(historical_changes))]) / min(864, len(historical_changes)) if len(historical_changes) >= 1 else avg_1day
                     avg_7day = sum(historical_changes[:min(2016, len(historical_changes))]) / min(2016, len(historical_changes)) if len(historical_changes) >= 1 else avg_1day
+                    avg_15day = sum(historical_changes[:min(4320, len(historical_changes))]) / min(4320, len(historical_changes)) if len(historical_changes) >= 1 else avg_1day
                     
                     result_data['avg_1day'] = round(avg_1day, 6)
                     result_data['avg_3day'] = round(avg_3day, 6)
                     result_data['avg_7day'] = round(avg_7day, 6)
+                    result_data['avg_15day'] = round(avg_15day, 6)
                     
                     # 计算相对变化百分比：(当前 - 平均) / 平均 × 100
                     # 例: 当前0.0613%, 平均0.083284%, 变化 = (0.0613-0.083284)/0.083284*100 = -26.40%
@@ -11484,12 +11486,18 @@ def sar_slope_current_cycle(symbol):
                     else:
                         change_7day_percent = 0
                     
+                    if avg_15day != 0:
+                        change_15day_percent = ((seq_change_percent - avg_15day) / avg_15day) * 100
+                    else:
+                        change_15day_percent = 0
+                    
                     # 同时保留绝对差值（用于偏向判断）
                     diff_1day = seq_change_percent - avg_1day
                     
                     result_data['change_1day_percent'] = round(change_1day_percent, 2)
                     result_data['change_3day_percent'] = round(change_3day_percent, 2)
                     result_data['change_7day_percent'] = round(change_7day_percent, 2)
+                    result_data['change_15day_percent'] = round(change_15day_percent, 2)
                     
                     # 判断偏向
                     if current_position == 'long':

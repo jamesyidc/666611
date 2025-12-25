@@ -87,7 +87,7 @@
         
         .table-header {
             display: grid;
-            grid-template-columns: 60px 80px 90px 100px 100px 100px 100px 110px 90px 100px 110px 90px 100px 110px;
+            grid-template-columns: 60px 80px 90px 100px 100px 100px 100px 110px 90px 100px 110px 90px 100px 110px 100px 110px;
             gap: 8px;
             padding: 15px;
             background: rgba(59, 125, 255, 0.2);
@@ -99,7 +99,7 @@
         
         .table-row {
             display: grid;
-            grid-template-columns: 60px 80px 90px 100px 100px 100px 100px 110px 90px 100px 110px 90px 100px 110px;
+            grid-template-columns: 60px 80px 90px 100px 100px 100px 100px 110px 90px 100px 110px 90px 100px 110px 100px 110px;
             gap: 8px;
             padding: 12px 15px;
             font-size: 12px;
@@ -189,6 +189,8 @@
                     <div>3天偏向</div>
                     <div>7天变化%</div>
                     <div>7天平均</div>
+                    <div>15天变化%</div>
+                    <div>15天平均</div>
                 </div>
                 <div id="tableBody"></div>
             </div>
@@ -294,6 +296,7 @@
                 const change1Class = hasChange && seq.change_1day_percent >= 0 ? 'trend-increase' : 'trend-decrease';
                 const change3Class = hasChange && seq.change_3day_percent >= 0 ? 'trend-increase' : 'trend-decrease';
                 const change7Class = hasChange && seq.change_7day_percent >= 0 ? 'trend-increase' : 'trend-decrease';
+                const change15Class = hasChange && seq.change_15day_percent >= 0 ? 'trend-increase' : 'trend-decrease';
                 
                 html += `
                     <div class="table-row">
@@ -311,6 +314,8 @@
                         <div class="table-cell ${bias3dayClass}">${bias3day}</div>
                         <div class="table-cell ${hasChange ? change7Class : ''}">${hasChange && seq.change_7day_percent !== undefined ? (seq.change_7day_percent >= 0 ? '+' : '') + seq.change_7day_percent.toFixed(2) + '%' : '-'}</div>
                         <div class="table-cell">${hasChange && seq.avg_7day !== undefined ? seq.avg_7day.toFixed(6) + '%' : '-'}</div>
+                        <div class="table-cell ${hasChange ? change15Class : ''}">${hasChange && seq.change_15day_percent !== undefined ? (seq.change_15day_percent >= 0 ? '+' : '') + seq.change_15day_percent.toFixed(2) + '%' : '-'}</div>
+                        <div class="table-cell">${hasChange && seq.avg_15day !== undefined ? seq.avg_15day.toFixed(6) + '%' : '-'}</div>
                     </div>
                 `;
             });
