@@ -1,0 +1,23 @@
+================================================================================
+📥 批量导入历史数据（最新 20 个文件）
+================================================================================
+
+1. 获取文件列表...
+❌ 获取文件列表失败: Locator.click: Timeout 30000ms exceeded.
+Call log:
+  - waiting for locator("text=\"Modified\"").first
+    - locator resolved to <div class="a-b-q-Kc-ga a-b-q-Ya-ga">Modified</div>
+  - attempting click action
+    2 × waiting for element to be visible, enabled and stable
+      - element is not visible
+    - retrying click action
+    - waiting 20ms
+    2 × waiting for element to be visible, enabled and stable
+      - element is not visible
+    - retrying click action
+      - waiting 100ms
+    58 × waiting for element to be visible, enabled and stable
+       - element is not visible
+     - retrying click action
+       - waiting 500ms
+
