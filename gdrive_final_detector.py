@@ -437,11 +437,11 @@ def import_to_database(data, content):
             conn.close()
             return False
         
-        # 验证数据有效性：rush_up和rush_down不能同时为0
-        if data['rush_up'] == 0 and data['rush_down'] == 0:
-            log(f"   ⚠️  数据无效：rush_up和rush_down均为0，跳过本次保存")
-            conn.close()
-            return False
+        # 注释掉旧的验证逻辑 - rush_up=0和rush_down=0是正常的市场状态（震荡无序）
+        # if data['rush_up'] == 0 and data['rush_down'] == 0:
+        #     log(f"   ⚠️  数据无效：rush_up和rush_down均为0，跳过本次保存")
+        #     conn.close()
+        #     return False
         
         # 插入新数据到crypto_snapshots
         log(f"   📝 准备插入新记录到 crypto_snapshots 表...")
