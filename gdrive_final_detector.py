@@ -254,16 +254,25 @@ def step4_get_latest_data(file_info, fixed_file_id):
         log(f"   ❌ 下载失败: {e}")
         return None
 
-def parse_content(content):
-    """解析TXT文件内容"""
+def parse_content(content, file_timestamp=None):
+    """解析TXT文件内容
+    
+    Args:
+        content: 文件内容
+        file_timestamp: 可选的时间戳（格式：YYYY-MM-DD HH:MM:SS）
+                       如果提供，则使用此时间戳而不从内容中提取
+    """
     try:
-        # 提取时间戳
-        timestamp_match = re.search(r'(\d{4}-\d{2}-\d{2}) (\d{2}:\d{2}:\d{2})', content)
-        if not timestamp_match:
-            return None
-        
-        date_str, time_str = timestamp_match.groups()
-        timestamp = f"{date_str} {time_str}"
+        # 提取时间戳（如果未提供则从内容中提取）
+        if file_timestamp:
+            timestamp = file_timestamp
+        else:
+            timestamp_match = re.search(r'(\d{4}-\d{2}-\d{2}) (\d{2}:\d{2}:\d{2})', content)
+            if not timestamp_match:
+                return None
+            
+            date_str, time_str = timestamp_match.groups()
+            timestamp = f"{date_str} {time_str}"
         
         # 解析为datetime对象（只保留到分钟）
         dt = datetime.strptime(timestamp, '%Y-%m-%d %H:%M:%S')
@@ -799,7 +808,7 @@ def main():
             
             # 解析内容
             log(f"⚙️  开始提取文件数据...")
-            data = parse_content(result['content'])
+            data = parse_content(result['content'], file_timestamp=result['file_timestamp'])
             if not data:
                 log("❌ 数据提取失败，等待下次检查...")
                 time.sleep(CHECK_INTERVAL)
