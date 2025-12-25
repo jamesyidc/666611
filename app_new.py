@@ -11147,6 +11147,195 @@ def sar_slope_duration_signal(symbol):
             'traceback': traceback.format_exc()
         })
 
+@app.route('/api/sar-slope/transition-analysis/<symbol>')
+def sar_slope_transition_analysis(symbol):
+    """
+    多空转换分析接口 - 用户最新需求
+    
+    核心逻辑:
+    1. 记录每个5分钟的多空转换点（保留16天数据）
+    2. 多头关注 sequence_num=2 (01→02，相当于03→02的变化)
+    3. 空头关注 sequence_num=2 (01→02，相当于02→03的变化)
+    4. 计算 当天/3天/7天/15天 平均值
+    5. 对比当前值与平均值的差值百分比
+    6. 判断偏多/偏空状态
+    
+    参数:
+    - position: long/short (可选)
+    """
+    try:
+        position_filter = request.args.get('position', None)
+        
+        conn = sqlite3.connect('/home/user/webapp/sar_slope_data.db')
+        cursor = conn.cursor()
+        
+        result = {
+            'success': True,
+            'symbol': symbol.upper(),
+            'analysis': {}
+        }
+        
+        # 获取当前状态
+        cursor.execute('''
+            SELECT current_position, current_sequence, last_kline_time
+            FROM system_status
+            WHERE symbol = ?
+        ''', (symbol.upper(),))
+        
+        status = cursor.fetchone()
+        if not status:
+            return jsonify({'success': False, 'error': 'Symbol not found'})
+        
+        result['current_status'] = {
+            'position': status[0],
+            'sequence': status[1],
+            'last_update': status[2]
+        }
+        
+        # 对每个方向进行分析
+        positions = [position_filter] if position_filter else ['long', 'short']
+        
+        for pos in positions:
+            # 获取该方向 sequence_num=2 的所有变化率数据（按时间降序）
+            cursor.execute('''
+                SELECT change_percent, kline_time, id
+                FROM sar_consecutive_changes
+                WHERE symbol = ? AND position = ? AND sequence_num = 2
+                ORDER BY id DESC
+            ''', (symbol.upper(), pos))
+            
+            changes = cursor.fetchall()
+            
+            if not changes:
+                continue
+            
+            # 当前最新值
+            current_value = changes[0][0]
+            current_time = changes[0][1]
+            
+            # 提取所有变化率（从旧到新）
+            all_changes = [c[0] for c in reversed(changes)]
+            
+            # 计算各周期平均值
+            periods = {
+                '1day': 288,   # 24小时 * 12个5分钟
+                '3day': 864,   # 3 * 24 * 12
+                '7day': 2016,  # 7 * 24 * 12
+                '15day': 4320  # 15 * 24 * 12
+            }
+            
+            period_averages = {}
+            for period_name, period_count in periods.items():
+                if len(all_changes) >= period_count:
+                    period_changes = all_changes[-period_count:]
+                else:
+                    period_changes = all_changes
+                
+                if period_changes:
+                    avg = sum(period_changes) / len(period_changes)
+                    period_averages[period_name] = {
+                        'average': avg,
+                        'sample_count': len(period_changes)
+                    }
+            
+            # 对比当前值与各周期平均值
+            comparisons = {}
+            for period_name, period_data in period_averages.items():
+                avg = period_data['average']
+                diff = current_value - avg
+                diff_percent = (diff / avg * 100) if avg != 0 else 0
+                
+                # 判断趋势
+                if diff > 0:
+                    trend = 'increased'  # 增加
+                    trend_cn = '增加'
+                elif diff < 0:
+                    trend = 'decreased'  # 减少
+                    trend_cn = '减少'
+                else:
+                    trend = 'unchanged'
+                    trend_cn = '持平'
+                
+                comparisons[period_name] = {
+                    'period_average': round(avg, 6),
+                    'current_value': round(current_value, 6),
+                    'difference': round(diff, 6),
+                    'difference_percent': round(diff_percent, 2),
+                    'trend': trend,
+                    'trend_cn': trend_cn,
+                    'sample_count': period_data['sample_count']
+                }
+            
+            # 综合判断偏多/偏空状态
+            # 使用 1天 和 3天 的对比结果
+            bias = None
+            bias_reason = []
+            
+            if '1day' in comparisons and '3day' in comparisons:
+                day1_diff = comparisons['1day']['difference_percent']
+                day3_diff = comparisons['3day']['difference_percent']
+                
+                # 如果当前值高于平均值，说明变化率在增大
+                # 如果当前值低于平均值，说明变化率在减小
+                
+                if pos == 'long':
+                    # 多头区间：变化率增大 → 偏空（可能赶顶）
+                    #          变化率减小 → 偏多（趋势稳健）
+                    if day1_diff > 0 and day3_diff > 0:
+                        bias = 'bearish'
+                        bias_cn = '偏空'
+                        bias_reason.append('多头变化率增大，可能加速赶顶')
+                    elif day1_diff < 0 and day3_diff < 0:
+                        bias = 'bullish'
+                        bias_cn = '偏多'
+                        bias_reason.append('多头变化率减小，趋势稳健')
+                    else:
+                        bias = 'neutral'
+                        bias_cn = '中性'
+                        bias_reason.append('多头信号不明确')
+                else:  # short
+                    # 空头区间：变化率增大 → 偏多（可能赶底）
+                    #          变化率减小 → 偏空（趋势稳健）
+                    if day1_diff > 0 and day3_diff > 0:
+                        bias = 'bullish'
+                        bias_cn = '偏多'
+                        bias_reason.append('空头变化率增大，可能加速赶底')
+                    elif day1_diff < 0 and day3_diff < 0:
+                        bias = 'bearish'
+                        bias_cn = '偏空'
+                        bias_reason.append('空头变化率减小，趋势稳健')
+                    else:
+                        bias = 'neutral'
+                        bias_cn = '中性'
+                        bias_reason.append('空头信号不明确')
+            
+            result['analysis'][pos] = {
+                'position': pos,
+                'position_cn': '多头' if pos == 'long' else '空头',
+                'sequence_info': '01→02 (序列2)',
+                'current_value': round(current_value, 6),
+                'current_time': current_time,
+                'total_samples': len(all_changes),
+                'period_comparisons': comparisons,
+                'bias': {
+                    'type': bias,
+                    'type_cn': bias_cn,
+                    'reason': bias_reason
+                }
+            }
+        
+        conn.close()
+        
+        return jsonify(result)
+    
+    except Exception as e:
+        import traceback
+        return jsonify({
+            'success': False,
+            'error': str(e),
+            'traceback': traceback.format_exc()
+        })
+
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=5000, debug=False)
 
