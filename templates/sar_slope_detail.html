@@ -259,13 +259,15 @@
         function renderDataTable(data) {
             const tableBody = document.getElementById('tableBody');
             const sequences = data.sequences;
-            const positionClass = data.current_status.position === 'long' ? 'position-long' : 'position-short';
-            const currentPosition = data.current_status.position;
             
             let html = '';
             
             sequences.forEach(seq => {
                 const hasChange = seq.sequence_change_percent !== undefined;
+                // 使用每行数据自己的position，而不是全局的currentPosition
+                const rowPosition = seq.position;
+                const positionClass = rowPosition === 'long' ? 'position-long' : 'position-short';
+                const positionCn = rowPosition === 'long' ? '多头' : '空头';
                 
                 // 计算1天偏向（基于1天变化%的正负，且绝对值>30%才显示）
                 let bias1day = '-';
@@ -273,7 +275,7 @@
                 if (hasChange && seq.change_1day_percent !== undefined) {
                     const abs1day = Math.abs(seq.change_1day_percent);
                     if (abs1day > 30) {  // 只有偏离值大于30%才显示
-                        if (currentPosition === 'long') {
+                        if (rowPosition === 'long') {
                             bias1day = seq.change_1day_percent < 0 ? '偏多' : '偏空';
                         } else {
                             bias1day = seq.change_1day_percent < 0 ? '偏空' : '偏多';
@@ -288,7 +290,7 @@
                 if (hasChange && seq.change_3day_percent !== undefined) {
                     const abs3day = Math.abs(seq.change_3day_percent);
                     if (abs3day > 30) {  // 只有偏离值大于30%才显示
-                        if (currentPosition === 'long') {
+                        if (rowPosition === 'long') {
                             bias3day = seq.change_3day_percent < 0 ? '偏多' : '偏空';
                         } else {
                             bias3day = seq.change_3day_percent < 0 ? '偏空' : '偏多';
@@ -306,7 +308,7 @@
                 
                 html += `
                     <div class="table-row">
-                        <div class="table-cell ${positionClass}">${data.current_status.position_cn}${seq.sequence.toString().padStart(2, '0')}</div>
+                        <div class="table-cell ${positionClass}">${positionCn}${seq.sequence.toString().padStart(2, '0')}</div>
                         <div class="table-cell">${seq.time.substring(11, 16)}</div>
                         <div class="table-cell">$${seq.price.toFixed(2)}</div>
                         <div class="table-cell">${seq.sar.toFixed(4)}</div>

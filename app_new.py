@@ -11382,20 +11382,22 @@ def sar_slope_current_cycle(symbol):
         current_sequence = status[1]
         last_update = status[2]
         
-        # 获取当前周期的所有序列数据（从01到当前序列）
+        # 获取所有可用的连续数据（不限制周期，显示16天或所有可用数据）
+        # 计算16天需要的记录数：16天 * 288条/天 = 4608条
+        max_records = 4608  # 16天的数据
         cursor.execute('''
             SELECT position_sequence, close_price, kline_time, 
-                   open_price, high_price, low_price, sar_value
+                   open_price, high_price, low_price, sar_value, position
             FROM sar_raw_data
-            WHERE symbol = ? AND position = ?
+            WHERE symbol = ?
             ORDER BY timestamp DESC
             LIMIT ?
-        ''', (symbol.upper(), current_position, current_sequence))
+        ''', (symbol.upper(), max_records))
         
         raw_sequences = []
         rows = cursor.fetchall()  # 从新到旧
         for row in rows:  # 不反转，保持最新的在前
-            seq, close, time, open_p, high, low, sar = row
+            seq, close, time, open_p, high, low, sar, pos = row
             raw_sequences.append({
                 'sequence': seq,
                 'price': round(close, 2),
@@ -11403,7 +11405,8 @@ def sar_slope_current_cycle(symbol):
                 'open': round(open_p, 2),
                 'high': round(high, 2),
                 'low': round(low, 2),
-                'sar': sar  # 保留完整精度用于计算
+                'sar': sar,  # 保留完整精度用于计算
+                'position': pos  # 记录该条数据的position（long/short）
             })
         
         # 计算每个序列相对于前一个序列的变化率
@@ -11411,6 +11414,9 @@ def sar_slope_current_cycle(symbol):
         sequences_with_changes = []
         for i, seq_data in enumerate(raw_sequences):
             seq_num = seq_data['sequence']
+            
+            # 获取当前行的position
+            row_position = seq_data['position']
             
             # 添加基础数据
             result_data = {
@@ -11420,92 +11426,99 @@ def sar_slope_current_cycle(symbol):
                 'open': seq_data['open'],
                 'high': seq_data['high'],
                 'low': seq_data['low'],
-                'sar': round(seq_data['sar'], 4)
+                'sar': round(seq_data['sar'], 4),
+                'position': row_position,  # 添加position字段用于前端判断
+                'position_cn': '多头' if row_position == 'long' else '空头'
             }
             
-            # 如果有下一个序列（时间更早的），计算变化率
+            # 如果有下一个序列（时间更早的），且position相同才计算变化率
             if i < len(raw_sequences) - 1:
-                next_sar = raw_sequences[i+1]['sar']  # 下一个（时间更早）
-                curr_sar = seq_data['sar']  # 当前（时间更新）
+                next_position = raw_sequences[i+1]['position']
                 
-                # 用户需求的计算公式:
-                # 当前是较新的序列号，next是较旧的序列号
-                # 例如：curr=空03, next=空02
-                # 多头: (当前SAR - 前一个SAR) / 当前SAR
-                # 空头: (前一个SAR - 当前SAR) / 前一个SAR
-                if current_position == 'long':
-                    # 多头: (curr - next) / curr
-                    seq_change_percent = ((curr_sar - next_sar) / curr_sar) * 100 if curr_sar != 0 else 0
-                    sar_absolute_diff = curr_sar - next_sar  # SAR绝对差值
-                else:  # short
-                    # 空头: (next - curr) / next
-                    # 注意：这里next是旧序列（序列号小），curr是新序列（序列号大）
-                    # 但SAR值计算时，next的SAR应该比curr的SAR大
-                    seq_change_percent = ((next_sar - curr_sar) / next_sar) * 100 if next_sar != 0 else 0
-                    sar_absolute_diff = next_sar - curr_sar  # SAR绝对差值
-                
-                result_data['sequence_change_percent'] = round(seq_change_percent, 4)
-                result_data['sar_diff'] = round(sar_absolute_diff, 4)  # SAR值的绝对差值
-                
-                # 获取该序列对应的历史平均值（用于对比）
-                # 从sar_consecutive_changes表获取同序列号的历史数据
-                cursor.execute('''
-                    SELECT change_percent
-                    FROM sar_consecutive_changes
-                    WHERE symbol = ? AND position = ? AND sequence_num = ?
-                    ORDER BY id DESC
-                    LIMIT 288
-                ''', (symbol.upper(), current_position, seq_num))
-                
-                historical_changes = [r[0] for r in cursor.fetchall()]
-                if historical_changes:
-                    avg_1day = sum(historical_changes) / len(historical_changes)
-                    avg_3day = sum(historical_changes[:min(864, len(historical_changes))]) / min(864, len(historical_changes)) if len(historical_changes) >= 1 else avg_1day
-                    avg_7day = sum(historical_changes[:min(2016, len(historical_changes))]) / min(2016, len(historical_changes)) if len(historical_changes) >= 1 else avg_1day
-                    avg_15day = sum(historical_changes[:min(4320, len(historical_changes))]) / min(4320, len(historical_changes)) if len(historical_changes) >= 1 else avg_1day
+                # 只有当前后两条数据的position相同时才计算变化率
+                # 如果position不同，说明发生了多空转换，跳过计算
+                if row_position == next_position:
+                    next_sar = raw_sequences[i+1]['sar']  # 下一个（时间更早）
+                    curr_sar = seq_data['sar']  # 当前（时间更新）
                     
-                    result_data['avg_1day'] = round(avg_1day, 6)
-                    result_data['avg_3day'] = round(avg_3day, 6)
-                    result_data['avg_7day'] = round(avg_7day, 6)
-                    result_data['avg_15day'] = round(avg_15day, 6)
+                    # 用户需求的计算公式:
+                    # 当前是较新的序列号，next是较旧的序列号
+                    # 例如：curr=空03, next=空02
+                    # 多头: (当前SAR - 前一个SAR) / 当前SAR
+                    # 空头: (前一个SAR - 当前SAR) / 前一个SAR
+                    if row_position == 'long':
+                        # 多头: (curr - next) / curr
+                        seq_change_percent = ((curr_sar - next_sar) / curr_sar) * 100 if curr_sar != 0 else 0
+                        sar_absolute_diff = curr_sar - next_sar  # SAR绝对差值
+                    else:  # short
+                        # 空头: (next - curr) / next
+                        # 注意：这里next是旧序列（序列号小），curr是新序列（序列号大）
+                        # 但SAR值计算时，next的SAR应该比curr的SAR大
+                        seq_change_percent = ((next_sar - curr_sar) / next_sar) * 100 if next_sar != 0 else 0
+                        sar_absolute_diff = next_sar - curr_sar  # SAR绝对差值
                     
-                    # 计算相对变化百分比：(当前 - 平均) / 平均 × 100
-                    # 例: 当前0.0613%, 平均0.083284%, 变化 = (0.0613-0.083284)/0.083284*100 = -26.40%
-                    if avg_1day != 0:
-                        change_1day_percent = ((seq_change_percent - avg_1day) / avg_1day) * 100
-                    else:
-                        change_1day_percent = 0
+                    result_data['sequence_change_percent'] = round(seq_change_percent, 4)
+                    result_data['sar_diff'] = round(sar_absolute_diff, 4)  # SAR值的绝对差值
                     
-                    if avg_3day != 0:
-                        change_3day_percent = ((seq_change_percent - avg_3day) / avg_3day) * 100
-                    else:
-                        change_3day_percent = 0
+                    # 获取该序列对应的历史平均值（用于对比）
+                    # 从sar_consecutive_changes表获取同序列号的历史数据
+                    cursor.execute('''
+                        SELECT change_percent
+                        FROM sar_consecutive_changes
+                        WHERE symbol = ? AND position = ? AND sequence_num = ?
+                        ORDER BY id DESC
+                        LIMIT 288
+                    ''', (symbol.upper(), row_position, seq_num))
                     
-                    if avg_7day != 0:
-                        change_7day_percent = ((seq_change_percent - avg_7day) / avg_7day) * 100
-                    else:
-                        change_7day_percent = 0
-                    
-                    if avg_15day != 0:
-                        change_15day_percent = ((seq_change_percent - avg_15day) / avg_15day) * 100
-                    else:
-                        change_15day_percent = 0
-                    
-                    # 同时保留绝对差值（用于偏向判断）
-                    diff_1day = seq_change_percent - avg_1day
-                    
-                    result_data['change_1day_percent'] = round(change_1day_percent, 2)
-                    result_data['change_3day_percent'] = round(change_3day_percent, 2)
-                    result_data['change_7day_percent'] = round(change_7day_percent, 2)
-                    result_data['change_15day_percent'] = round(change_15day_percent, 2)
-                    
-                    # 判断偏向
-                    if current_position == 'long':
-                        bias = '偏多' if diff_1day < 0 else '偏空'
-                    else:
-                        bias = '偏空' if diff_1day < 0 else '偏多'
-                    
-                    result_data['bias'] = bias
+                    historical_changes = [r[0] for r in cursor.fetchall()]
+                    if historical_changes:
+                        avg_1day = sum(historical_changes) / len(historical_changes)
+                        avg_3day = sum(historical_changes[:min(864, len(historical_changes))]) / min(864, len(historical_changes)) if len(historical_changes) >= 1 else avg_1day
+                        avg_7day = sum(historical_changes[:min(2016, len(historical_changes))]) / min(2016, len(historical_changes)) if len(historical_changes) >= 1 else avg_1day
+                        avg_15day = sum(historical_changes[:min(4320, len(historical_changes))]) / min(4320, len(historical_changes)) if len(historical_changes) >= 1 else avg_1day
+                        
+                        result_data['avg_1day'] = round(avg_1day, 6)
+                        result_data['avg_3day'] = round(avg_3day, 6)
+                        result_data['avg_7day'] = round(avg_7day, 6)
+                        result_data['avg_15day'] = round(avg_15day, 6)
+                        
+                        # 计算相对变化百分比：(当前 - 平均) / 平均 × 100
+                        # 例: 当前0.0613%, 平均0.083284%, 变化 = (0.0613-0.083284)/0.083284*100 = -26.40%
+                        if avg_1day != 0:
+                            change_1day_percent = ((seq_change_percent - avg_1day) / avg_1day) * 100
+                        else:
+                            change_1day_percent = 0
+                        
+                        if avg_3day != 0:
+                            change_3day_percent = ((seq_change_percent - avg_3day) / avg_3day) * 100
+                        else:
+                            change_3day_percent = 0
+                        
+                        if avg_7day != 0:
+                            change_7day_percent = ((seq_change_percent - avg_7day) / avg_7day) * 100
+                        else:
+                            change_7day_percent = 0
+                        
+                        if avg_15day != 0:
+                            change_15day_percent = ((seq_change_percent - avg_15day) / avg_15day) * 100
+                        else:
+                            change_15day_percent = 0
+                        
+                        # 同时保留绝对差值（用于偏向判断）
+                        diff_1day = seq_change_percent - avg_1day
+                        
+                        result_data['change_1day_percent'] = round(change_1day_percent, 2)
+                        result_data['change_3day_percent'] = round(change_3day_percent, 2)
+                        result_data['change_7day_percent'] = round(change_7day_percent, 2)
+                        result_data['change_15day_percent'] = round(change_15day_percent, 2)
+                        
+                        # 判断偏向（使用当前行的position）
+                        if row_position == 'long':
+                            bias = '偏多' if diff_1day < 0 else '偏空'
+                        else:
+                            bias = '偏空' if diff_1day < 0 else '偏多'
+                        
+                        result_data['bias'] = bias
             
             sequences_with_changes.append(result_data)
         
