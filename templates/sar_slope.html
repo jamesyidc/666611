@@ -268,31 +268,36 @@
     <script>
         // 加载数据
         async function loadData() {
+            console.log('[Main] Starting loadData()...');
             try {
+                console.log('[Main] Fetching /api/sar-slope/status...');
                 const response = await fetch('/api/sar-slope/status');
                 const data = await response.json();
+                console.log('[Main] Got response:', data.success, 'data count:', data.data?.length);
                 
                 if (!data.success) {
                     throw new Error(data.error || '加载数据失败');
                 }
                 
                 // 先显示币种列表
+                console.log('[Main] Hiding loading, rendering crypto grid...');
                 document.getElementById('loading').style.display = 'none';
                 renderCryptoGrid(data.data);
                 
                 // 后台异步加载统计数据（不阻塞页面）
+                console.log('[Main] Starting loadDetailedStatistics in background...');
                 document.getElementById('statistics').style.display = 'grid';
                 document.getElementById('bullishList').innerHTML = '<div class="stat-empty">正在加载...</div>';
                 document.getElementById('bearishList').innerHTML = '<div class="stat-empty">正在加载...</div>';
                 
                 loadDetailedStatistics(data.data).catch(error => {
-                    console.error('统计数据加载失败:', error);
+                    console.error('[Main] 统计数据加载失败:', error);
                     document.getElementById('bullishList').innerHTML = '<div class="stat-empty">加载失败</div>';
                     document.getElementById('bearishList').innerHTML = '<div class="stat-empty">加载失败</div>';
                 });
                 
             } catch (error) {
-                console.error('Error:', error);
+                console.error('[Main] Error:', error);
                 document.getElementById('loading').style.display = 'none';
                 document.getElementById('error').style.display = 'block';
                 document.getElementById('error').textContent = '加载数据失败: ' + error.message;
@@ -301,6 +306,7 @@
         
         // 加载详细统计数据（异步，不阻塞）
         async function loadDetailedStatistics(cryptos) {
+            console.log('[Statistics] Starting to load detailed statistics for', cryptos.length, 'cryptos');
             const bullishSymbols = [];
             const bearishSymbols = [];
             
@@ -311,6 +317,7 @@
             const batchSize = 5; // 每批5个请求
             for (let i = 0; i < cryptos.length; i += batchSize) {
                 const batch = cryptos.slice(i, i + batchSize);
+                console.log(`[Statistics] Processing batch ${Math.floor(i/batchSize) + 1}:`, batch.map(c => c.symbol).join(', '));
                 
                 await Promise.all(batch.map(async (crypto) => {
                     try {
@@ -324,12 +331,15 @@
                             const bullishRatio = stats.bullish_ratio || 0;
                             const bearishRatio = stats.bearish_ratio || 0;
                             
+                            console.log(`[Statistics] ${crypto.symbol}: bullish=${bullishRatio.toFixed(1)}%, bearish=${bearishRatio.toFixed(1)}%`);
+                            
                             // 偏多占比 > 80%
                             if (bullishRatio > 80) {
                                 bullishSymbols.push({
                                     symbol: crypto.symbol,
                                     ratio: bullishRatio
                                 });
+                                console.log(`[Statistics] ✓ ${crypto.symbol} added to bullish (${bullishRatio.toFixed(1)}%)`);
                             }
                             
                             // 偏空占比 > 80%
@@ -338,10 +348,11 @@
                                     symbol: crypto.symbol,
                                     ratio: bearishRatio
                                 });
+                                console.log(`[Statistics] ✓ ${crypto.symbol} added to bearish (${bearishRatio.toFixed(1)}%)`);
                             }
                         }
                     } catch (error) {
-                        console.error(`Failed to load ${crypto.symbol}:`, error);
+                        console.error(`[Statistics] Failed to load ${crypto.symbol}:`, error);
                     }
                     
                     completed++;
@@ -350,6 +361,7 @@
                 }));
             }
             
+            console.log('[Statistics] Finished loading. Bullish:', bullishSymbols.length, 'Bearish:', bearishSymbols.length);
             // 显示统计结果
             renderStatistics(bullishSymbols, bearishSymbols);
         }
