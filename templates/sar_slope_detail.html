@@ -87,22 +87,22 @@
         
         .table-header {
             display: grid;
-            grid-template-columns: 60px 80px 100px 100px 100px 100px 100px 120px 100px 120px 90px;
-            gap: 10px;
+            grid-template-columns: 60px 80px 90px 100px 100px 100px 100px 110px 90px 100px 110px 90px 100px 110px;
+            gap: 8px;
             padding: 15px;
             background: rgba(59, 125, 255, 0.2);
             font-weight: bold;
-            font-size: 13px;
+            font-size: 12px;
             color: #00d4ff;
             border-bottom: 1px solid rgba(59, 125, 255, 0.3);
         }
         
         .table-row {
             display: grid;
-            grid-template-columns: 60px 80px 100px 100px 100px 100px 100px 120px 100px 120px 90px;
-            gap: 10px;
+            grid-template-columns: 60px 80px 90px 100px 100px 100px 100px 110px 90px 100px 110px 90px 100px 110px;
+            gap: 8px;
             padding: 12px 15px;
-            font-size: 13px;
+            font-size: 12px;
             border-bottom: 1px solid rgba(139, 146, 184, 0.1);
             transition: background 0.2s;
         }
@@ -183,9 +183,12 @@
                     <div>变化率%</div>
                     <div>1天变化%</div>
                     <div>1天平均</div>
+                    <div>1天偏向</div>
                     <div>3天变化%</div>
                     <div>3天平均</div>
-                    <div>偏向</div>
+                    <div>3天偏向</div>
+                    <div>7天变化%</div>
+                    <div>7天平均</div>
                 </div>
                 <div id="tableBody"></div>
             </div>
@@ -255,16 +258,42 @@
             const tableBody = document.getElementById('tableBody');
             const sequences = data.sequences;
             const positionClass = data.current_status.position === 'long' ? 'position-long' : 'position-short';
+            const currentPosition = data.current_status.position;
             
             let html = '';
             
             sequences.forEach(seq => {
                 const hasChange = seq.sequence_change_percent !== undefined;
-                const biasClass = hasChange && seq.bias ? (seq.bias === '偏多' ? 'bias-bullish' : 'bias-bearish') : '';
+                
+                // 计算1天偏向（基于1天变化%的正负）
+                let bias1day = '-';
+                let bias1dayClass = '';
+                if (hasChange && seq.change_1day_percent !== undefined) {
+                    if (currentPosition === 'long') {
+                        bias1day = seq.change_1day_percent < 0 ? '偏多' : '偏空';
+                    } else {
+                        bias1day = seq.change_1day_percent < 0 ? '偏空' : '偏多';
+                    }
+                    bias1dayClass = bias1day === '偏多' ? 'bias-bullish' : 'bias-bearish';
+                }
+                
+                // 计算3天偏向（基于3天变化%的正负）
+                let bias3day = '-';
+                let bias3dayClass = '';
+                if (hasChange && seq.change_3day_percent !== undefined) {
+                    if (currentPosition === 'long') {
+                        bias3day = seq.change_3day_percent < 0 ? '偏多' : '偏空';
+                    } else {
+                        bias3day = seq.change_3day_percent < 0 ? '偏空' : '偏多';
+                    }
+                    bias3dayClass = bias3day === '偏多' ? 'bias-bullish' : 'bias-bearish';
+                }
+                
                 const sarDiffClass = hasChange && seq.sar_diff >= 0 ? 'trend-increase' : 'trend-decrease';
                 const changeClass = hasChange && seq.sequence_change_percent >= 0 ? 'trend-increase' : 'trend-decrease';
                 const change1Class = hasChange && seq.change_1day_percent >= 0 ? 'trend-increase' : 'trend-decrease';
                 const change3Class = hasChange && seq.change_3day_percent >= 0 ? 'trend-increase' : 'trend-decrease';
+                const change7Class = hasChange && seq.change_7day_percent >= 0 ? 'trend-increase' : 'trend-decrease';
                 
                 html += `
                     <div class="table-row">
@@ -276,9 +305,12 @@
                         <div class="table-cell ${hasChange ? changeClass : ''}">${hasChange ? seq.sequence_change_percent.toFixed(4) + '%' : '-'}</div>
                         <div class="table-cell ${hasChange ? change1Class : ''}">${hasChange ? (seq.change_1day_percent >= 0 ? '+' : '') + seq.change_1day_percent.toFixed(2) + '%' : '-'}</div>
                         <div class="table-cell">${hasChange ? seq.avg_1day.toFixed(6) + '%' : '-'}</div>
+                        <div class="table-cell ${bias1dayClass}">${bias1day}</div>
                         <div class="table-cell ${hasChange ? change3Class : ''}">${hasChange ? (seq.change_3day_percent >= 0 ? '+' : '') + seq.change_3day_percent.toFixed(2) + '%' : '-'}</div>
                         <div class="table-cell">${hasChange ? seq.avg_3day.toFixed(6) + '%' : '-'}</div>
-                        <div class="table-cell ${biasClass}">${hasChange && seq.bias ? seq.bias : '-'}</div>
+                        <div class="table-cell ${bias3dayClass}">${bias3day}</div>
+                        <div class="table-cell ${hasChange ? change7Class : ''}">${hasChange && seq.change_7day_percent !== undefined ? (seq.change_7day_percent >= 0 ? '+' : '') + seq.change_7day_percent.toFixed(2) + '%' : '-'}</div>
+                        <div class="table-cell">${hasChange && seq.avg_7day !== undefined ? seq.avg_7day.toFixed(6) + '%' : '-'}</div>
                     </div>
                 `;
             });
