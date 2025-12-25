@@ -460,6 +460,8 @@ def calculate_consecutive_changes(symbol):
     按照用户提供的例子：
     Sar空01=0.3797, Sar空02=0.3797, 变化率=0%
     Sar空02=0.3797, Sar空03=0.3796, 变化率=0.02633%
+    
+    同时记录持续时间(duration_minutes)用于后续按时间段分组统计
     """
     conn = sqlite3.connect(DB_PATH)
     cursor = conn.cursor()
@@ -469,9 +471,9 @@ def calculate_consecutive_changes(symbol):
     
     # 按position分组处理
     for position in ['long', 'short']:
-        # 获取该position的所有SAR数据（按时间升序）
+        # 获取该position的所有SAR数据（按时间升序），包含duration_minutes
         cursor.execute('''
-            SELECT timestamp, sar_value, position_sequence, kline_time
+            SELECT timestamp, sar_value, position_sequence, kline_time, duration_minutes
             FROM sar_raw_data
             WHERE symbol = ? AND position = ?
             ORDER BY timestamp ASC
@@ -488,20 +490,21 @@ def calculate_consecutive_changes(symbol):
             current_sar = rows[i+1][1]
             sequence_num = rows[i+1][2]
             kline_time = rows[i+1][3]
+            duration = rows[i+1][4]  # 获取持续时间
             
             # 计算变化值和变化率
             change_value = current_sar - prev_sar
             change_percent = abs(change_value / prev_sar * 100) if prev_sar != 0 else 0
             
-            # 保存变化记录
+            # 保存变化记录，包含duration_minutes
             cursor.execute('''
                 INSERT INTO sar_consecutive_changes
                 (symbol, position, sequence_num, prev_sar, current_sar,
-                 change_value, change_percent, kline_time)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                 change_value, change_percent, kline_time, duration_minutes)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
             ''', (
                 symbol, position, sequence_num, prev_sar, current_sar,
-                change_value, change_percent, kline_time
+                change_value, change_percent, kline_time, duration
             ))
     
     conn.commit()
@@ -596,6 +599,57 @@ def calculate_period_averages(symbol):
                     (symbol, position, period_type, avg_change_percent, sample_count)
                     VALUES (?, ?, ?, ?, ?)
                 ''', (symbol, position, period_type, avg_change, len(changes_list)))
+        
+        # 3. 计算按持续时间(duration)分组的平均值（新增 - 用户最新需求）
+        # 对每个持续时间段，计算1天、3天、7天、15天的平均变化率
+        cursor.execute('''
+            SELECT DISTINCT duration_minutes
+            FROM sar_consecutive_changes
+            WHERE symbol = ? AND position = ? AND duration_minutes IS NOT NULL
+            ORDER BY duration_minutes
+        ''', (symbol, position))
+        
+        durations = [row[0] for row in cursor.fetchall()]
+        
+        for duration in durations:
+            # 获取该duration的所有变化率（按时间升序）
+            cursor.execute('''
+                SELECT change_percent, id
+                FROM sar_consecutive_changes
+                WHERE symbol = ? AND position = ? AND duration_minutes = ?
+                ORDER BY id ASC
+            ''', (symbol, position, duration))
+            
+            duration_changes = [row[0] for row in cursor.fetchall()]
+            
+            if not duration_changes:
+                continue
+            
+            # 计算该duration的各周期平均值
+            duration_periods = {
+                '1day': 288,
+                '3day': 864,
+                '7day': 2016,
+                '15day': 4320
+            }
+            
+            for period_type, period_count in duration_periods.items():
+                if len(duration_changes) >= period_count:
+                    recent_changes = duration_changes[-period_count:]
+                else:
+                    recent_changes = duration_changes
+                
+                if recent_changes:
+                    avg_change = sum(recent_changes) / len(recent_changes)
+                    
+                    # 使用格式: dur_<时长>_<周期>, 例如 dur_15_1day, dur_30_3day
+                    period_type_name = f'dur_{duration}_{period_type}'
+                    
+                    cursor.execute('''
+                        INSERT OR REPLACE INTO sar_period_averages
+                        (symbol, position, period_type, avg_change_percent, sample_count)
+                        VALUES (?, ?, ?, ?, ?)
+                    ''', (symbol, position, period_type_name, avg_change, len(recent_changes)))
     
     conn.commit()
     conn.close()

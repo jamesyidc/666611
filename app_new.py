@@ -10968,6 +10968,185 @@ def sar_slope_sequence_compare(symbol):
             'traceback': traceback.format_exc()
         })
 
+@app.route('/api/sar-slope/duration-signal/<symbol>')
+def sar_slope_duration_signal(symbol):
+    """
+    按持续时间段分析信号 - 用户最新需求
+    
+    对比逻辑：
+    - 多头区间：
+      * 1天平均 < 3天平均（比值减小）→ 强势多头信号（偏多）
+      * 1天平均 > 3天平均（比值增大）→ 加速赶顶信号（偏空）
+    - 空头区间：
+      * 1天平均 < 3天平均（比值减小）→ 强势空头信号（偏空）
+      * 1天平均 > 3天平均（比值增大）→ 加速赶底信号（偏多）
+    
+    参数:
+    - position: long/short (可选，不填则返回两个方向)
+    - duration: 持续时间（分钟，可选）
+    """
+    try:
+        position_filter = request.args.get('position', None)
+        duration_filter = request.args.get('duration', None, type=int)
+        
+        conn = sqlite3.connect('/home/user/webapp/sar_slope_data.db')
+        cursor = conn.cursor()
+        
+        result = {
+            'success': True,
+            'symbol': symbol.upper(),
+            'signals': []
+        }
+        
+        # 获取当前状态
+        cursor.execute('''
+            SELECT current_position, current_sequence
+            FROM system_status
+            WHERE symbol = ?
+        ''', (symbol.upper(),))
+        
+        status = cursor.fetchone()
+        if not status:
+            return jsonify({'success': False, 'error': 'Symbol not found'})
+        
+        result['current_status'] = {
+            'position': status[0],
+            'sequence': status[1]
+        }
+        
+        # 构建查询条件
+        conditions = ["symbol = ?", "period_type LIKE 'dur_%'"]
+        params = [symbol.upper()]
+        
+        if position_filter:
+            conditions.append("position = ?")
+            params.append(position_filter)
+        
+        # 获取所有 duration 的平均值数据
+        cursor.execute(f'''
+            SELECT position, period_type, avg_change_percent, sample_count
+            FROM sar_period_averages
+            WHERE {' AND '.join(conditions)}
+            ORDER BY position, period_type
+        ''', params)
+        
+        # 组织数据结构: {position: {duration: {period: avg}}}
+        duration_data = {}
+        for row in cursor.fetchall():
+            pos = row[0]
+            period_type = row[1]  # 格式: dur_15_1day
+            avg_pct = row[2]
+            sample_count = row[3]
+            
+            # 解析 period_type
+            parts = period_type.split('_')
+            if len(parts) != 3:
+                continue
+            
+            duration = int(parts[1])
+            period = parts[2]  # 1day, 3day, 7day, 15day
+            
+            # 过滤 duration
+            if duration_filter and duration != duration_filter:
+                continue
+            
+            if pos not in duration_data:
+                duration_data[pos] = {}
+            if duration not in duration_data[pos]:
+                duration_data[pos][duration] = {}
+            
+            duration_data[pos][duration][period] = {
+                'avg': avg_pct,
+                'samples': sample_count
+            }
+        
+        # 分析每个 position 和 duration 的信号
+        for pos in duration_data:
+            for duration in sorted(duration_data[pos].keys()):
+                periods = duration_data[pos][duration]
+                
+                # 必须有 1day 和 3day 数据才能对比
+                if '1day' not in periods or '3day' not in periods:
+                    continue
+                
+                avg_1day = periods['1day']['avg']
+                avg_3day = periods['3day']['avg']
+                avg_7day = periods.get('7day', {}).get('avg', None)
+                avg_15day = periods.get('15day', {}).get('avg', None)
+                
+                # 计算比值
+                ratio = (avg_1day / avg_3day) if avg_3day != 0 else 1.0
+                ratio_change = avg_1day - avg_3day
+                ratio_change_percent = ((avg_1day - avg_3day) / avg_3day * 100) if avg_3day != 0 else 0
+                
+                # 根据用户逻辑判断信号
+                if pos == 'long':
+                    if avg_1day < avg_3day:  # 比值减小
+                        signal_type = 'strong_long'
+                        signal_desc = '强势多头'
+                        bias = 'bullish'  # 偏多
+                        interpretation = '当天平均 < 3天平均，变化率减小，趋势强劲'
+                    else:  # 比值增大
+                        signal_type = 'top_acceleration'
+                        signal_desc = '加速赶顶'
+                        bias = 'bearish'  # 偏空
+                        interpretation = '当天平均 > 3天平均，变化率增大，可能见顶'
+                else:  # short
+                    if avg_1day < avg_3day:  # 比值减小
+                        signal_type = 'strong_short'
+                        signal_desc = '强势空头'
+                        bias = 'bearish'  # 偏空
+                        interpretation = '当天平均 < 3天平均，变化率减小，趋势强劲'
+                    else:  # 比值增大
+                        signal_type = 'bottom_acceleration'
+                        signal_desc = '加速赶底'
+                        bias = 'bullish'  # 偏多
+                        interpretation = '当天平均 > 3天平均，变化率增大，可能见底'
+                
+                signal = {
+                    'position': pos,
+                    'duration_minutes': duration,
+                    'averages': {
+                        '1day': round(avg_1day, 6),
+                        '3day': round(avg_3day, 6),
+                        '7day': round(avg_7day, 6) if avg_7day else None,
+                        '15day': round(avg_15day, 6) if avg_15day else None
+                    },
+                    'comparison': {
+                        'ratio': round(ratio, 4),
+                        'change': round(ratio_change, 6),
+                        'change_percent': round(ratio_change_percent, 2)
+                    },
+                    'signal': {
+                        'type': signal_type,
+                        'description': signal_desc,
+                        'bias': bias,
+                        'interpretation': interpretation
+                    },
+                    'sample_counts': {
+                        '1day': periods['1day']['samples'],
+                        '3day': periods['3day']['samples'],
+                        '7day': periods.get('7day', {}).get('samples', None),
+                        '15day': periods.get('15day', {}).get('samples', None)
+                    }
+                }
+                
+                result['signals'].append(signal)
+        
+        result['total_signals'] = len(result['signals'])
+        
+        conn.close()
+        
+        return jsonify(result)
+    
+    except Exception as e:
+        import traceback
+        return jsonify({
+            'success': False,
+            'error': str(e),
+            'traceback': traceback.format_exc()
+        })
+
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=5000, debug=False)
 
