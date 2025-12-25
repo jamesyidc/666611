@@ -11393,7 +11393,8 @@ def sar_slope_current_cycle(symbol):
         ''', (symbol.upper(), current_position, current_sequence))
         
         raw_sequences = []
-        for row in reversed(cursor.fetchall()):  # 反转以从序列01开始
+        rows = cursor.fetchall()  # 从新到旧
+        for row in rows:  # 不反转，保持最新的在前
             seq, close, time, open_p, high, low, sar = row
             raw_sequences.append({
                 'sequence': seq,
@@ -11406,6 +11407,7 @@ def sar_slope_current_cycle(symbol):
             })
         
         # 计算每个序列相对于前一个序列的变化率
+        # 注意：现在raw_sequences[0]是最新的，raw_sequences[-1]是最早的
         sequences_with_changes = []
         for i, seq_data in enumerate(raw_sequences):
             seq_num = seq_data['sequence']
@@ -11421,22 +11423,26 @@ def sar_slope_current_cycle(symbol):
                 'sar': round(seq_data['sar'], 4)
             }
             
-            # 如果是第2个序列及以后，计算与前一个序列的变化率
-            if i >= 1:
-                prev_sar = raw_sequences[i-1]['sar']
-                curr_sar = seq_data['sar']
+            # 如果有下一个序列（时间更早的），计算变化率
+            if i < len(raw_sequences) - 1:
+                next_sar = raw_sequences[i+1]['sar']  # 下一个（时间更早）
+                curr_sar = seq_data['sar']  # 当前（时间更新）
                 
                 # 用户需求的计算公式:
+                # 当前是较新的序列号，next是较旧的序列号
+                # 例如：curr=空03, next=空02
                 # 多头: (当前SAR - 前一个SAR) / 当前SAR
                 # 空头: (前一个SAR - 当前SAR) / 前一个SAR
                 if current_position == 'long':
-                    # 多头: (curr - prev) / curr
-                    seq_change_percent = ((curr_sar - prev_sar) / curr_sar) * 100 if curr_sar != 0 else 0
-                    sar_absolute_diff = curr_sar - prev_sar  # SAR绝对差值
+                    # 多头: (curr - next) / curr
+                    seq_change_percent = ((curr_sar - next_sar) / curr_sar) * 100 if curr_sar != 0 else 0
+                    sar_absolute_diff = curr_sar - next_sar  # SAR绝对差值
                 else:  # short
-                    # 空头: (prev - curr) / prev
-                    seq_change_percent = ((prev_sar - curr_sar) / prev_sar) * 100 if prev_sar != 0 else 0
-                    sar_absolute_diff = prev_sar - curr_sar  # SAR绝对差值
+                    # 空头: (next - curr) / next
+                    # 注意：这里next是旧序列（序列号小），curr是新序列（序列号大）
+                    # 但SAR值计算时，next的SAR应该比curr的SAR大
+                    seq_change_percent = ((next_sar - curr_sar) / next_sar) * 100 if next_sar != 0 else 0
+                    sar_absolute_diff = next_sar - curr_sar  # SAR绝对差值
                 
                 result_data['sequence_change_percent'] = round(seq_change_percent, 4)
                 result_data['sar_diff'] = round(sar_absolute_diff, 4)  # SAR值的绝对差值
