@@ -11432,11 +11432,14 @@ def sar_slope_current_cycle(symbol):
                 if current_position == 'long':
                     # 多头: (curr - prev) / curr
                     seq_change_percent = ((curr_sar - prev_sar) / curr_sar) * 100 if curr_sar != 0 else 0
+                    sar_absolute_diff = curr_sar - prev_sar  # SAR绝对差值
                 else:  # short
                     # 空头: (prev - curr) / prev
                     seq_change_percent = ((prev_sar - curr_sar) / prev_sar) * 100 if prev_sar != 0 else 0
+                    sar_absolute_diff = prev_sar - curr_sar  # SAR绝对差值
                 
                 result_data['sequence_change_percent'] = round(seq_change_percent, 4)
+                result_data['sar_diff'] = round(sar_absolute_diff, 4)  # SAR值的绝对差值
                 
                 # 获取该序列对应的历史平均值（用于对比）
                 # 从sar_consecutive_changes表获取同序列号的历史数据

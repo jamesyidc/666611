@@ -87,7 +87,7 @@
         
         .table-header {
             display: grid;
-            grid-template-columns: 60px 80px 100px 120px 120px 100px 120px 100px 120px 100px 90px;
+            grid-template-columns: 60px 80px 100px 100px 100px 100px 100px 120px 100px 120px 90px;
             gap: 10px;
             padding: 15px;
             background: rgba(59, 125, 255, 0.2);
@@ -99,7 +99,7 @@
         
         .table-row {
             display: grid;
-            grid-template-columns: 60px 80px 100px 120px 120px 100px 120px 100px 120px 100px 90px;
+            grid-template-columns: 60px 80px 100px 100px 100px 100px 100px 120px 100px 120px 90px;
             gap: 10px;
             padding: 12px 15px;
             font-size: 13px;
@@ -179,12 +179,12 @@
                     <div>时间</div>
                     <div>币价</div>
                     <div>SAR值</div>
-                    <div>当前变化率</div>
+                    <div>SAR差值</div>
+                    <div>变化率%</div>
                     <div>1天变化%</div>
                     <div>1天平均</div>
                     <div>3天变化%</div>
                     <div>3天平均</div>
-                    <div>7天变化%</div>
                     <div>偏向</div>
                 </div>
                 <div id="tableBody"></div>
@@ -261,10 +261,10 @@
             sequences.forEach(seq => {
                 const hasChange = seq.sequence_change_percent !== undefined;
                 const biasClass = hasChange && seq.bias ? (seq.bias === '偏多' ? 'bias-bullish' : 'bias-bearish') : '';
+                const sarDiffClass = hasChange && seq.sar_diff >= 0 ? 'trend-increase' : 'trend-decrease';
                 const changeClass = hasChange && seq.sequence_change_percent >= 0 ? 'trend-increase' : 'trend-decrease';
                 const diff1Class = hasChange && seq.diff_1day >= 0 ? 'trend-increase' : 'trend-decrease';
                 const diff3Class = hasChange && seq.diff_3day >= 0 ? 'trend-increase' : 'trend-decrease';
-                const diff7Class = hasChange && seq.diff_7day >= 0 ? 'trend-increase' : 'trend-decrease';
                 
                 html += `
                     <div class="table-row">
@@ -272,12 +272,12 @@
                         <div class="table-cell">${seq.time.substring(11, 16)}</div>
                         <div class="table-cell">$${seq.price.toFixed(2)}</div>
                         <div class="table-cell">${seq.sar.toFixed(4)}</div>
+                        <div class="table-cell ${hasChange ? sarDiffClass : ''}">${hasChange ? (seq.sar_diff >= 0 ? '+' : '') + seq.sar_diff.toFixed(4) : '-'}</div>
                         <div class="table-cell ${hasChange ? changeClass : ''}">${hasChange ? seq.sequence_change_percent.toFixed(4) + '%' : '-'}</div>
                         <div class="table-cell ${hasChange ? diff1Class : ''}">${hasChange ? (seq.diff_1day >= 0 ? '+' : '') + seq.diff_1day.toFixed(4) + '%' : '-'}</div>
                         <div class="table-cell">${hasChange ? seq.avg_1day.toFixed(6) + '%' : '-'}</div>
                         <div class="table-cell ${hasChange ? diff3Class : ''}">${hasChange ? (seq.diff_3day >= 0 ? '+' : '') + seq.diff_3day.toFixed(4) + '%' : '-'}</div>
                         <div class="table-cell">${hasChange ? seq.avg_3day.toFixed(6) + '%' : '-'}</div>
-                        <div class="table-cell ${hasChange ? diff7Class : ''}">${hasChange ? (seq.diff_7day >= 0 ? '+' : '') + seq.diff_7day.toFixed(4) + '%' : '-'}</div>
                         <div class="table-cell ${biasClass}">${hasChange && seq.bias ? seq.bias : '-'}</div>
                     </div>
                 `;
