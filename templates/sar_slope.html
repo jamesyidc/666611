@@ -273,16 +273,23 @@
                 const data = await response.json();
                 
                 if (!data.success) {
-                    throw new Error('加载数据失败');
+                    throw new Error(data.error || '加载数据失败');
                 }
                 
-                document.getElementById('loading').textContent = '正在加载统计数据...';
-                
-                // 加载每个币种的详细统计
-                await loadDetailedStatistics(data.data);
-                
+                // 先显示币种列表
                 document.getElementById('loading').style.display = 'none';
                 renderCryptoGrid(data.data);
+                
+                // 后台异步加载统计数据（不阻塞页面）
+                document.getElementById('statistics').style.display = 'grid';
+                document.getElementById('bullishList').innerHTML = '<div class="stat-empty">正在加载...</div>';
+                document.getElementById('bearishList').innerHTML = '<div class="stat-empty">正在加载...</div>';
+                
+                loadDetailedStatistics(data.data).catch(error => {
+                    console.error('统计数据加载失败:', error);
+                    document.getElementById('bullishList').innerHTML = '<div class="stat-empty">加载失败</div>';
+                    document.getElementById('bearishList').innerHTML = '<div class="stat-empty">加载失败</div>';
+                });
                 
             } catch (error) {
                 console.error('Error:', error);
@@ -292,44 +299,56 @@
             }
         }
         
-        // 加载详细统计数据
+        // 加载详细统计数据（异步，不阻塞）
         async function loadDetailedStatistics(cryptos) {
             const bullishSymbols = [];
             const bearishSymbols = [];
             
-            // 批量加载每个币种的偏向统计
-            const promises = cryptos.map(async (crypto) => {
-                try {
-                    const response = await fetch(`/api/sar-slope/current-cycle/${crypto.symbol}?_t=${Date.now()}`);
-                    const data = await response.json();
-                    
-                    if (data.success && data.bias_statistics) {
-                        const stats = data.bias_statistics;
-                        const bullishRatio = stats.bullish_ratio || 0;
-                        const bearishRatio = stats.bearish_ratio || 0;
-                        
-                        // 偏多占比 > 80%
-                        if (bullishRatio > 80) {
-                            bullishSymbols.push({
-                                symbol: crypto.symbol,
-                                ratio: bullishRatio
-                            });
-                        }
-                        
-                        // 偏空占比 > 80%
-                        if (bearishRatio > 80) {
-                            bearishSymbols.push({
-                                symbol: crypto.symbol,
-                                ratio: bearishRatio
-                            });
-                        }
-                    }
-                } catch (error) {
-                    console.error(`Failed to load ${crypto.symbol}:`, error);
-                }
-            });
+            let completed = 0;
+            const total = cryptos.length;
             
-            await Promise.all(promises);
+            // 批量加载每个币种的偏向统计（限制并发数量）
+            const batchSize = 5; // 每批5个请求
+            for (let i = 0; i < cryptos.length; i += batchSize) {
+                const batch = cryptos.slice(i, i + batchSize);
+                
+                await Promise.all(batch.map(async (crypto) => {
+                    try {
+                        const response = await fetch(`/api/sar-slope/current-cycle/${crypto.symbol}?_t=${Date.now()}`, {
+                            signal: AbortSignal.timeout(5000) // 5秒超时
+                        });
+                        const data = await response.json();
+                        
+                        if (data.success && data.bias_statistics) {
+                            const stats = data.bias_statistics;
+                            const bullishRatio = stats.bullish_ratio || 0;
+                            const bearishRatio = stats.bearish_ratio || 0;
+                            
+                            // 偏多占比 > 80%
+                            if (bullishRatio > 80) {
+                                bullishSymbols.push({
+                                    symbol: crypto.symbol,
+                                    ratio: bullishRatio
+                                });
+                            }
+                            
+                            // 偏空占比 > 80%
+                            if (bearishRatio > 80) {
+                                bearishSymbols.push({
+                                    symbol: crypto.symbol,
+                                    ratio: bearishRatio
+                                });
+                            }
+                        }
+                    } catch (error) {
+                        console.error(`Failed to load ${crypto.symbol}:`, error);
+                    }
+                    
+                    completed++;
+                    // 更新进度
+                    document.getElementById('bullishList').innerHTML = `<div class="stat-empty">加载中... ${completed}/${total}</div>`;
+                }));
+            }
             
             // 显示统计结果
             renderStatistics(bullishSymbols, bearishSymbols);
