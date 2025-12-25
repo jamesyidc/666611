@@ -87,22 +87,22 @@
         
         .table-header {
             display: grid;
-            grid-template-columns: 60px 80px 90px 90px 120px 100px 120px 100px 120px 100px 120px 100px 90px;
-            gap: 8px;
+            grid-template-columns: 60px 80px 100px 120px 120px 100px 120px 100px 120px 100px 90px;
+            gap: 10px;
             padding: 15px;
             background: rgba(59, 125, 255, 0.2);
             font-weight: bold;
-            font-size: 12px;
+            font-size: 13px;
             color: #00d4ff;
             border-bottom: 1px solid rgba(59, 125, 255, 0.3);
         }
         
         .table-row {
             display: grid;
-            grid-template-columns: 60px 80px 90px 90px 120px 100px 120px 100px 120px 100px 120px 100px 90px;
-            gap: 8px;
+            grid-template-columns: 60px 80px 100px 120px 120px 100px 120px 100px 120px 100px 90px;
+            gap: 10px;
             padding: 12px 15px;
-            font-size: 12px;
+            font-size: 13px;
             border-bottom: 1px solid rgba(139, 146, 184, 0.1);
             transition: background 0.2s;
         }
@@ -175,18 +175,16 @@
         <div id="dataTable" style="display: none;">
             <div class="data-table">
                 <div class="table-header">
-                    <div>序号</div>
-                    <div>方向</div>
+                    <div>序列</div>
+                    <div>时间</div>
                     <div>币价</div>
-                    <div>持续时间</div>
-                    <div>当前值</div>
+                    <div>SAR值</div>
+                    <div>当前变化率</div>
                     <div>1天变化%</div>
                     <div>1天平均</div>
                     <div>3天变化%</div>
                     <div>3天平均</div>
                     <div>7天变化%</div>
-                    <div>7天平均</div>
-                    <div>15天平均</div>
                     <div>偏向</div>
                 </div>
                 <div id="tableBody"></div>
@@ -199,7 +197,7 @@
         
         async function loadData() {
             try {
-                const response = await fetch(`/api/sar-slope/transition-analysis/${symbol}`);
+                const response = await fetch(`/api/sar-slope/current-cycle/${symbol}`);
                 const data = await response.json();
                 
                 if (!data.success) {
@@ -207,7 +205,7 @@
                 }
                 
                 document.getElementById('loading').style.display = 'none';
-                document.getElementById('pageTitle').textContent = `${symbol} - SAR 持续时间段统计`;
+                document.getElementById('pageTitle').textContent = `${symbol} - ${data.current_status.position_cn}完整周期 (${data.current_status.cycle_info})`;
                 
                 renderStatusBar(data);
                 renderDataTable(data);
@@ -223,26 +221,25 @@
         function renderStatusBar(data) {
             const statusBar = document.getElementById('statusBar');
             const status = data.current_status;
-            const analysis = data.analysis;
             
             let html = `
                 <div class="status-item">
                     <div class="status-label">当前状态</div>
                     <div class="status-value ${status.position === 'long' ? 'position-long' : 'position-short'}">
-                        ${status.position === 'long' ? '多头' : '空头'}
+                        ${status.position_cn}
                     </div>
                 </div>
                 <div class="status-item">
-                    <div class="status-label">币价</div>
-                    <div class="status-value">$${status.current_price ? status.current_price.toFixed(2) : 'N/A'}</div>
+                    <div class="status-label">当前序列</div>
+                    <div class="status-value">${status.current_sequence}</div>
                 </div>
                 <div class="status-item">
-                    <div class="status-label">持续时间</div>
-                    <div class="status-value">${status.duration_minutes || 0}分钟</div>
+                    <div class="status-label">周期范围</div>
+                    <div class="status-value">${status.cycle_info}</div>
                 </div>
                 <div class="status-item">
-                    <div class="status-label">序列号</div>
-                    <div class="status-value">${status.sequence}</div>
+                    <div class="status-label">序列总数</div>
+                    <div class="status-value">${data.total_sequences}</div>
                 </div>
                 <div class="status-item">
                     <div class="status-label">最后更新</div>
@@ -250,118 +247,36 @@
                 </div>
             `;
             
-            // 显示当前方向的偏向
-            if (status.position === 'long' && analysis.long) {
-                html += `
-                    <div class="status-item">
-                        <div class="status-label">多头信号</div>
-                        <div class="status-value ${analysis.long.bias.type === 'bullish' ? 'bias-bullish' : 'bias-bearish'}">
-                            ${analysis.long.bias.type_cn}
-                        </div>
-                    </div>
-                `;
-            } else if (status.position === 'short' && analysis.short) {
-                html += `
-                    <div class="status-item">
-                        <div class="status-label">空头信号</div>
-                        <div class="status-value ${analysis.short.bias.type === 'bullish' ? 'bias-bullish' : 'bias-bearish'}">
-                            ${analysis.short.bias.type_cn}
-                        </div>
-                    </div>
-                `;
-            }
-            
             statusBar.innerHTML = html;
             statusBar.style.display = 'grid';
         }
         
         function renderDataTable(data) {
             const tableBody = document.getElementById('tableBody');
-            const analysis = data.analysis;
+            const sequences = data.sequences;
+            const positionClass = data.current_status.position === 'long' ? 'position-long' : 'position-short';
             
-            let rows = [];
-            let index = 1;
-            
-            // 添加多头数据
-            if (analysis.long) {
-                const long = analysis.long;
-                const comp1day = long.period_comparisons['1day'];
-                const comp3day = long.period_comparisons['3day'];
-                const comp7day = long.period_comparisons['7day'];
-                const comp15day = long.period_comparisons['15day'];
-                
-                rows.push({
-                    index: index++,
-                    position: 'long',
-                    position_cn: '多头',
-                    current_price: data.current_status.current_price,
-                    duration_minutes: data.current_status.duration_minutes,
-                    current_value: long.current_value,
-                    avg_1day: comp1day.period_average,
-                    change_1day: comp1day.difference_percent,
-                    avg_3day: comp3day.period_average,
-                    change_3day: comp3day.difference_percent,
-                    avg_7day: comp7day.period_average,
-                    change_7day: comp7day.difference_percent,
-                    avg_15day: comp15day.period_average,
-                    bias: long.bias.type_cn,
-                    bias_type: long.bias.type,
-                    time: long.current_time
-                });
-            }
-            
-            // 添加空头数据
-            if (analysis.short) {
-                const short = analysis.short;
-                const comp1day = short.period_comparisons['1day'];
-                const comp3day = short.period_comparisons['3day'];
-                const comp7day = short.period_comparisons['7day'];
-                const comp15day = short.period_comparisons['15day'];
-                
-                rows.push({
-                    index: index++,
-                    position: 'short',
-                    position_cn: '空头',
-                    current_price: data.current_status.current_price,
-                    duration_minutes: data.current_status.duration_minutes,
-                    current_value: short.current_value,
-                    avg_1day: comp1day.period_average,
-                    change_1day: comp1day.difference_percent,
-                    avg_3day: comp3day.period_average,
-                    change_3day: comp3day.difference_percent,
-                    avg_7day: comp7day.period_average,
-                    change_7day: comp7day.difference_percent,
-                    avg_15day: comp15day.period_average,
-                    bias: short.bias.type_cn,
-                    bias_type: short.bias.type,
-                    time: short.current_time
-                });
-            }
-            
-            // 渲染表格行
             let html = '';
-            rows.forEach(row => {
-                const change1Class = row.change_1day > 0 ? 'trend-increase' : 'trend-decrease';
-                const change3Class = row.change_3day > 0 ? 'trend-increase' : 'trend-decrease';
-                const change7Class = row.change_7day > 0 ? 'trend-increase' : 'trend-decrease';
-                const biasClass = row.bias_type === 'bullish' ? 'bias-bullish' : 'bias-bearish';
-                const positionClass = row.position === 'long' ? 'position-long' : 'position-short';
+            
+            sequences.forEach(seq => {
+                const hasBias = seq.bias !== undefined;
+                const biasClass = hasBias ? (seq.bias === '偏多' ? 'bias-bullish' : 'bias-bearish') : '';
+                const change1Class = seq.change_1day_percent > 0 ? 'trend-increase' : 'trend-decrease';
+                const change3Class = seq.change_1day_percent > 0 ? 'trend-increase' : 'trend-decrease';
                 
                 html += `
-                    <div class="table-row" title="${row.time}">
-                        <div class="table-cell">${row.index}</div>
-                        <div class="table-cell ${positionClass}">${row.position_cn}</div>
-                        <div class="table-cell">$${row.current_price ? row.current_price.toFixed(2) : 'N/A'}</div>
-                        <div class="table-cell">${row.duration_minutes || 0}分钟</div>
-                        <div class="table-cell">${row.current_value.toFixed(6)}%</div>
-                        <div class="table-cell ${change1Class}">${row.change_1day > 0 ? '+' : ''}${row.change_1day.toFixed(2)}%</div>
-                        <div class="table-cell">${row.avg_1day.toFixed(6)}%</div>
-                        <div class="table-cell ${change3Class}">${row.change_3day > 0 ? '+' : ''}${row.change_3day.toFixed(2)}%</div>
-                        <div class="table-cell">${row.avg_3day.toFixed(6)}%</div>
-                        <div class="table-cell ${change7Class}">${row.change_7day > 0 ? '+' : ''}${row.change_7day.toFixed(2)}%</div>
-                        <div class="table-cell">${row.avg_7day.toFixed(6)}%</div>
-                        <div class="table-cell">${row.avg_15day.toFixed(6)}%</div>
-                        <div class="table-cell ${biasClass}">${row.bias}</div>
+                    <div class="table-row">
+                        <div class="table-cell ${positionClass}">${data.current_status.position_cn}${seq.sequence.toString().padStart(2, '0')}</div>
+                        <div class="table-cell">${seq.time.substring(11, 16)}</div>
+                        <div class="table-cell">$${seq.price.toFixed(2)}</div>
+                        <div class="table-cell">${seq.sar.toFixed(4)}</div>
+                        <div class="table-cell">${hasBias ? seq.change_rate.toFixed(6) + '%' : '-'}</div>
+                        <div class="table-cell ${hasBias ? change1Class : ''}">${hasBias ? (seq.change_1day_percent > 0 ? '+' : '') + seq.change_1day_percent.toFixed(2) + '%' : '-'}</div>
+                        <div class="table-cell">${hasBias ? seq.avg_1day.toFixed(6) + '%' : '-'}</div>
+                        <div class="table-cell ${hasBias ? change3Class : ''}">${hasBias ? (seq.change_1day_percent > 0 ? '+' : '') + seq.change_1day_percent.toFixed(2) + '%' : '-'}</div>
+                        <div class="table-cell">${hasBias ? seq.avg_3day.toFixed(6) + '%' : '-'}</div>
+                        <div class="table-cell ${hasBias ? change1Class : ''}">${hasBias ? (seq.change_1day_percent > 0 ? '+' : '') + seq.change_1day_percent.toFixed(2) + '%' : '-'}</div>
+                        <div class="table-cell ${biasClass}">${hasBias ? seq.bias : '-'}</div>
                     </div>
                 `;
             });

@@ -11351,6 +11351,122 @@ def sar_slope_transition_analysis(symbol):
             'traceback': traceback.format_exc()
         })
 
+@app.route('/api/sar-slope/current-cycle/<symbol>')
+def sar_slope_current_cycle(symbol):
+    """
+    获取当前完整周期的所有序列数据
+    
+    用户需求:
+    - 空头01开始显示，一直到空头转多头
+    - 多头01开始显示，一直到多头转空头
+    - 不显示持续时间字段
+    
+    返回当前周期从序列01到当前序列的完整数据
+    """
+    try:
+        conn = sqlite3.connect('/home/user/webapp/sar_slope_data.db')
+        cursor = conn.cursor()
+        
+        # 获取当前状态
+        cursor.execute('''
+            SELECT current_position, current_sequence, last_kline_time
+            FROM system_status
+            WHERE symbol = ?
+        ''', (symbol.upper(),))
+        
+        status = cursor.fetchone()
+        if not status:
+            return jsonify({'success': False, 'error': 'Symbol not found'})
+        
+        current_position = status[0]
+        current_sequence = status[1]
+        last_update = status[2]
+        
+        # 获取当前周期的所有序列数据（从01到当前序列）
+        cursor.execute('''
+            SELECT position_sequence, close_price, kline_time, 
+                   open_price, high_price, low_price, sar_value
+            FROM sar_raw_data
+            WHERE symbol = ? AND position = ?
+            ORDER BY timestamp DESC
+            LIMIT ?
+        ''', (symbol.upper(), current_position, current_sequence))
+        
+        sequence_data = []
+        for row in reversed(cursor.fetchall()):  # 反转以从序列01开始
+            seq, close, time, open_p, high, low, sar = row
+            sequence_data.append({
+                'sequence': seq,
+                'price': round(close, 2),
+                'time': time,
+                'open': round(open_p, 2),
+                'high': round(high, 2),
+                'low': round(low, 2),
+                'sar': round(sar, 4)
+            })
+        
+        # 获取每个序列的变化率数据
+        sequences_with_changes = []
+        for i, seq_data in enumerate(sequence_data):
+            seq_num = seq_data['sequence']
+            
+            # 获取该序列的01→02变化率（sequence_num=2表示01→02）
+            if seq_num >= 2:
+                cursor.execute('''
+                    SELECT change_percent
+                    FROM sar_consecutive_changes
+                    WHERE symbol = ? AND position = ? AND sequence_num = 2
+                    ORDER BY id DESC
+                    LIMIT 288
+                ''', (symbol.upper(), current_position))
+                
+                changes = [r[0] for r in cursor.fetchall()]
+                if changes:
+                    current_value = changes[0] if len(changes) > 0 else 0
+                    avg_1day = sum(changes) / len(changes)
+                    avg_3day = sum(changes[:min(864, len(changes))]) / min(864, len(changes)) if len(changes) > 0 else 0
+                    
+                    change_1day_percent = ((current_value - avg_1day) / avg_1day * 100) if avg_1day != 0 else 0
+                    
+                    # 判断偏向
+                    if current_position == 'long':
+                        bias = '偏多' if change_1day_percent < 0 else '偏空'
+                    else:
+                        bias = '偏空' if change_1day_percent < 0 else '偏多'
+                    
+                    seq_data['change_rate'] = round(current_value, 6)
+                    seq_data['avg_1day'] = round(avg_1day, 6)
+                    seq_data['avg_3day'] = round(avg_3day, 6)
+                    seq_data['change_1day_percent'] = round(change_1day_percent, 2)
+                    seq_data['bias'] = bias
+            
+            sequences_with_changes.append(seq_data)
+        
+        result = {
+            'success': True,
+            'symbol': symbol.upper(),
+            'current_status': {
+                'position': current_position,
+                'position_cn': '多头' if current_position == 'long' else '空头',
+                'current_sequence': current_sequence,
+                'last_update': last_update,
+                'cycle_info': f"{current_position}01 → {current_position}{current_sequence:02d}"
+            },
+            'sequences': sequences_with_changes,
+            'total_sequences': len(sequences_with_changes)
+        }
+        
+        conn.close()
+        return jsonify(result)
+    
+    except Exception as e:
+        import traceback
+        return jsonify({
+            'success': False,
+            'error': str(e),
+            'traceback': traceback.format_exc()
+        })
+
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=5000, debug=False)
 
