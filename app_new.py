@@ -10555,6 +10555,290 @@ def sar_slope_conversions():
     except Exception as e:
         return jsonify({'success': False, 'error': str(e)})
 
+@app.route('/api/sar-slope/query/<symbol>')
+def sar_slope_query_symbol(symbol):
+    """
+    完整的单币查询接口
+    查询参数:
+    - start_time: 开始时间 (格式: YYYY-MM-DD HH:MM:SS)
+    - end_time: 结束时间 (格式: YYYY-MM-DD HH:MM:SS)
+    - limit: 返回数量限制 (默认: 1000)
+    - position: 筛选多空状态 (long/short)
+    - include_changes: 是否包含变化率 (true/false, 默认: true)
+    - include_alerts: 是否包含异常告警 (true/false, 默认: true)
+    - include_conversions: 是否包含多空转换 (true/false, 默认: true)
+    - include_averages: 是否包含周期平均值 (true/false, 默认: true)
+    """
+    try:
+        # 获取查询参数
+        start_time = request.args.get('start_time', None)
+        end_time = request.args.get('end_time', None)
+        limit = request.args.get('limit', 1000, type=int)
+        position = request.args.get('position', None)  # long/short
+        
+        include_changes = request.args.get('include_changes', 'true').lower() == 'true'
+        include_alerts = request.args.get('include_alerts', 'true').lower() == 'true'
+        include_conversions = request.args.get('include_conversions', 'true').lower() == 'true'
+        include_averages = request.args.get('include_averages', 'true').lower() == 'true'
+        
+        conn = sqlite3.connect('/home/user/webapp/sar_slope_data.db')
+        cursor = conn.cursor()
+        
+        result = {
+            'success': True,
+            'symbol': symbol.upper(),
+            'query_params': {
+                'start_time': start_time,
+                'end_time': end_time,
+                'limit': limit,
+                'position': position
+            }
+        }
+        
+        # 1. 获取系统状态
+        cursor.execute('''
+            SELECT last_update_time, last_kline_time, total_klines,
+                   current_position, current_sequence, status, updated_at
+            FROM system_status
+            WHERE symbol = ?
+        ''', (symbol.upper(),))
+        
+        status_row = cursor.fetchone()
+        if status_row:
+            result['system_status'] = {
+                'last_update_time': status_row[0],
+                'last_kline_time': status_row[1],
+                'total_klines': status_row[2],
+                'current_position': status_row[3],
+                'current_sequence': status_row[4],
+                'status': status_row[5],
+                'updated_at': status_row[6]
+            }
+        else:
+            return jsonify({
+                'success': False,
+                'error': f'Symbol {symbol.upper()} not found in system'
+            })
+        
+        # 2. 构建原始数据查询SQL
+        sql_conditions = ["symbol = ?"]
+        sql_params = [symbol.upper()]
+        
+        if start_time:
+            # 转换时间字符串为时间戳
+            from datetime import datetime
+            import pytz
+            beijing_tz = pytz.timezone('Asia/Shanghai')
+            dt = beijing_tz.localize(datetime.strptime(start_time, '%Y-%m-%d %H:%M:%S'))
+            timestamp = int(dt.timestamp() * 1000)
+            sql_conditions.append("timestamp >= ?")
+            sql_params.append(timestamp)
+        
+        if end_time:
+            from datetime import datetime
+            import pytz
+            beijing_tz = pytz.timezone('Asia/Shanghai')
+            dt = beijing_tz.localize(datetime.strptime(end_time, '%Y-%m-%d %H:%M:%S'))
+            timestamp = int(dt.timestamp() * 1000)
+            sql_conditions.append("timestamp <= ?")
+            sql_params.append(timestamp)
+        
+        if position:
+            sql_conditions.append("position = ?")
+            sql_params.append(position)
+        
+        # 获取原始SAR数据
+        cursor.execute(f'''
+            SELECT timestamp, kline_time, open_price, high_price, low_price,
+                   close_price, sar_value, position, position_sequence, duration_minutes
+            FROM sar_raw_data
+            WHERE {' AND '.join(sql_conditions)}
+            ORDER BY timestamp DESC
+            LIMIT ?
+        ''', sql_params + [limit])
+        
+        sar_data = []
+        for row in cursor.fetchall():
+            sar_data.append({
+                'timestamp': row[0],
+                'kline_time': row[1],
+                'open': row[2],
+                'high': row[3],
+                'low': row[4],
+                'close': row[5],
+                'sar': row[6],
+                'position': row[7],
+                'sequence': row[8],
+                'duration': row[9]
+            })
+        
+        result['sar_data'] = {
+            'count': len(sar_data),
+            'data': sar_data
+        }
+        
+        # 3. 获取变化率数据（如果需要）
+        if include_changes:
+            change_conditions = ["symbol = ?"]
+            change_params = [symbol.upper()]
+            
+            if position:
+                change_conditions.append("position = ?")
+                change_params.append(position)
+            
+            cursor.execute(f'''
+                SELECT sequence_num, prev_sar, current_sar, change_value,
+                       change_percent, kline_time, position
+                FROM sar_consecutive_changes
+                WHERE {' AND '.join(change_conditions)}
+                ORDER BY id DESC
+                LIMIT ?
+            ''', change_params + [limit])
+            
+            changes = []
+            for row in cursor.fetchall():
+                changes.append({
+                    'sequence': row[0],
+                    'prev_sar': row[1],
+                    'current_sar': row[2],
+                    'change_value': row[3],
+                    'change_percent': row[4],
+                    'time': row[5],
+                    'position': row[6]
+                })
+            
+            result['changes'] = {
+                'count': len(changes),
+                'data': changes
+            }
+        
+        # 4. 获取周期平均值（如果需要）
+        if include_averages:
+            cursor.execute('''
+                SELECT position, period_type, avg_change_percent, 
+                       sample_count, calculated_at
+                FROM sar_period_averages
+                WHERE symbol = ?
+                ORDER BY position, period_type
+            ''', (symbol.upper(),))
+            
+            averages = {
+                'long': {},
+                'short': {}
+            }
+            
+            for row in cursor.fetchall():
+                pos = row[0]
+                period = row[1]
+                averages[pos][period] = {
+                    'avg_change_percent': row[2],
+                    'sample_count': row[3],
+                    'calculated_at': row[4]
+                }
+            
+            result['averages'] = averages
+        
+        # 5. 获取异常告警（如果需要）
+        if include_alerts:
+            alert_conditions = ["symbol = ?"]
+            alert_params = [symbol.upper()]
+            
+            if position:
+                alert_conditions.append("position = ?")
+                alert_params.append(position)
+            
+            cursor.execute(f'''
+                SELECT position, sequence_num, sar_value, change_percent,
+                       period_avg, deviation_percent, alert_level,
+                       is_extreme_point, extreme_type, kline_time, created_at
+                FROM sar_anomaly_alerts
+                WHERE {' AND '.join(alert_conditions)}
+                ORDER BY created_at DESC
+                LIMIT ?
+            ''', alert_params + [min(limit, 200)])
+            
+            alerts = []
+            for row in cursor.fetchall():
+                alerts.append({
+                    'position': row[0],
+                    'sequence': row[1],
+                    'sar': row[2],
+                    'change_percent': row[3],
+                    'period_avg': row[4],
+                    'deviation': row[5],
+                    'level': row[6],
+                    'is_extreme': row[7],
+                    'extreme_type': row[8],
+                    'time': row[9],
+                    'created_at': row[10]
+                })
+            
+            result['alerts'] = {
+                'count': len(alerts),
+                'data': alerts
+            }
+        
+        # 6. 获取多空转换点（如果需要）
+        if include_conversions:
+            cursor.execute('''
+                SELECT timestamp, kline_time, from_position, to_position,
+                       conversion_sar, conversion_price, previous_duration, created_at
+                FROM sar_conversion_points
+                WHERE symbol = ?
+                ORDER BY timestamp DESC
+                LIMIT ?
+            ''', (symbol.upper(), min(limit, 100)))
+            
+            conversions = []
+            for row in cursor.fetchall():
+                conversions.append({
+                    'timestamp': row[0],
+                    'time': row[1],
+                    'from_position': row[2],
+                    'to_position': row[3],
+                    'sar': row[4],
+                    'price': row[5],
+                    'prev_duration': row[6],
+                    'created_at': row[7]
+                })
+            
+            result['conversions'] = {
+                'count': len(conversions),
+                'data': conversions
+            }
+        
+        # 7. 统计信息
+        result['statistics'] = {
+            'total_records': len(sar_data),
+            'date_range': {
+                'earliest': sar_data[-1]['kline_time'] if sar_data else None,
+                'latest': sar_data[0]['kline_time'] if sar_data else None
+            }
+        }
+        
+        # 计算多空分布
+        if sar_data:
+            long_count = sum(1 for d in sar_data if d['position'] == 'long')
+            short_count = sum(1 for d in sar_data if d['position'] == 'short')
+            result['statistics']['position_distribution'] = {
+                'long': long_count,
+                'short': short_count,
+                'long_percent': round(long_count / len(sar_data) * 100, 2),
+                'short_percent': round(short_count / len(sar_data) * 100, 2)
+            }
+        
+        conn.close()
+        
+        return jsonify(result)
+    
+    except Exception as e:
+        import traceback
+        return jsonify({
+            'success': False,
+            'error': str(e),
+            'traceback': traceback.format_exc()
+        })
+
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=5000, debug=False)
 
