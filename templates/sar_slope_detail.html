@@ -267,28 +267,34 @@
             sequences.forEach(seq => {
                 const hasChange = seq.sequence_change_percent !== undefined;
                 
-                // 计算1天偏向（基于1天变化%的正负）
+                // 计算1天偏向（基于1天变化%的正负，且绝对值>30%才显示）
                 let bias1day = '-';
                 let bias1dayClass = '';
                 if (hasChange && seq.change_1day_percent !== undefined) {
-                    if (currentPosition === 'long') {
-                        bias1day = seq.change_1day_percent < 0 ? '偏多' : '偏空';
-                    } else {
-                        bias1day = seq.change_1day_percent < 0 ? '偏空' : '偏多';
+                    const abs1day = Math.abs(seq.change_1day_percent);
+                    if (abs1day > 30) {  // 只有偏离值大于30%才显示
+                        if (currentPosition === 'long') {
+                            bias1day = seq.change_1day_percent < 0 ? '偏多' : '偏空';
+                        } else {
+                            bias1day = seq.change_1day_percent < 0 ? '偏空' : '偏多';
+                        }
+                        bias1dayClass = bias1day === '偏多' ? 'bias-bullish' : 'bias-bearish';
                     }
-                    bias1dayClass = bias1day === '偏多' ? 'bias-bullish' : 'bias-bearish';
                 }
                 
-                // 计算3天偏向（基于3天变化%的正负）
+                // 计算3天偏向（基于3天变化%的正负，且绝对值>30%才显示）
                 let bias3day = '-';
                 let bias3dayClass = '';
                 if (hasChange && seq.change_3day_percent !== undefined) {
-                    if (currentPosition === 'long') {
-                        bias3day = seq.change_3day_percent < 0 ? '偏多' : '偏空';
-                    } else {
-                        bias3day = seq.change_3day_percent < 0 ? '偏空' : '偏多';
+                    const abs3day = Math.abs(seq.change_3day_percent);
+                    if (abs3day > 30) {  // 只有偏离值大于30%才显示
+                        if (currentPosition === 'long') {
+                            bias3day = seq.change_3day_percent < 0 ? '偏多' : '偏空';
+                        } else {
+                            bias3day = seq.change_3day_percent < 0 ? '偏空' : '偏多';
+                        }
+                        bias3dayClass = bias3day === '偏多' ? 'bias-bullish' : 'bias-bearish';
                     }
-                    bias3dayClass = bias3day === '偏多' ? 'bias-bullish' : 'bias-bearish';
                 }
                 
                 const sarDiffClass = hasChange && seq.sar_diff >= 0 ? 'trend-increase' : 'trend-decrease';
