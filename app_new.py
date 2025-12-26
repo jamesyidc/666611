@@ -11725,12 +11725,28 @@ def sar_bias_trend_page():
 
 @app.route('/api/sar-slope/bias-trend')
 def sar_slope_bias_trend():
-    """获取SAR偏向趋势数据（12小时）"""
+    """获取SAR偏向趋势数据（12小时分页）"""
     try:
+        from datetime import datetime, timezone, timedelta
+        import json
+        
+        # 获取分页参数
+        page = request.args.get('page', 1, type=int)
+        
         conn = sqlite3.connect('/home/user/webapp/sar_slope_data.db', timeout=10.0)
         cursor = conn.cursor()
         
-        # 获取最近12小时的数据
+        # 北京时区
+        beijing_tz = timezone(timedelta(hours=8))
+        
+        # 计算时间范围（每页12小时）
+        # page=1: 最近12小时
+        # page=2: 12-24小时前
+        # page=3: 24-36小时前
+        hours_end = (page - 1) * 12
+        hours_start = page * 12
+        
+        # 获取指定页的12小时数据
         cursor.execute('''
         SELECT 
             timestamp,
@@ -11740,18 +11756,32 @@ def sar_slope_bias_trend():
             bullish_symbols,
             bearish_symbols
         FROM sar_bias_trend
-        WHERE datetime(timestamp) >= datetime('now', '-12 hours')
+        WHERE datetime(timestamp) >= datetime('now', '-' || ? || ' hours')
+          AND datetime(timestamp) < datetime('now', '-' || ? || ' hours')
         ORDER BY timestamp ASC
-        ''')
+        ''', (hours_start, hours_end))
         
         rows = cursor.fetchall()
+        
+        # 获取总页数（基于所有数据）
+        cursor.execute('SELECT MIN(timestamp) FROM sar_bias_trend')
+        min_timestamp = cursor.fetchone()[0]
+        
+        total_pages = 1
+        if min_timestamp:
+            # 计算最早数据距今的小时数
+            cursor.execute("SELECT (julianday('now') - julianday(?)) * 24", (min_timestamp,))
+            hours_diff = cursor.fetchone()[0]
+            total_pages = max(1, int(hours_diff / 12) + 1)
+        
         conn.close()
         
         data = []
         for row in rows:
-            import json
+            # 将时间戳转换为北京时间（如果需要）
+            timestamp_str = row[0]
             data.append({
-                'timestamp': row[0],
+                'timestamp': timestamp_str,
                 'bullish_count': row[1],
                 'bearish_count': row[2],
                 'total_symbols': row[3],
@@ -11759,10 +11789,24 @@ def sar_slope_bias_trend():
                 'bearish_symbols': json.loads(row[5]) if row[5] else []
             })
         
+        # 获取当前页的时间范围（用于显示）
+        time_range = {
+            'start': '',
+            'end': ''
+        }
+        if data:
+            time_range['start'] = data[0]['timestamp']
+            time_range['end'] = data[-1]['timestamp']
+        
         return jsonify({
             'success': True,
             'data': data,
-            'total': len(data)
+            'total': len(data),
+            'page': page,
+            'total_pages': total_pages,
+            'time_range': time_range,
+            'has_prev': page < total_pages,
+            'has_next': page > 1
         })
     
     except Exception as e:
@@ -11772,6 +11816,7 @@ def sar_slope_bias_trend():
             'error': str(e),
             'traceback': traceback.format_exc()
         })
+
 
 # ============================================
 # 缓存管理API

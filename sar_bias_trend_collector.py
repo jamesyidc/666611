@@ -8,8 +8,11 @@ SAR斜率偏多/偏空趋势采集器
 import sqlite3
 import time
 import requests
-from datetime import datetime
+from datetime import datetime, timezone, timedelta
 import sys
+
+# 设置北京时区
+BEIJING_TZ = timezone(timedelta(hours=8))
 
 # 监控的币种列表
 MONITORED_SYMBOLS = [
@@ -58,8 +61,11 @@ def get_bias_statistics():
     bullish_symbols = []
     bearish_symbols = []
     
+    # 使用北京时间
+    beijing_time = datetime.now(BEIJING_TZ).strftime('%Y-%m-%d %H:%M:%S')
+    
     print(f"\n{'='*60}")
-    print(f"开始采集 SAR 偏向统计 - {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
+    print(f"开始采集 SAR 偏向统计 - {beijing_time}")
     print(f"{'='*60}")
     
     for idx, symbol in enumerate(MONITORED_SYMBOLS, 1):
@@ -126,7 +132,8 @@ def save_trend_data(bullish_symbols, bearish_symbols):
     conn = sqlite3.connect(DB_PATH, timeout=10.0)
     cursor = conn.cursor()
     
-    timestamp = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+    # 使用北京时间
+    timestamp = datetime.now(BEIJING_TZ).strftime('%Y-%m-%d %H:%M:%S')
     
     # 准备符号列表的JSON字符串
     import json
