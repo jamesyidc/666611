@@ -11746,7 +11746,7 @@ def sar_slope_bias_trend():
         hours_end = (page - 1) * 12
         hours_start = page * 12
         
-        # 获取指定页的12小时数据
+        # 获取指定页的12小时数据（数据库存储的是北京时间，需要+8小时来匹配）
         cursor.execute('''
         SELECT 
             timestamp,
@@ -11756,8 +11756,8 @@ def sar_slope_bias_trend():
             bullish_symbols,
             bearish_symbols
         FROM sar_bias_trend
-        WHERE datetime(timestamp) >= datetime('now', '-' || ? || ' hours')
-          AND datetime(timestamp) < datetime('now', '-' || ? || ' hours')
+        WHERE datetime(timestamp) >= datetime('now', '+8 hours', '-' || ? || ' hours')
+          AND datetime(timestamp) < datetime('now', '+8 hours', '-' || ? || ' hours')
         ORDER BY timestamp ASC
         ''', (hours_start, hours_end))
         
@@ -11769,8 +11769,8 @@ def sar_slope_bias_trend():
         
         total_pages = 1
         if min_timestamp:
-            # 计算最早数据距今的小时数
-            cursor.execute("SELECT (julianday('now') - julianday(?)) * 24", (min_timestamp,))
+            # 计算最早数据距今的小时数（使用北京时间）
+            cursor.execute("SELECT (julianday('now', '+8 hours') - julianday(?)) * 24", (min_timestamp,))
             hours_diff = cursor.fetchone()[0]
             total_pages = max(1, int(hours_diff / 12) + 1)
         
