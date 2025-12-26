@@ -64,8 +64,11 @@ def get_bias_statistics():
     
     for idx, symbol in enumerate(MONITORED_SYMBOLS, 1):
         try:
+            # 转换币种格式：BTC-USDT-SWAP -> BTC
+            symbol_short = symbol.split('-')[0]
+            
             # 调用API获取当前周期数据
-            url = f'http://localhost:5000/api/sar-slope/current-cycle/{symbol}'
+            url = f'http://localhost:5000/api/sar-slope/current-cycle/{symbol_short}'
             response = requests.get(url, timeout=5)
             
             if response.status_code == 200:
