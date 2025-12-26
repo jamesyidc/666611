@@ -1,0 +1,512 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SAR偏向趋势图 - 12小时实时监控</title>
+    <script src="https://cdn.jsdelivr.net/npm/echarts@5.4.3/dist/echarts.min.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', sans-serif;
+            background: #1e2139;
+            color: #fff;
+            padding: 20px;
+        }
+        
+        .container {
+            max-width: 1600px;
+            margin: 0 auto;
+        }
+        
+        .header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 30px;
+        }
+        
+        h1 {
+            font-size: 28px;
+            color: #00d4ff;
+        }
+        
+        .back-btn {
+            background: rgba(59, 125, 255, 0.2);
+            border: 1px solid rgba(59, 125, 255, 0.4);
+            color: #00d4ff;
+            padding: 10px 20px;
+            border-radius: 6px;
+            cursor: pointer;
+            text-decoration: none;
+            font-size: 14px;
+            transition: all 0.3s;
+        }
+        
+        .back-btn:hover {
+            background: rgba(59, 125, 255, 0.3);
+            border-color: rgba(59, 125, 255, 0.6);
+        }
+        
+        .stats-cards {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 20px;
+            margin-bottom: 30px;
+        }
+        
+        .stat-card {
+            background: rgba(42, 45, 71, 0.8);
+            border: 1px solid rgba(59, 125, 255, 0.3);
+            border-radius: 8px;
+            padding: 20px;
+        }
+        
+        .stat-label {
+            font-size: 14px;
+            color: #8b92b8;
+            margin-bottom: 10px;
+        }
+        
+        .stat-value {
+            font-size: 32px;
+            font-weight: bold;
+            color: #00d4ff;
+        }
+        
+        .stat-value.bullish {
+            color: #26d639;
+        }
+        
+        .stat-value.bearish {
+            color: #ff4757;
+        }
+        
+        .stat-trend {
+            font-size: 12px;
+            color: #8b92b8;
+            margin-top: 5px;
+        }
+        
+        .chart-container {
+            background: rgba(42, 45, 71, 0.8);
+            border: 1px solid rgba(59, 125, 255, 0.3);
+            border-radius: 8px;
+            padding: 20px;
+            margin-bottom: 30px;
+        }
+        
+        .chart-title {
+            font-size: 18px;
+            color: #00d4ff;
+            margin-bottom: 15px;
+        }
+        
+        #trendChart {
+            width: 100%;
+            height: 500px;
+        }
+        
+        .symbol-lists {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+        }
+        
+        .symbol-list {
+            background: rgba(42, 45, 71, 0.8);
+            border: 1px solid rgba(59, 125, 255, 0.3);
+            border-radius: 8px;
+            padding: 20px;
+        }
+        
+        .list-title {
+            font-size: 16px;
+            font-weight: bold;
+            margin-bottom: 15px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        
+        .list-title.bullish {
+            color: #26d639;
+        }
+        
+        .list-title.bearish {
+            color: #ff4757;
+        }
+        
+        .symbol-item {
+            background: rgba(30, 33, 57, 0.5);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 4px;
+            padding: 10px;
+            margin-bottom: 8px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        
+        .symbol-name {
+            font-weight: bold;
+            color: #00d4ff;
+        }
+        
+        .loading {
+            text-align: center;
+            padding: 40px;
+            color: #8b92b8;
+        }
+        
+        .update-info {
+            text-align: center;
+            color: #8b92b8;
+            font-size: 12px;
+            margin-top: 20px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>SAR偏向趋势图 - 12小时实时监控</h1>
+            <a href="/sar-slope" class="back-btn">← 返回列表</a>
+        </div>
+        
+        <div class="stats-cards">
+            <div class="stat-card">
+                <div class="stat-label">当前偏多币种 (>80%)</div>
+                <div class="stat-value bullish" id="currentBullish">-</div>
+                <div class="stat-trend" id="bullishTrend">加载中...</div>
+            </div>
+            
+            <div class="stat-card">
+                <div class="stat-label">当前偏空币种 (>80%)</div>
+                <div class="stat-value bearish" id="currentBearish">-</div>
+                <div class="stat-trend" id="bearishTrend">加载中...</div>
+            </div>
+            
+            <div class="stat-card">
+                <div class="stat-label">总监控币种</div>
+                <div class="stat-value" id="totalSymbols">27</div>
+                <div class="stat-trend">实时更新中</div>
+            </div>
+            
+            <div class="stat-card">
+                <div class="stat-label">数据点数</div>
+                <div class="stat-value" id="dataPoints">-</div>
+                <div class="stat-trend" id="timeRange">加载中...</div>
+            </div>
+        </div>
+        
+        <div class="chart-container">
+            <div class="chart-title">📊 偏多/偏空数量趋势 (12小时)</div>
+            <div id="trendChart"></div>
+        </div>
+        
+        <div class="symbol-lists">
+            <div class="symbol-list">
+                <div class="list-title bullish">
+                    ⬆️ 当前偏多币种 (>80%)
+                </div>
+                <div id="bullishList">
+                    <div class="loading">加载中...</div>
+                </div>
+            </div>
+            
+            <div class="symbol-list">
+                <div class="list-title bearish">
+                    ⬇️ 当前偏空币种 (>80%)
+                </div>
+                <div id="bearishList">
+                    <div class="loading">加载中...</div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="update-info">
+            最后更新: <span id="lastUpdate">-</span> | 
+            数据每30秒更新一次，图表显示最近12小时数据
+        </div>
+    </div>
+    
+    <script>
+        let chart = null;
+        let updateInterval = null;
+        
+        // 初始化图表
+        function initChart() {
+            const chartDom = document.getElementById('trendChart');
+            chart = echarts.init(chartDom);
+            
+            const option = {
+                backgroundColor: 'transparent',
+                tooltip: {
+                    trigger: 'axis',
+                    backgroundColor: 'rgba(30, 33, 57, 0.9)',
+                    borderColor: 'rgba(59, 125, 255, 0.4)',
+                    textStyle: {
+                        color: '#fff'
+                    },
+                    formatter: function(params) {
+                        let result = params[0].axisValue + '<br/>';
+                        params.forEach(item => {
+                            const color = item.seriesName.includes('偏多') ? '#26d639' : '#ff4757';
+                            result += `<span style="color:${color}">● ${item.seriesName}: ${item.value}</span><br/>`;
+                        });
+                        return result;
+                    }
+                },
+                legend: {
+                    data: ['偏多币种 (>80%)', '偏空币种 (>80%)'],
+                    textStyle: {
+                        color: '#8b92b8'
+                    },
+                    top: 10
+                },
+                grid: {
+                    left: '3%',
+                    right: '4%',
+                    bottom: '10%',
+                    top: '15%',
+                    containLabel: true
+                },
+                xAxis: {
+                    type: 'category',
+                    boundaryGap: false,
+                    data: [],
+                    axisLabel: {
+                        color: '#8b92b8',
+                        rotate: 45
+                    },
+                    axisLine: {
+                        lineStyle: {
+                            color: 'rgba(59, 125, 255, 0.3)'
+                        }
+                    }
+                },
+                yAxis: {
+                    type: 'value',
+                    name: '币种数量',
+                    nameTextStyle: {
+                        color: '#8b92b8'
+                    },
+                    axisLabel: {
+                        color: '#8b92b8'
+                    },
+                    axisLine: {
+                        lineStyle: {
+                            color: 'rgba(59, 125, 255, 0.3)'
+                        }
+                    },
+                    splitLine: {
+                        lineStyle: {
+                            color: 'rgba(59, 125, 255, 0.1)'
+                        }
+                    }
+                },
+                series: [
+                    {
+                        name: '偏多币种 (>80%)',
+                        type: 'line',
+                        smooth: true,
+                        symbol: 'circle',
+                        symbolSize: 6,
+                        lineStyle: {
+                            color: '#26d639',
+                            width: 2
+                        },
+                        itemStyle: {
+                            color: '#26d639'
+                        },
+                        areaStyle: {
+                            color: {
+                                type: 'linear',
+                                x: 0,
+                                y: 0,
+                                x2: 0,
+                                y2: 1,
+                                colorStops: [
+                                    { offset: 0, color: 'rgba(38, 214, 57, 0.3)' },
+                                    { offset: 1, color: 'rgba(38, 214, 57, 0.05)' }
+                                ]
+                            }
+                        },
+                        data: []
+                    },
+                    {
+                        name: '偏空币种 (>80%)',
+                        type: 'line',
+                        smooth: true,
+                        symbol: 'circle',
+                        symbolSize: 6,
+                        lineStyle: {
+                            color: '#ff4757',
+                            width: 2
+                        },
+                        itemStyle: {
+                            color: '#ff4757'
+                        },
+                        areaStyle: {
+                            color: {
+                                type: 'linear',
+                                x: 0,
+                                y: 0,
+                                x2: 0,
+                                y2: 1,
+                                colorStops: [
+                                    { offset: 0, color: 'rgba(255, 71, 87, 0.3)' },
+                                    { offset: 1, color: 'rgba(255, 71, 87, 0.05)' }
+                                ]
+                            }
+                        },
+                        data: []
+                    }
+                ]
+            };
+            
+            chart.setOption(option);
+            
+            // 响应式
+            window.addEventListener('resize', () => {
+                chart.resize();
+            });
+        }
+        
+        // 加载趋势数据
+        async function loadTrendData() {
+            try {
+                const response = await fetch('/api/sar-slope/bias-trend');
+                const data = await response.json();
+                
+                if (data.success && data.data.length > 0) {
+                    // 准备图表数据
+                    const times = [];
+                    const bullishData = [];
+                    const bearishData = [];
+                    
+                    data.data.forEach(item => {
+                        // 格式化时间 (只显示时:分)
+                        const time = item.timestamp.substring(11, 16);
+                        times.push(time);
+                        bullishData.push(item.bullish_count);
+                        bearishData.push(item.bearish_count);
+                    });
+                    
+                    // 更新图表
+                    chart.setOption({
+                        xAxis: {
+                            data: times
+                        },
+                        series: [
+                            { data: bullishData },
+                            { data: bearishData }
+                        ]
+                    });
+                    
+                    // 更新统计卡片
+                    const latest = data.data[data.data.length - 1];
+                    document.getElementById('currentBullish').textContent = latest.bullish_count;
+                    document.getElementById('currentBearish').textContent = latest.bearish_count;
+                    document.getElementById('dataPoints').textContent = data.data.length;
+                    
+                    // 计算趋势
+                    if (data.data.length >= 2) {
+                        const prev = data.data[data.data.length - 2];
+                        const bullishChange = latest.bullish_count - prev.bullish_count;
+                        const bearishChange = latest.bearish_count - prev.bearish_count;
+                        
+                        document.getElementById('bullishTrend').textContent = 
+                            bullishChange > 0 ? `↑ +${bullishChange}` : 
+                            bullishChange < 0 ? `↓ ${bullishChange}` : '→ 持平';
+                        
+                        document.getElementById('bearishTrend').textContent = 
+                            bearishChange > 0 ? `↑ +${bearishChange}` : 
+                            bearishChange < 0 ? `↓ ${bearishChange}` : '→ 持平';
+                    }
+                    
+                    // 时间范围
+                    const startTime = data.data[0].timestamp;
+                    const endTime = latest.timestamp;
+                    document.getElementById('timeRange').textContent = 
+                        `${startTime.substring(11, 16)} - ${endTime.substring(11, 16)}`;
+                    
+                    // 更新币种列表
+                    updateSymbolLists(latest.bullish_symbols, latest.bearish_symbols);
+                    
+                    // 更新时间
+                    document.getElementById('lastUpdate').textContent = 
+                        new Date().toLocaleTimeString('zh-CN');
+                    
+                    console.log(`✅ 数据已更新: ${data.data.length} 个数据点`);
+                } else {
+                    console.log('⚠️  暂无数据');
+                }
+            } catch (error) {
+                console.error('❌ 加载数据失败:', error);
+            }
+        }
+        
+        // 更新币种列表
+        function updateSymbolLists(bullishSymbols, bearishSymbols) {
+            // 偏多列表
+            const bullishList = document.getElementById('bullishList');
+            if (bullishSymbols && bullishSymbols.length > 0) {
+                bullishList.innerHTML = bullishSymbols.map(symbol => `
+                    <div class="symbol-item">
+                        <span class="symbol-name">${symbol}</span>
+                        <span style="color: #26d639;">⬆️</span>
+                    </div>
+                `).join('');
+            } else {
+                bullishList.innerHTML = '<div class="loading">暂无币种</div>';
+            }
+            
+            // 偏空列表
+            const bearishList = document.getElementById('bearishList');
+            if (bearishSymbols && bearishSymbols.length > 0) {
+                bearishList.innerHTML = bearishSymbols.map(symbol => `
+                    <div class="symbol-item">
+                        <span class="symbol-name">${symbol}</span>
+                        <span style="color: #ff4757;">⬇️</span>
+                    </div>
+                `).join('');
+            } else {
+                bearishList.innerHTML = '<div class="loading">暂无币种</div>';
+            }
+        }
+        
+        // 页面加载完成
+        window.addEventListener('DOMContentLoaded', () => {
+            console.log('📊 SAR偏向趋势图加载中...');
+            
+            // 初始化图表
+            initChart();
+            
+            // 首次加载数据
+            loadTrendData();
+            
+            // 每30秒更新一次
+            updateInterval = setInterval(loadTrendData, 30000);
+            
+            console.log('✅ 页面初始化完成，每30秒自动更新');
+        });
+        
+        // 页面卸载时清理
+        window.addEventListener('beforeunload', () => {
+            if (updateInterval) {
+                clearInterval(updateInterval);
+            }
+            if (chart) {
+                chart.dispose();
+            }
+        });
+    </script>
+</body>
+</html>

@@ -11716,6 +11716,64 @@ def sar_slope_current_cycle(symbol):
         })
 
 # ============================================
+# SAR偏向趋势API
+# ============================================
+@app.route('/sar-bias-trend')
+def sar_bias_trend_page():
+    """SAR偏向趋势图页面"""
+    return render_template('sar_bias_trend.html')
+
+@app.route('/api/sar-slope/bias-trend')
+def sar_slope_bias_trend():
+    """获取SAR偏向趋势数据（12小时）"""
+    try:
+        conn = sqlite3.connect('/home/user/webapp/sar_slope_data.db', timeout=10.0)
+        cursor = conn.cursor()
+        
+        # 获取最近12小时的数据
+        cursor.execute('''
+        SELECT 
+            timestamp,
+            bullish_count,
+            bearish_count,
+            total_symbols,
+            bullish_symbols,
+            bearish_symbols
+        FROM sar_bias_trend
+        WHERE datetime(timestamp) >= datetime('now', '-12 hours')
+        ORDER BY timestamp ASC
+        ''')
+        
+        rows = cursor.fetchall()
+        conn.close()
+        
+        data = []
+        for row in rows:
+            import json
+            data.append({
+                'timestamp': row[0],
+                'bullish_count': row[1],
+                'bearish_count': row[2],
+                'total_symbols': row[3],
+                'bullish_symbols': json.loads(row[4]) if row[4] else [],
+                'bearish_symbols': json.loads(row[5]) if row[5] else []
+            })
+        
+        return jsonify({
+            'success': True,
+            'data': data,
+            'total': len(data)
+        })
+    
+    except Exception as e:
+        import traceback
+        return jsonify({
+            'success': False,
+            'error': str(e),
+            'traceback': traceback.format_exc()
+        })
+
+# ============================================
 # 缓存管理API
 # ============================================
 @app.route('/api/cache/stats')
