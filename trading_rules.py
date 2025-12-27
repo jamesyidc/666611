@@ -15,6 +15,10 @@ DB_PATH = '/home/user/webapp/trading_decision.db'
 class TakeProfitRules:
     """止盈规则"""
     
+    def __init__(self, db_path):
+        """初始化"""
+        self.db_path = db_path
+    
     # 允许开多单的情况 - 空单止盈规则
     SHORT_ALLOWED_LONG = [
         {'profit_rate': 10, 'close_percent': 20},
@@ -112,10 +116,124 @@ class TakeProfitRules:
             'close_percent': 0,
             'reason': '未达到止盈条件'
         }
+    
+    def save_decision(self, inst_id, pos_side, action, decision_type, current_size, 
+                     target_size, close_size, close_percent, profit_rate, current_price, 
+                     reason, executed=0):
+        """保存交易决策记录"""
+        try:
+            conn = sqlite3.connect(self.db_path, timeout=10.0)
+            cursor = conn.cursor()
+            
+            timestamp = datetime.now(BEIJING_TZ).strftime('%Y-%m-%d %H:%M:%S')
+            
+            cursor.execute('''
+            INSERT INTO trading_decisions (
+                inst_id, pos_side, action, decision_type, current_size, target_size,
+                close_size, close_percent, profit_rate, current_price, reason,
+                executed, timestamp
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ''', (inst_id, pos_side, action, decision_type, current_size, target_size,
+                  close_size, close_percent, profit_rate, current_price, reason,
+                  executed, timestamp))
+            
+            conn.commit()
+            conn.close()
+            print(f"✅ 交易决策已保存: {inst_id} - {reason}")
+            return True
+        except Exception as e:
+            print(f"❌ 保存交易决策失败: {e}")
+            return False
 
 
 class AnchorMaintenance:
     """锚点单维护"""
+    
+    def __init__(self, db_path):
+        """初始化"""
+        self.db_path = db_path
+    
+    def save_maintenance(self, inst_id, pos_side, original_size, original_price, 
+                        maintenance_price, maintenance_size, profit_rate, action, status):
+        """保存锚点单维护记录"""
+        try:
+            conn = sqlite3.connect(self.db_path, timeout=10.0)
+            cursor = conn.cursor()
+            
+            timestamp = datetime.now(BEIJING_TZ).strftime('%Y-%m-%d %H:%M:%S')
+            
+            cursor.execute('''
+            INSERT INTO anchor_maintenance (
+                inst_id, pos_side, original_size, original_price, maintenance_price,
+                maintenance_size, profit_rate, action, status, timestamp
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ''', (inst_id, pos_side, original_size, original_price, maintenance_price,
+                  maintenance_size, profit_rate, action, status, timestamp))
+            
+            conn.commit()
+            conn.close()
+            print(f"✅ 锚点单维护记录已保存: {inst_id}")
+            return True
+        except Exception as e:
+            print(f"❌ 保存锚点单维护记录失败: {e}")
+            return False
+    
+    def get_latest_maintenance(self, inst_id, pos_side):
+        """获取最新的维护记录"""
+        try:
+            conn = sqlite3.connect(self.db_path, timeout=10.0)
+            cursor = conn.cursor()
+            
+            cursor.execute('''
+            SELECT id, inst_id, pos_side, original_size, original_price, maintenance_price,
+                   maintenance_size, profit_rate, action, status, timestamp
+            FROM anchor_maintenance
+            WHERE inst_id = ? AND pos_side = ?
+            ORDER BY created_at DESC
+            LIMIT 1
+            ''', (inst_id, pos_side))
+            
+            result = cursor.fetchone()
+            conn.close()
+            
+            if result:
+                return {
+                    'id': result[0],
+                    'inst_id': result[1],
+                    'pos_side': result[2],
+                    'original_size': result[3],
+                    'original_price': result[4],
+                    'maintenance_price': result[5],
+                    'maintenance_size': result[6],
+                    'profit_rate': result[7],
+                    'action': result[8],
+                    'status': result[9],
+                    'timestamp': result[10]
+                }
+            return None
+        except Exception as e:
+            print(f"❌ 获取维护记录失败: {e}")
+            return None
+    
+    def update_maintenance_status(self, maintenance_id, new_status):
+        """更新维护记录状态"""
+        try:
+            conn = sqlite3.connect(self.db_path, timeout=10.0)
+            cursor = conn.cursor()
+            
+            cursor.execute('''
+            UPDATE anchor_maintenance
+            SET status = ?
+            WHERE id = ?
+            ''', (new_status, maintenance_id))
+            
+            conn.commit()
+            conn.close()
+            print(f"✅ 维护记录状态已更新: {new_status}")
+            return True
+        except Exception as e:
+            print(f"❌ 更新维护记录状态失败: {e}")
+            return False
     
     @staticmethod
     def check_maintenance_needed(position, market_trend):

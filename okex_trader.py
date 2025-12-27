@@ -26,11 +26,14 @@ DB_PATH = '/home/user/webapp/trading_decision.db'
 class SafetyGate:
     """安全闸门"""
     
-    @staticmethod
-    def check_master_switch():
-        """检查总开关"""
+    def __init__(self, db_path=None):
+        """初始化安全闸门"""
+        self.db_path = db_path or DB_PATH
+    
+    def is_master_switch_on(self):
+        """检查总开关是否开启"""
         try:
-            conn = sqlite3.connect(DB_PATH, timeout=10.0)
+            conn = sqlite3.connect(self.db_path, timeout=10.0)
             cursor = conn.cursor()
             cursor.execute('SELECT enabled FROM market_config ORDER BY updated_at DESC LIMIT 1')
             result = cursor.fetchone()
@@ -39,8 +42,27 @@ class SafetyGate:
         except:
             return False
     
-    @staticmethod
-    def check_coin_switch(inst_id):
+    def check_can_trade(self, inst_id):
+        """
+        检查是否可以交易
+        
+        Args:
+            inst_id: 币种ID
+        
+        Returns:
+            bool: 是否可以交易
+        """
+        # 1. 检查总开关
+        if not self.is_master_switch_on():
+            return False
+        
+        # 2. 检查币种开关
+        if not self.check_coin_switch(inst_id):
+            return False
+        
+        return True
+    
+    def check_coin_switch(self, inst_id):
         """检查单个币种开关"""
         # TODO: 实现单个币种开关表
         return True
@@ -73,12 +95,15 @@ class SafetyGate:
         Returns:
             (bool, str): (是否允许, 原因)
         """
+        # 创建临时实例检查总开关
+        gate = SafetyGate()
+        
         # 1. 检查总开关
-        if not SafetyGate.check_master_switch():
+        if not gate.is_master_switch_on():
             return False, "❌ 总开关已关闭"
         
         # 2. 检查币种开关
-        if not SafetyGate.check_coin_switch(inst_id):
+        if not gate.check_coin_switch(inst_id):
             return False, f"❌ {inst_id}币种开关已关闭"
         
         # 3. 检查仓位限制
@@ -97,11 +122,18 @@ class SafetyGate:
 class OKExTrader:
     """OKEx交易执行器"""
     
-    def __init__(self):
+    def __init__(self, dry_run=True):
+        """
+        初始化OKEx交易执行器
+        
+        Args:
+            dry_run: 是否模拟运行（True不实际下单）
+        """
         self.api_key = OKEX_API_KEY
         self.secret_key = OKEX_SECRET_KEY
         self.passphrase = OKEX_PASSPHRASE
         self.base_url = OKEX_BASE_URL
+        self.dry_run = dry_run
     
     def get_signature(self, timestamp, method, request_path, body=''):
         """生成签名"""
@@ -203,6 +235,39 @@ class OKExTrader:
         except Exception as e:
             print(f"❌ 下单异常: {e}")
             return False, {'error': str(e)}
+    
+    def execute_trade(self, inst_id, trade_mode, pos_side, side, order_type, size, reason=''):
+        """
+        执行交易
+        
+        Args:
+            inst_id: 币种
+            trade_mode: 交易模式 (isolated/cross)
+            pos_side: 持仓方向 (long/short)
+            side: 买卖方向 (buy/sell)
+            order_type: 订单类型 (market/limit)
+            size: 数量
+            reason: 原因
+        
+        Returns:
+            bool: 是否成功
+        """
+        if self.dry_run:
+            print(f"🔸 [模拟] {reason}")
+            print(f"   {inst_id} {pos_side} {side} {size}")
+            return True
+        
+        order_data = {
+            'instId': inst_id,
+            'tdMode': trade_mode,
+            'side': side,
+            'posSide': pos_side,
+            'ordType': order_type,
+            'sz': str(size)
+        }
+        
+        success, data = self.place_order(order_data)
+        return success
 
 
 def execute_trading_decision(decision, config, dry_run=True):
