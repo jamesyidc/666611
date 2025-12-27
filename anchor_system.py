@@ -407,6 +407,9 @@ def update_profit_record(position, profit_rate):
         existing = cursor.fetchone()
         
         should_update = False
+        should_alert = False
+        alert_message = ""
+        
         if existing is None:
             # 没有记录，直接插入
             should_update = True
@@ -415,11 +418,15 @@ def update_profit_record(position, profit_rate):
             if record_type == 'max_profit' and profit_rate > current_record:
                 # 新的收益更高
                 should_update = True
+                should_alert = True
                 print(f"  🎉 {inst_id} 刷新最高收益: {current_record:.2f}% → {profit_rate:.2f}%")
+                alert_message = format_extreme_alert(position, profit_rate, current_record, 'max_profit')
             elif record_type == 'max_loss' and profit_rate < current_record:
                 # 新的亏损更大（更负）
                 should_update = True
+                should_alert = True
                 print(f"  ⚠️  {inst_id} 刷新最大亏损: {current_record:.2f}% → {profit_rate:.2f}%")
+                alert_message = format_extreme_alert(position, profit_rate, current_record, 'max_loss')
         
         if should_update:
             cursor.execute('''
@@ -442,6 +449,19 @@ def update_profit_record(position, profit_rate):
                 timestamp
             ))
             conn.commit()
+            
+            # 如果需要发送极值突破预警
+            if should_alert and alert_message:
+                # 检查冷却时间（使用特殊的alert_type）
+                extreme_alert_type = f"extreme_{record_type}"
+                if not check_alert_sent_recently(inst_id, extreme_alert_type, minutes=ALERT_COOLDOWN):
+                    print(f"  📢 发送极值突破预警...")
+                    success = send_telegram_message(alert_message)
+                    if success:
+                        # 保存告警记录
+                        save_alert_record(inst_id, pos_side, profit_rate, extreme_alert_type, alert_message, 1)
+                else:
+                    print(f"  ⏸️  极值突破预警冷却中，跳过")
         
         conn.close()
     except Exception as e:
@@ -586,6 +606,97 @@ def format_alert_message(position, profit_rate, alert_type, cycle_count=None):
 
 {'=' * 35}
 💡 建议: 请根据自身风险承受能力谨慎决策
+"""
+    
+    return message.strip()
+
+
+def format_extreme_alert(position, current_rate, previous_rate, extreme_type):
+    """
+    格式化极值突破告警消息
+    
+    Args:
+        position: 持仓信息
+        current_rate: 当前收益率
+        previous_rate: 之前的极值收益率
+        extreme_type: 'max_profit' 或 'max_loss'
+    """
+    inst_id = position.get('instId')
+    pos_side = position.get('posSide')
+    pos_size = float(position.get('pos', 0))
+    avg_price = float(position.get('avgPx', 0))
+    mark_price = float(position.get('markPx', 0))
+    upl = float(position.get('upl', 0))
+    margin = float(position.get('margin', 0))
+    lever = float(position.get('lever', 0))
+    
+    beijing_time = datetime.now(BEIJING_TZ).strftime('%Y-%m-%d %H:%M:%S')
+    
+    # 判断方向
+    direction = "做空" if pos_side == "short" else "做多"
+    
+    # 根据类型设置标题和emoji
+    if extreme_type == 'max_profit':
+        emoji = "🎉"
+        alert_title = "历史最高收益突破"
+        trend = "上涨"
+        change = current_rate - previous_rate
+    else:  # max_loss
+        emoji = "⚠️"
+        alert_title = "历史最大亏损突破"
+        trend = "下跌"
+        change = abs(current_rate - previous_rate)
+    
+    # 获取市场数据
+    market_data = get_market_data()
+    
+    message = f"""
+{emoji} <b>锚点系统 - 极值突破预警</b>
+
+🚨 <b>{alert_title}</b>
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+📊 <b>币种信息</b>
+币种: {inst_id}
+方向: {direction}
+
+📈 <b>收益率变化</b>
+之前极值: {previous_rate:+.2f}%
+当前收益率: {current_rate:+.2f}%
+突破幅度: {change:+.2f}%
+
+💰 <b>当前持仓</b>
+持仓量: {abs(pos_size):.4f}
+杠杆: {lever:.0f}x
+开仓均价: ${avg_price:.4f}
+当前标记: ${mark_price:.4f}
+
+💵 <b>收益情况</b>
+未实现盈亏: {upl:+.4f} USDT
+保证金: {margin:.4f} USDT
+收益率: {current_rate:+.2f}%
+"""
+    
+    # 添加市场计次数据
+    if market_data:
+        message += f"""
+📈 <b>市场计次数据</b>
+计次: {market_data['count']}
+计次得分: {market_data['count_score_display']}
+急涨: {market_data['rush_up']}
+急跌: {market_data['rush_down']}
+差值: {market_data['diff']}
+状态: {market_data['status']}
+数据时间: {market_data['snapshot_time']}
+"""
+    
+    message += f"""
+⏰ <b>突破时间</b>
+{beijing_time} (北京时间)
+
+{'=' * 35}
+💡 提示: 收益率已突破历史极值，请密切关注市场变化！
 """
     
     return message.strip()
