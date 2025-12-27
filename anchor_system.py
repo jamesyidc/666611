@@ -99,6 +99,50 @@ def get_positions():
         return []
 
 
+def get_btc_eth_change():
+    """
+    获取BTC和ETH的24小时涨跌幅
+    
+    Returns:
+        dict: {'BTC': change%, 'ETH': change%}
+    """
+    try:
+        # 使用OKEx的公共ticker接口（不需要签名）
+        tickers = ['BTC-USDT', 'ETH-USDT']
+        result = {}
+        
+        for ticker in tickers:
+            url = f"{OKEX_BASE_URL}/api/v5/market/ticker?instId={ticker}"
+            
+            # 公共接口不需要签名
+            response = requests.get(url, timeout=10)
+            data = response.json()
+            
+            if data.get('code') == '0' and data.get('data'):
+                ticker_data = data['data'][0]
+                
+                # 手动计算24小时涨跌幅
+                last_price = float(ticker_data.get('last', 0))
+                open_24h = float(ticker_data.get('open24h', 0))
+                
+                if open_24h > 0:
+                    change_24h = ((last_price - open_24h) / open_24h) * 100
+                else:
+                    change_24h = 0.0
+                
+                # 提取币种名称
+                coin = ticker.split('-')[0]
+                result[coin] = change_24h
+            else:
+                print(f"❌ 获取{ticker}数据失败: {data.get('msg')}")
+                result[ticker.split('-')[0]] = 0.0
+        
+        return result
+    except Exception as e:
+        print(f"❌ 获取BTC/ETH涨跌幅失败: {e}")
+        return {'BTC': 0.0, 'ETH': 0.0}
+
+
 def calculate_profit_rate(position):
     """计算持仓收益率"""
     try:
@@ -600,6 +644,20 @@ def format_alert_message(position, profit_rate, alert_type, cycle_count=None):
 暂无数据
 """
     
+    # 获取BTC和ETH的24小时涨跌幅
+    btc_eth_change = get_btc_eth_change()
+    btc_change = btc_eth_change.get('BTC', 0.0)
+    eth_change = btc_eth_change.get('ETH', 0.0)
+    
+    btc_emoji = "📈" if btc_change >= 0 else "📉"
+    eth_emoji = "📈" if eth_change >= 0 else "📉"
+    
+    message += f"""
+💹 <b>主流币24H涨跌</b>
+{btc_emoji} BTC: {btc_change:+.2f}%
+{eth_emoji} ETH: {eth_change:+.2f}%
+"""
+    
     message += f"""
 ⏰ <b>触发时间</b>
 {beijing_time} (北京时间)
@@ -689,6 +747,20 @@ def format_extreme_alert(position, current_rate, previous_rate, extreme_type):
 差值: {market_data['diff']}
 状态: {market_data['status']}
 数据时间: {market_data['snapshot_time']}
+"""
+    
+    # 获取BTC和ETH的24小时涨跌幅
+    btc_eth_change = get_btc_eth_change()
+    btc_change = btc_eth_change.get('BTC', 0.0)
+    eth_change = btc_eth_change.get('ETH', 0.0)
+    
+    btc_emoji = "📈" if btc_change >= 0 else "📉"
+    eth_emoji = "📈" if eth_change >= 0 else "📉"
+    
+    message += f"""
+💹 <b>主流币24H涨跌</b>
+{btc_emoji} BTC: {btc_change:+.2f}%
+{eth_emoji} ETH: {eth_change:+.2f}%
 """
     
     message += f"""
