@@ -27,6 +27,9 @@ DEFAULT_CONFIG = {
     "anchor_capital_limit": 200,  # 锚点单资金上限（USDT）
     "anchor_capital_percent": 10,  # 锚点单资金百分比上限
     "allow_long": False,  # 是否允许开多单
+    "allow_short": True,  # 是否允许开空单
+    "max_long_position": 500,  # 多单最大仓位（USDT）
+    "max_short_position": 600,  # 空单最大仓位（USDT）
     "min_granularity": 1,  # 最小颗粒度（%）
     "long_granularity": 10,  # 多单颗粒度（%）
     "enabled": False  # 是否启用自动交易
@@ -49,7 +52,10 @@ def init_database():
         position_limit_percent REAL NOT NULL,
         anchor_capital_limit REAL NOT NULL,
         anchor_capital_percent REAL NOT NULL,
-        allow_long INTEGER NOT NULL,
+        allow_long INTEGER NOT NULL DEFAULT 0,
+        allow_short INTEGER NOT NULL DEFAULT 1,
+        max_long_position REAL NOT NULL DEFAULT 500,
+        max_short_position REAL NOT NULL DEFAULT 600,
         min_granularity REAL NOT NULL,
         long_granularity REAL NOT NULL,
         enabled INTEGER NOT NULL,
@@ -231,8 +237,9 @@ def save_market_config(config):
     INSERT INTO market_config (
         market_mode, market_trend, total_capital, position_limit_mode,
         position_limit_percent, anchor_capital_limit, anchor_capital_percent,
-        allow_long, min_granularity, long_granularity, enabled, updated_at
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        allow_long, allow_short, max_long_position, max_short_position,
+        min_granularity, long_granularity, enabled, updated_at
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     ''', (
         config.get('market_mode', 'manual'),
         config.get('market_trend', 'neutral'),
@@ -242,6 +249,9 @@ def save_market_config(config):
         config.get('anchor_capital_limit', 200),
         config.get('anchor_capital_percent', 10),
         1 if config.get('allow_long', False) else 0,
+        1 if config.get('allow_short', True) else 0,
+        config.get('max_long_position', 500),
+        config.get('max_short_position', 600),
         config.get('min_granularity', 1),
         config.get('long_granularity', 10),
         1 if config.get('enabled', False) else 0,

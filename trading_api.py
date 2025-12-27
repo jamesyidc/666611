@@ -27,7 +27,8 @@ def get_config():
         cursor.execute('''
         SELECT market_mode, market_trend, total_capital, position_limit_mode,
                position_limit_percent, anchor_capital_limit, anchor_capital_percent,
-               allow_long, min_granularity, long_granularity, enabled, updated_at
+               allow_long, allow_short, max_long_position, max_short_position,
+               min_granularity, long_granularity, enabled, updated_at
         FROM market_config
         ORDER BY updated_at DESC
         LIMIT 1
@@ -48,10 +49,13 @@ def get_config():
                     'anchor_capital_limit': row[5],
                     'anchor_capital_percent': row[6],
                     'allow_long': bool(row[7]),
-                    'min_granularity': row[8],
-                    'long_granularity': row[9],
-                    'enabled': bool(row[10]),
-                    'updated_at': row[11]
+                    'allow_short': bool(row[8]) if row[8] is not None else True,
+                    'max_long_position': row[9] if row[9] is not None else 500,
+                    'max_short_position': row[10] if row[10] is not None else 600,
+                    'min_granularity': row[11],
+                    'long_granularity': row[12],
+                    'enabled': bool(row[13]),
+                    'updated_at': row[14]
                 }
             })
         else:
@@ -76,8 +80,9 @@ def update_config():
         INSERT INTO market_config (
             market_mode, market_trend, total_capital, position_limit_mode,
             position_limit_percent, anchor_capital_limit, anchor_capital_percent,
-            allow_long, min_granularity, long_granularity, enabled, updated_at
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            allow_long, allow_short, max_long_position, max_short_position,
+            min_granularity, long_granularity, enabled, updated_at
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         ''', (
             data.get('market_mode', 'manual'),
             data.get('market_trend', 'neutral'),
@@ -87,6 +92,9 @@ def update_config():
             data.get('anchor_capital_limit', 200),
             data.get('anchor_capital_percent', 10),
             1 if data.get('allow_long', False) else 0,
+            1 if data.get('allow_short', True) else 0,
+            data.get('max_long_position', 500),
+            data.get('max_short_position', 600),
             data.get('min_granularity', 1),
             data.get('long_granularity', 10),
             1 if data.get('enabled', False) else 0,

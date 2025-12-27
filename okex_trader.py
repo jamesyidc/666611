@@ -88,9 +88,16 @@ class SafetyGate:
         return 0
     
     @staticmethod
-    def can_execute_trade(inst_id, action, size, config):
+    def can_execute_trade(inst_id, action, size, pos_side, config):
         """
         综合检查是否可以执行交易
+        
+        Args:
+            inst_id: 币种ID
+            action: 动作类型 (open/add/close)
+            size: 交易数量
+            pos_side: 持仓方向 (long/short)
+            config: 系统配置
         
         Returns:
             (bool, str): (是否允许, 原因)
@@ -106,17 +113,71 @@ class SafetyGate:
         if not gate.check_coin_switch(inst_id):
             return False, f"❌ {inst_id}币种开关已关闭"
         
-        # 3. 检查仓位限制
+        # 3. 对于开仓/补仓，检查方向是否允许
         if action in ['open', 'add']:
-            allowed, msg = SafetyGate.check_position_limit(
-                inst_id, size, 
-                config.get('total_capital', 1000),
-                config.get('position_limit_percent', 60)
+            # 检查是否允许做多
+            if pos_side == 'long' and not config.get('allow_long', False):
+                return False, f"❌ 系统禁止做多"
+            
+            # 检查是否允许做空
+            if pos_side == 'short' and not config.get('allow_short', True):
+                return False, f"❌ 系统禁止做空"
+            
+            # 检查方向仓位限制
+            allowed, msg = SafetyGate.check_direction_position_limit(
+                inst_id, size, pos_side, config
             )
             if not allowed:
                 return False, msg
         
         return True, "✅ 安全检查通过"
+    
+    @staticmethod
+    def check_direction_position_limit(inst_id, new_size, pos_side, config):
+        """
+        检查方向仓位限制
+        
+        Args:
+            inst_id: 币种ID
+            new_size: 新增仓位大小
+            pos_side: 持仓方向 (long/short)
+            config: 系统配置
+        
+        Returns:
+            (bool, str): (是否允许, 原因)
+        """
+        # 获取当前方向的总仓位
+        current_position = SafetyGate.get_direction_position(pos_side)
+        
+        # 获取该方向的最大仓位限制
+        if pos_side == 'long':
+            max_position = config.get('max_long_position', 500)
+            direction_name = "多单"
+        else:
+            max_position = config.get('max_short_position', 600)
+            direction_name = "空单"
+        
+        # 检查是否超限
+        if current_position + new_size > max_position:
+            return False, f"❌ {direction_name}仓位超限：当前{current_position:.2f}U + 新增{new_size:.2f}U > 限额{max_position:.2f}U"
+        
+        return True, f"✅ {direction_name}仓位检查通过"
+    
+    @staticmethod
+    def get_direction_position(pos_side):
+        """
+        获取指定方向的当前总仓位（USDT）
+        
+        Args:
+            pos_side: 持仓方向 (long/short)
+        
+        Returns:
+            float: 当前该方向的总仓位
+        """
+        # TODO: 从OKEx API获取实时仓位
+        # 这里应该调用OKEx API获取真实的持仓数据
+        # 并按pos_side筛选计算总仓位
+        return 0
 
 
 class OKExTrader:
