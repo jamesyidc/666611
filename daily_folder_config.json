@@ -1,11 +1,12 @@
 {
   "root_folder_odd": "1j8YV6KysUCmgcmASFOxztWWIE1Vq-kYV",
   "root_folder_even": "1j8YV6KysUCmgcmASFOxztWWIE1Vq-kYV",
-  "current_date": "2025-12-26",
-  "folder_id": "1jgqcidqq0PwA-2-AtHH6fM87Cuh3b99J",
+  "current_date": "2025-12-27",
+  "folder_id": "1l1x2p5fu48drMbUX0p4G5uQWn3xg7iO_",
   "parent_folder_id": "1j8YV6KysUCmgcmASFOxztWWIE1Vq-kYV",
   "updated_at": "2025-12-26 00:41:06",
-  "update_reason": "手动更新新一天文件夹",
-  "folder_name": "2025-12-26",
-  "auto_updated": true
+  "update_reason": "每日00:10自动更新到新日期文件夹",
+  "folder_name": "2025-12-27",
+  "auto_updated": true,
+  "auto_update_time": "2025-12-27 00:10:28"
 }
