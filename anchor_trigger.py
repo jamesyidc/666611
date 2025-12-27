@@ -12,7 +12,7 @@ from typing import Dict, List, Tuple, Optional
 
 # 配置
 DB_PATH = '/home/user/webapp/trading_decision.db'
-SUPPORT_RESISTANCE_DB = '/home/user/webapp/support_resistance.db'
+CRYPTO_DATA_DB = '/home/user/webapp/crypto_data.db'
 BEIJING_TZ = pytz.timezone('Asia/Shanghai')
 
 
@@ -22,7 +22,7 @@ class AnchorTrigger:
     def __init__(self):
         """初始化"""
         self.db_path = DB_PATH
-        self.sr_db_path = SUPPORT_RESISTANCE_DB
+        self.crypto_db_path = CRYPTO_DATA_DB
     
     def get_config(self) -> Dict:
         """获取配置"""
@@ -59,38 +59,56 @@ class AnchorTrigger:
     def get_escape_top_signals(self) -> List[Dict]:
         """
         获取逃顶信号
-        条件：压力线1 和 压力线2 同时存在
+        条件：
+        1. 当前价格非常接近压力线（距离<=2%）
+        2. 同时存在压力线1和压力线2
+        3. 位置百分比>90%（接近顶部）
         """
         try:
-            conn = sqlite3.connect(self.sr_db_path, timeout=10.0)
+            conn = sqlite3.connect(self.crypto_db_path, timeout=10.0)
             cursor = conn.cursor()
             
-            # 查询最新的逃顶信号
+            # 从 support_resistance_levels 表获取最新数据
             cursor.execute('''
-            SELECT inst_id, escape_top_signal, pressure1, pressure2,
-                   current_price, timestamp
-            FROM support_resistance
-            WHERE escape_top_signal = 1
-              AND pressure1 IS NOT NULL
-              AND pressure2 IS NOT NULL
-            ORDER BY timestamp DESC
+            SELECT symbol, current_price, 
+                   resistance_line_1, resistance_line_2,
+                   distance_to_resistance_1, distance_to_resistance_2,
+                   position_7d, position_48h,
+                   record_time
+            FROM support_resistance_levels
+            WHERE record_time = (SELECT MAX(record_time) FROM support_resistance_levels)
+              AND resistance_line_1 IS NOT NULL
+              AND resistance_line_2 IS NOT NULL
+              AND distance_to_resistance_1 <= 2.0
+              AND position_7d >= 90
+            ORDER BY record_time DESC
             ''')
             
             signals = []
             for row in cursor.fetchall():
+                # 转换为OKX永续合约格式: BTCUSDT -> BTC-USDT-SWAP
+                symbol = row[0]
+                inst_id = f"{symbol[:-4]}-{symbol[-4:]}-SWAP"
+                
                 signals.append({
-                    'inst_id': row[0],
-                    'escape_top_signal': bool(row[1]),
-                    'pressure1': float(row[2]),
-                    'pressure2': float(row[3]),
-                    'current_price': float(row[4]),
-                    'timestamp': row[5]
+                    'inst_id': inst_id,
+                    'escape_top_signal': True,
+                    'pressure1': float(row[2]),  # resistance_line_1
+                    'pressure2': float(row[3]),  # resistance_line_2
+                    'current_price': float(row[1]),
+                    'distance_to_resistance_1': float(row[4]),
+                    'distance_to_resistance_2': float(row[5]),
+                    'position_7d': float(row[6]),
+                    'position_48h': float(row[7]),
+                    'timestamp': row[8]
                 })
             
             conn.close()
             return signals
         except Exception as e:
             print(f"❌ 获取逃顶信号失败: {e}")
+            import traceback
+            traceback.print_exc()
             return []
     
     def get_coin_position_value(self, inst_id: str) -> float:
