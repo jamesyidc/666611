@@ -270,7 +270,7 @@ def check_alert_sent_recently(inst_id, alert_type, minutes=30):
         return False
 
 
-def format_alert_message(position, profit_rate, alert_type):
+def format_alert_message(position, profit_rate, alert_type, cycle_count=None):
     """格式化告警消息"""
     inst_id = position.get('instId')
     pos_side = position.get('posSide')
@@ -286,41 +286,55 @@ def format_alert_message(position, profit_rate, alert_type):
     # 确定方向
     direction = "做空" if pos_side == "short" else "做多"
     
-    # 告警类型
+    # 告警类型 - 修改为开仓预警
     if alert_type == "profit_target":
-        alert_emoji = "🎉"
-        alert_title = "【盈利目标达成】"
+        alert_emoji = "📈"
+        alert_title = "【锚点系统触发 - 开仓多头预警】"
+        signal_type = "做空盈利40%，建议开仓做多"
     else:
-        alert_emoji = "⚠️"
-        alert_title = "【止损警告】"
+        alert_emoji = "📉"
+        alert_title = "【锚点系统触发 - 开仓空头预警】"
+        signal_type = "做空亏损-10%，建议开仓做空"
+    
+    # 计算计次得分
+    score = abs(profit_rate)  # 简单使用收益率绝对值作为得分
     
     message = f"""
-{alert_emoji} <b>锚点系统提醒</b> {alert_emoji}
+{alert_emoji} <b>锚点系统触发</b> {alert_emoji}
 
 {alert_title}
 
-📊 <b>持仓信息</b>
+🎯 <b>交易信号</b>
+{signal_type}
+
+📊 <b>当前持仓数据</b>
 币种: {inst_id}
-方向: {direction}
+持仓方向: {direction}
 持仓量: {abs(pos_size):.4f}
 杠杆: {lever}x
-
-💰 <b>收益情况</b>
 开仓均价: ${avg_price:.4f}
 当前标记: ${mark_price:.4f}
+
+💰 <b>收益情况</b>
 未实现盈亏: ${upl:.2f} USDT
 保证金: ${margin:.2f} USDT
 <b>收益率: {profit_rate:+.2f}%</b>
 
-⏰ 时间: {beijing_time} (北京时间)
+📈 <b>计次数据</b>
+检测次数: {cycle_count if cycle_count else '实时'}
+触发得分: {score:.2f}分
 
-{'=' * 30}
+⏰ <b>触发时间</b>
+{beijing_time} (北京时间)
+
+{'=' * 35}
+💡 建议: 请根据自身风险承受能力谨慎决策
 """
     
     return message.strip()
 
 
-def monitor_positions():
+def monitor_positions(cycle=None):
     """监控持仓"""
     print("\n" + "=" * 60)
     print("🔍 锚点系统 - 持仓监控")
@@ -379,8 +393,8 @@ def monitor_positions():
                 print(f"  ⏸️  {ALERT_COOLDOWN}分钟内已发送过告警，跳过")
                 save_monitor_record(pos, profit_rate, alert_type, alert_sent=0)
             else:
-                # 发送Telegram消息
-                message = format_alert_message(pos, profit_rate, alert_type)
+                # 发送Telegram消息（传入检测次数）
+                message = format_alert_message(pos, profit_rate, alert_type, cycle)
                 success = send_telegram_message(message)
                 
                 # 保存记录
@@ -417,7 +431,7 @@ def main():
         try:
             cycle += 1
             print(f"\n\n🔄 第 {cycle} 次检测")
-            monitor_positions()
+            monitor_positions(cycle)
             
             print(f"\n⏳ 等待{CHECK_INTERVAL}秒后继续监控...")
             time.sleep(CHECK_INTERVAL)
