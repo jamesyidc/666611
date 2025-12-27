@@ -173,9 +173,31 @@ def init_database():
     )
     ''')
     
+    # 8. 锚点单管理表 ⭐
+    cursor.execute('''
+    CREATE TABLE IF NOT EXISTS anchor_positions (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        inst_id TEXT NOT NULL,
+        pos_side TEXT NOT NULL,
+        anchor_size REAL NOT NULL,
+        anchor_price REAL NOT NULL,
+        current_price REAL,
+        profit_rate REAL,
+        upl REAL,
+        status TEXT NOT NULL,
+        open_time TEXT NOT NULL,
+        update_time TEXT,
+        close_time TEXT,
+        notes TEXT,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        UNIQUE(inst_id, pos_side, status)
+    )
+    ''')
+    
     conn.commit()
     conn.close()
-    print("✅ 交易决策系统数据库初始化完成")
+    print("✅ 交易决策系统数据库初始化完成（包含8张表）")
 
 
 def load_config():

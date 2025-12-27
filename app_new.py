@@ -16,6 +16,10 @@ app.config['TEMPLATES_AUTO_RELOAD'] = True
 app.config['SEND_FILE_MAX_AGE_DEFAULT'] = 0
 BEIJING_TZ = pytz.timezone('Asia/Shanghai')
 
+# 导入交易API Blueprint
+from trading_api import trading_bp
+app.register_blueprint(trading_bp)
+
 # K线图服务URL配置
 CHART_BASE_URL = "https://5000-iz6uddj6rs3xe48ilsyqq-2e1b9533.sandbox.novita.ai"
 

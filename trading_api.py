@@ -447,3 +447,98 @@ def get_system_status():
     
     except Exception as e:
         return jsonify({'success': False, 'error': str(e)})
+
+
+# ============================================================================
+# 锚点单管理API
+# ============================================================================
+
+@trading_bp.route('/anchors', methods=['GET'])
+def get_anchors():
+    """获取所有锚点单"""
+    try:
+        from anchor_manager import AnchorPositionManager
+        manager = AnchorPositionManager(DB_PATH)
+        
+        status = request.args.get('status', 'active')
+        anchors = manager.get_all_anchors(status)
+        
+        return jsonify({'success': True, 'anchors': anchors, 'count': len(anchors)})
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)})
+
+
+@trading_bp.route('/anchors/<inst_id>/<pos_side>', methods=['GET'])
+def get_anchor(inst_id, pos_side):
+    """获取特定锚点单"""
+    try:
+        from anchor_manager import AnchorPositionManager
+        manager = AnchorPositionManager(DB_PATH)
+        
+        anchor = manager.get_anchor(inst_id, pos_side)
+        if anchor:
+            return jsonify({'success': True, 'anchor': anchor})
+        else:
+            return jsonify({'success': False, 'error': '锚点单不存在'})
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)})
+
+
+@trading_bp.route('/anchors/create', methods=['POST'])
+def create_anchor():
+    """创建锚点单"""
+    try:
+        from anchor_manager import AnchorPositionManager
+        manager = AnchorPositionManager(DB_PATH)
+        
+        data = request.get_json()
+        success, msg = manager.create_anchor(
+            inst_id=data.get('inst_id'),
+            pos_side=data.get('pos_side'),
+            anchor_size=data.get('anchor_size'),
+            anchor_price=data.get('anchor_price'),
+            notes=data.get('notes', '')
+        )
+        
+        if success:
+            return jsonify({'success': True, 'message': msg})
+        else:
+            return jsonify({'success': False, 'error': msg})
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)})
+
+
+@trading_bp.route('/anchors/close', methods=['POST'])
+def close_anchor():
+    """关闭锚点单"""
+    try:
+        from anchor_manager import AnchorPositionManager
+        manager = AnchorPositionManager(DB_PATH)
+        
+        data = request.get_json()
+        success, msg = manager.close_anchor(
+            inst_id=data.get('inst_id'),
+            pos_side=data.get('pos_side'),
+            final_price=data.get('final_price'),
+            notes=data.get('notes', '手动关闭')
+        )
+        
+        if success:
+            return jsonify({'success': True, 'message': msg})
+        else:
+            return jsonify({'success': False, 'error': msg})
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)})
+
+
+@trading_bp.route('/anchors/statistics', methods=['GET'])
+def get_anchor_statistics():
+    """获取锚点单统计"""
+    try:
+        from anchor_manager import AnchorPositionManager
+        manager = AnchorPositionManager(DB_PATH)
+        
+        stats = manager.get_anchor_statistics()
+        return jsonify({'success': True, 'statistics': stats})
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)})
