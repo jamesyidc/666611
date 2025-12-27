@@ -385,6 +385,35 @@
             </div>
         </div>
 
+        <!-- 历史极值记录 -->
+        <div class="card">
+            <div class="card-header">
+                <div class="card-title">
+                    <span>🏆</span>
+                    历史极值记录
+                </div>
+            </div>
+            <div class="table-container">
+                <table id="recordsTable">
+                    <thead>
+                        <tr>
+                            <th>币种</th>
+                            <th>方向</th>
+                            <th>类型</th>
+                            <th>收益率</th>
+                            <th>持仓量</th>
+                            <th>开仓价</th>
+                            <th>标记价</th>
+                            <th>时间</th>
+                        </tr>
+                    </thead>
+                    <tbody id="recordsBody">
+                        <tr><td colspan="8" class="loading">加载中...</td></tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
         <!-- 监控记录表 -->
         <div class="card">
             <div class="card-header">
@@ -452,6 +481,14 @@
                     renderAlerts(alertsData.data);
                 }
 
+                // 加载历史极值记录
+                const recordsRes = await fetch('/api/anchor-system/profit-records');
+                const recordsData = await recordsRes.json();
+                
+                if (recordsData.success) {
+                    renderRecordsTable(recordsData.records);
+                }
+
                 // 更新时间
                 const now = new Date();
                 document.getElementById('updateTime').textContent = 
@@ -460,6 +497,39 @@
             } catch (error) {
                 console.error('加载数据失败:', error);
             }
+        }
+
+        // 渲染历史极值记录表
+        function renderRecordsTable(data) {
+            const tbody = document.getElementById('recordsBody');
+            
+            if (data.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="8" class="empty">暂无历史记录</td></tr>';
+                return;
+            }
+
+            tbody.innerHTML = data.map(item => `
+                <tr>
+                    <td>${item.inst_id || '--'}</td>
+                    <td>
+                        <span class="badge ${item.pos_side === 'short' ? 'badge-short' : 'badge-long'}">
+                            ${item.pos_side === 'short' ? '做空' : '做多'}
+                        </span>
+                    </td>
+                    <td>
+                        <span class="badge ${item.record_type === 'max_profit' ? 'badge-profit' : 'badge-loss'}">
+                            ${item.record_type === 'max_profit' ? '🏆 最高盈利' : '📉 最大亏损'}
+                        </span>
+                    </td>
+                    <td style="color: ${(item.profit_rate || 0) >= 0 ? '#48bb78' : '#f56565'}; font-weight: 700; font-size: 16px;">
+                        ${(item.profit_rate || 0) >= 0 ? '+' : ''}${(item.profit_rate || 0).toFixed(2)}%
+                    </td>
+                    <td>${Math.abs(item.pos_size || 0).toFixed(4)}</td>
+                    <td>$${(item.avg_price || 0).toFixed(4)}</td>
+                    <td>$${(item.mark_price || 0).toFixed(4)}</td>
+                    <td>${item.timestamp}</td>
+                </tr>
+            `).join('');
         }
 
         // 渲染监控记录表

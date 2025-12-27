@@ -187,6 +187,34 @@ def init_database():
     )
     ''')
     
+    # 创建历史极值记录表
+    cursor.execute('''
+    CREATE TABLE IF NOT EXISTS anchor_profit_records (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        inst_id TEXT NOT NULL,
+        pos_side TEXT NOT NULL,
+        record_type TEXT NOT NULL,
+        profit_rate REAL NOT NULL,
+        timestamp TEXT NOT NULL,
+        pos_size REAL,
+        avg_price REAL,
+        mark_price REAL,
+        upl REAL,
+        margin REAL,
+        leverage REAL,
+        snapshot_data TEXT,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        UNIQUE(inst_id, pos_side, record_type)
+    )
+    ''')
+    
+    # 创建索引
+    cursor.execute('''
+    CREATE INDEX IF NOT EXISTS idx_profit_records 
+    ON anchor_profit_records(inst_id, pos_side, record_type)
+    ''')
+    
     conn.commit()
     conn.close()
     print("✅ 数据库初始化完成")
@@ -247,6 +275,89 @@ def save_alert_record(inst_id, pos_side, profit_rate, alert_type, message, sent_
         print(f"❌ 保存告警记录失败: {e}")
 
 
+def update_profit_extremes(position, profit_rate):
+    """更新历史极值记录（最高收益和最大亏损）"""
+    try:
+        inst_id = position.get('instId')
+        pos_side = position.get('posSide')
+        timestamp = datetime.now(BEIJING_TZ).strftime('%Y-%m-%d %H:%M:%S')
+        
+        # 准备快照数据
+        snapshot_data = json.dumps({
+            'pos_size': float(position.get('pos', 0)),
+            'avg_price': float(position.get('avgPx', 0)),
+            'mark_price': float(position.get('markPx', 0)),
+            'upl': float(position.get('upl', 0)),
+            'margin': float(position.get('margin', 0)),
+            'leverage': float(position.get('lever', 0)),
+            'timestamp': timestamp
+        }, ensure_ascii=False)
+        
+        conn = sqlite3.connect(DB_PATH, timeout=10.0)
+        cursor = conn.cursor()
+        
+        # 检查是否需要更新最高收益
+        if profit_rate > 0:
+            cursor.execute('''
+            SELECT profit_rate FROM anchor_profit_records
+            WHERE inst_id = ? AND pos_side = ? AND record_type = 'max_profit'
+            ''', (inst_id, pos_side))
+            row = cursor.fetchone()
+            
+            if row is None or profit_rate > row[0]:
+                # 插入或更新最高收益记录
+                cursor.execute('''
+                INSERT OR REPLACE INTO anchor_profit_records (
+                    inst_id, pos_side, record_type, profit_rate, timestamp,
+                    pos_size, avg_price, mark_price, upl, margin, leverage,
+                    snapshot_data, updated_at
+                ) VALUES (?, ?, 'max_profit', ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now', '+8 hours'))
+                ''', (
+                    inst_id, pos_side, profit_rate, timestamp,
+                    float(position.get('pos', 0)),
+                    float(position.get('avgPx', 0)),
+                    float(position.get('markPx', 0)),
+                    float(position.get('upl', 0)),
+                    float(position.get('margin', 0)),
+                    float(position.get('lever', 0)),
+                    snapshot_data
+                ))
+                print(f"  📈 更新最高收益记录: {inst_id} {profit_rate:+.2f}%")
+        
+        # 检查是否需要更新最大亏损
+        if profit_rate < 0:
+            cursor.execute('''
+            SELECT profit_rate FROM anchor_profit_records
+            WHERE inst_id = ? AND pos_side = ? AND record_type = 'max_loss'
+            ''', (inst_id, pos_side))
+            row = cursor.fetchone()
+            
+            if row is None or profit_rate < row[0]:
+                # 插入或更新最大亏损记录
+                cursor.execute('''
+                INSERT OR REPLACE INTO anchor_profit_records (
+                    inst_id, pos_side, record_type, profit_rate, timestamp,
+                    pos_size, avg_price, mark_price, upl, margin, leverage,
+                    snapshot_data, updated_at
+                ) VALUES (?, ?, 'max_loss', ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now', '+8 hours'))
+                ''', (
+                    inst_id, pos_side, profit_rate, timestamp,
+                    float(position.get('pos', 0)),
+                    float(position.get('avgPx', 0)),
+                    float(position.get('markPx', 0)),
+                    float(position.get('upl', 0)),
+                    float(position.get('margin', 0)),
+                    float(position.get('lever', 0)),
+                    snapshot_data
+                ))
+                print(f"  📉 更新最大亏损记录: {inst_id} {profit_rate:+.2f}%")
+        
+        conn.commit()
+        conn.close()
+    except Exception as e:
+        print(f"❌ 更新极值记录失败: {e}")
+
+
 def check_alert_sent_recently(inst_id, alert_type, minutes=30):
     """检查最近是否已发送过告警（避免重复提醒）"""
     try:
@@ -269,6 +380,100 @@ def check_alert_sent_recently(inst_id, alert_type, minutes=30):
     except Exception as e:
         print(f"❌ 检查告警历史失败: {e}")
         return False
+
+
+def update_profit_record(position, profit_rate):
+    """更新历史最高收益和最大亏损记录"""
+    try:
+        inst_id = position.get('instId')
+        pos_side = position.get('posSide')
+        timestamp = datetime.now(BEIJING_TZ).strftime('%Y-%m-%d %H:%M:%S')
+        
+        conn = sqlite3.connect(DB_PATH, timeout=10.0)
+        cursor = conn.cursor()
+        
+        # 判断是盈利还是亏损
+        if profit_rate > 0:
+            record_type = 'max_profit'  # 最高收益
+        else:
+            record_type = 'max_loss'    # 最大亏损
+        
+        # 查询当前记录
+        cursor.execute('''
+        SELECT profit_rate FROM anchor_profit_records
+        WHERE inst_id = ? AND pos_side = ? AND record_type = ?
+        ''', (inst_id, pos_side, record_type))
+        
+        existing = cursor.fetchone()
+        
+        should_update = False
+        if existing is None:
+            # 没有记录，直接插入
+            should_update = True
+        else:
+            current_record = existing[0]
+            if record_type == 'max_profit' and profit_rate > current_record:
+                # 新的收益更高
+                should_update = True
+                print(f"  🎉 {inst_id} 刷新最高收益: {current_record:.2f}% → {profit_rate:.2f}%")
+            elif record_type == 'max_loss' and profit_rate < current_record:
+                # 新的亏损更大（更负）
+                should_update = True
+                print(f"  ⚠️  {inst_id} 刷新最大亏损: {current_record:.2f}% → {profit_rate:.2f}%")
+        
+        if should_update:
+            cursor.execute('''
+            INSERT OR REPLACE INTO anchor_profit_records (
+                inst_id, pos_side, record_type, profit_rate, timestamp,
+                pos_size, avg_price, mark_price, upl, margin, leverage, updated_at
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ''', (
+                inst_id,
+                pos_side,
+                record_type,
+                profit_rate,
+                timestamp,
+                float(position.get('pos', 0)),
+                float(position.get('avgPx', 0)),
+                float(position.get('markPx', 0)),
+                float(position.get('upl', 0)),
+                float(position.get('margin', 0)),
+                float(position.get('lever', 0)),
+                timestamp
+            ))
+            conn.commit()
+        
+        conn.close()
+    except Exception as e:
+        print(f"❌ 更新历史极值失败: {e}")
+
+
+def get_profit_records(inst_id=None, pos_side=None):
+    """获取历史极值记录"""
+    try:
+        conn = sqlite3.connect(DB_PATH, timeout=10.0)
+        cursor = conn.cursor()
+        
+        if inst_id and pos_side:
+            cursor.execute('''
+            SELECT record_type, profit_rate, timestamp, avg_price, mark_price
+            FROM anchor_profit_records
+            WHERE inst_id = ? AND pos_side = ?
+            ORDER BY record_type
+            ''', (inst_id, pos_side))
+        else:
+            cursor.execute('''
+            SELECT inst_id, pos_side, record_type, profit_rate, timestamp
+            FROM anchor_profit_records
+            ORDER BY inst_id, pos_side, record_type
+            ''')
+        
+        rows = cursor.fetchall()
+        conn.close()
+        return rows
+    except Exception as e:
+        print(f"❌ 获取历史记录失败: {e}")
+        return []
 
 
 def get_market_data():
@@ -416,6 +621,9 @@ def monitor_positions(cycle=None):
         # 计算收益率
         profit_rate = calculate_profit_rate(pos)
         print(f"  收益率: {profit_rate:+.2f}%")
+        
+        # 更新历史极值记录
+        update_profit_record(pos, profit_rate)
         
         # 只监控做空持仓（如果配置要求）
         if ONLY_SHORT and pos_side != 'short':

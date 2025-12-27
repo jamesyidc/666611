@@ -12002,6 +12002,75 @@ def get_anchor_status():
             'traceback': traceback.format_exc()
         })
 
+@app.route('/api/anchor-system/profit-records')
+def get_anchor_profit_records():
+    """获取历史极值记录"""
+    try:
+        inst_id = request.args.get('inst_id')
+        pos_side = request.args.get('pos_side')
+        
+        db_path = '/home/user/webapp/anchor_system.db'
+        conn = sqlite3.connect(db_path, timeout=10.0)
+        cursor = conn.cursor()
+        
+        if inst_id and pos_side:
+            # 查询特定币种的记录
+            cursor.execute('''
+            SELECT record_type, profit_rate, timestamp, pos_size, avg_price, mark_price, upl, margin, leverage
+            FROM anchor_profit_records
+            WHERE inst_id = ? AND pos_side = ?
+            ORDER BY record_type
+            ''', (inst_id, pos_side))
+        else:
+            # 查询所有记录
+            cursor.execute('''
+            SELECT inst_id, pos_side, record_type, profit_rate, timestamp, pos_size, avg_price, mark_price
+            FROM anchor_profit_records
+            ORDER BY inst_id, pos_side, record_type
+            ''')
+        
+        rows = cursor.fetchall()
+        conn.close()
+        
+        records = []
+        if inst_id and pos_side:
+            for row in rows:
+                records.append({
+                    'record_type': row[0],
+                    'profit_rate': row[1],
+                    'timestamp': row[2],
+                    'pos_size': row[3],
+                    'avg_price': row[4],
+                    'mark_price': row[5],
+                    'upl': row[6],
+                    'margin': row[7],
+                    'leverage': row[8]
+                })
+        else:
+            for row in rows:
+                records.append({
+                    'inst_id': row[0],
+                    'pos_side': row[1],
+                    'record_type': row[2],
+                    'profit_rate': row[3],
+                    'timestamp': row[4],
+                    'pos_size': row[5],
+                    'avg_price': row[6],
+                    'mark_price': row[7]
+                })
+        
+        return jsonify({
+            'success': True,
+            'records': records,
+            'total': len(records)
+        })
+    except Exception as e:
+        return jsonify({
+            'success': False,
+            'error': str(e),
+            'traceback': traceback.format_exc()
+        })
+
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=5000, debug=False)
 
