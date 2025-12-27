@@ -228,7 +228,7 @@ def get_position_adds():
 
 @trading_bp.route('/orders/pending', methods=['GET'])
 def get_pending_orders():
-    """获取挂单记录"""
+    """获取挂单记录（只显示有锚点单的挂单）"""
     try:
         conn = sqlite3.connect(DB_PATH, timeout=10.0)
         cursor = conn.cursor()
@@ -236,21 +236,34 @@ def get_pending_orders():
         status = request.args.get('status', 'pending')
         inst_id = request.args.get('inst_id')
         
+        # 只查询有对应锚点单的挂单
         if inst_id:
             cursor.execute('''
-            SELECT id, inst_id, pos_side, order_type, anchor_price, target_price,
-                   price_diff_percent, order_size, status, timestamp, created_at
-            FROM pending_orders
-            WHERE inst_id = ? AND status = ?
-            ORDER BY created_at DESC
+            SELECT p.id, p.inst_id, p.pos_side, p.order_type, p.anchor_price, p.target_price,
+                   p.price_diff_percent, p.order_size, p.status, p.timestamp, p.created_at
+            FROM pending_orders p
+            WHERE p.inst_id = ? AND p.status = ?
+              AND EXISTS (
+                  SELECT 1 FROM position_opens o
+                  WHERE o.inst_id = p.inst_id 
+                    AND o.pos_side = p.pos_side
+                    AND o.is_anchor = 1
+              )
+            ORDER BY p.created_at DESC
             ''', (inst_id, status))
         else:
             cursor.execute('''
-            SELECT id, inst_id, pos_side, order_type, anchor_price, target_price,
-                   price_diff_percent, order_size, status, timestamp, created_at
-            FROM pending_orders
-            WHERE status = ?
-            ORDER BY created_at DESC
+            SELECT p.id, p.inst_id, p.pos_side, p.order_type, p.anchor_price, p.target_price,
+                   p.price_diff_percent, p.order_size, p.status, p.timestamp, p.created_at
+            FROM pending_orders p
+            WHERE p.status = ?
+              AND EXISTS (
+                  SELECT 1 FROM position_opens o
+                  WHERE o.inst_id = p.inst_id 
+                    AND o.pos_side = p.pos_side
+                    AND o.is_anchor = 1
+              )
+            ORDER BY p.created_at DESC
             ''', (status,))
         
         records = []
