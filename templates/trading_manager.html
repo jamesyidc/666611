@@ -365,6 +365,12 @@
         <h1>🤖 自动交易管理系统</h1>
         <p class="subtitle">第二阶段：开仓规则 | 补仓规则 | 系统配置</p>
         
+        <div style="margin: 15px 0; text-align: center;">
+            <a href="/dashboard" style="display: inline-block; padding: 8px 15px; background: #667eea; color: white; text-decoration: none; border-radius: 5px; margin: 0 5px; font-size: 14px;">📊 实时仪表板</a>
+            <a href="/simulated-trades" style="display: inline-block; padding: 8px 15px; background: #10b981; color: white; text-decoration: none; border-radius: 5px; margin: 0 5px; font-size: 14px;">📋 模拟交易详情</a>
+            <a href="/anchor-system" style="display: inline-block; padding: 8px 15px; background: #f59e0b; color: white; text-decoration: none; border-radius: 5px; margin: 0 5px; font-size: 14px;">⚓ 锚点系统</a>
+        </div>
+        
         <div class="tabs">
             <button class="tab active" onclick="switchTab('config')">⚙️ 系统配置</button>
             <button class="tab" onclick="switchTab('statistics')">📊 统计数据</button>
@@ -437,6 +443,18 @@
                                 </label>
                                 <span id="allow-short-text">允许</span>
                             </div>
+                        </div>
+                        
+                        <div class="form-group">
+                            <label class="form-label">📌 允许开锚点单</label>
+                            <div class="switch-container">
+                                <label class="switch">
+                                    <input type="checkbox" name="allow_anchor" id="allow-anchor-checkbox" checked>
+                                    <span class="slider"></span>
+                                </label>
+                                <span id="allow-anchor-text">允许</span>
+                            </div>
+                            <small style="color: #666;">即使禁止开空单，也可以开锚点单</small>
                         </div>
                         
                         <div class="form-group">
@@ -634,6 +652,7 @@
                         document.querySelector('[name="anchor_capital_limit"]').value = config.anchor_capital_limit;
                         document.getElementById('allow-long-checkbox').checked = config.allow_long || false;
                         document.getElementById('allow-short-checkbox').checked = config.allow_short !== false;
+                        document.getElementById('allow-anchor-checkbox').checked = config.allow_anchor !== false;
                         document.querySelector('[name="max_long_position"]').value = config.max_long_position || 500;
                         document.querySelector('[name="max_short_position"]').value = config.max_short_position || 600;
                         document.getElementById('enabled-checkbox').checked = config.enabled;
@@ -649,16 +668,19 @@
         function updateSwitchText() {
             const allowLong = document.getElementById('allow-long-checkbox').checked;
             const allowShort = document.getElementById('allow-short-checkbox').checked;
+            const allowAnchor = document.getElementById('allow-anchor-checkbox').checked;
             const enabled = document.getElementById('enabled-checkbox').checked;
             
             document.getElementById('allow-long-text').textContent = allowLong ? '允许' : '禁止';
             document.getElementById('allow-short-text').textContent = allowShort ? '允许' : '禁止';
+            document.getElementById('allow-anchor-text').textContent = allowAnchor ? '允许' : '禁止';
             document.getElementById('enabled-text').textContent = enabled ? '开启' : '关闭';
         }
         
         // 监听开关变化
         document.getElementById('allow-long-checkbox').addEventListener('change', updateSwitchText);
         document.getElementById('allow-short-checkbox').addEventListener('change', updateSwitchText);
+        document.getElementById('allow-anchor-checkbox').addEventListener('change', updateSwitchText);
         document.getElementById('enabled-checkbox').addEventListener('change', updateSwitchText);
         
         // 更新配置
@@ -675,6 +697,8 @@
                 anchor_capital_limit: parseFloat(formData.get('anchor_capital_limit')),
                 anchor_capital_percent: 10,
                 allow_long: document.getElementById('allow-long-checkbox').checked,
+                allow_short: document.getElementById('allow-short-checkbox').checked,
+                allow_anchor: document.getElementById('allow-anchor-checkbox').checked,
                 allow_short: document.getElementById('allow-short-checkbox').checked,
                 max_long_position: parseFloat(formData.get('max_long_position')),
                 max_short_position: parseFloat(formData.get('max_short_position')),

@@ -27,7 +27,7 @@ def get_config():
         cursor.execute('''
         SELECT market_mode, market_trend, total_capital, position_limit_mode,
                position_limit_percent, anchor_capital_limit, anchor_capital_percent,
-               allow_long, allow_short, max_long_position, max_short_position,
+               allow_long, allow_short, allow_anchor, max_long_position, max_short_position,
                min_granularity, long_granularity, enabled, updated_at
         FROM market_config
         ORDER BY updated_at DESC
@@ -50,12 +50,13 @@ def get_config():
                     'anchor_capital_percent': row[6],
                     'allow_long': bool(row[7]),
                     'allow_short': bool(row[8]) if row[8] is not None else True,
-                    'max_long_position': row[9] if row[9] is not None else 500,
-                    'max_short_position': row[10] if row[10] is not None else 600,
-                    'min_granularity': row[11],
-                    'long_granularity': row[12],
-                    'enabled': bool(row[13]),
-                    'updated_at': row[14]
+                    'allow_anchor': bool(row[9]) if row[9] is not None else True,
+                    'max_long_position': row[10] if row[10] is not None else 500,
+                    'max_short_position': row[11] if row[11] is not None else 600,
+                    'min_granularity': row[12],
+                    'long_granularity': row[13],
+                    'enabled': bool(row[14]),
+                    'updated_at': row[15]
                 }
             })
         else:
@@ -80,9 +81,9 @@ def update_config():
         INSERT INTO market_config (
             market_mode, market_trend, total_capital, position_limit_mode,
             position_limit_percent, anchor_capital_limit, anchor_capital_percent,
-            allow_long, allow_short, max_long_position, max_short_position,
+            allow_long, allow_short, allow_anchor, max_long_position, max_short_position,
             min_granularity, long_granularity, enabled, updated_at
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         ''', (
             data.get('market_mode', 'manual'),
             data.get('market_trend', 'neutral'),
@@ -93,6 +94,7 @@ def update_config():
             data.get('anchor_capital_percent', 10),
             1 if data.get('allow_long', False) else 0,
             1 if data.get('allow_short', True) else 0,
+            1 if data.get('allow_anchor', True) else 0,
             data.get('max_long_position', 500),
             data.get('max_short_position', 600),
             data.get('min_granularity', 1),
@@ -540,5 +542,106 @@ def get_anchor_statistics():
         
         stats = manager.get_anchor_statistics()
         return jsonify({'success': True, 'statistics': stats})
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)})
+
+
+# ============================================================================
+# 模拟交易记录API
+# ============================================================================
+
+@trading_bp.route('/simulated-trades', methods=['GET'])
+def get_simulated_trades():
+    """获取模拟交易记录"""
+    try:
+        limit = request.args.get('limit', 100, type=int)
+        trade_type = request.args.get('trade_type', None)  # anchor/normal/stop_loss/take_profit
+        
+        conn = sqlite3.connect(DB_PATH, timeout=10.0)
+        cursor = conn.cursor()
+        
+        if trade_type:
+            cursor.execute('''
+            SELECT id, trade_type, inst_id, pos_side, action, order_side,
+                   price, size, amount, reason, trigger_condition, profit_rate,
+                   executed_at, created_at
+            FROM simulated_trades
+            WHERE trade_type = ?
+            ORDER BY created_at DESC
+            LIMIT ?
+            ''', (trade_type, limit))
+        else:
+            cursor.execute('''
+            SELECT id, trade_type, inst_id, pos_side, action, order_side,
+                   price, size, amount, reason, trigger_condition, profit_rate,
+                   executed_at, created_at
+            FROM simulated_trades
+            ORDER BY created_at DESC
+            LIMIT ?
+            ''', (limit,))
+        
+        rows = cursor.fetchall()
+        conn.close()
+        
+        trades = []
+        for row in rows:
+            trades.append({
+                'id': row[0],
+                'trade_type': row[1],
+                'inst_id': row[2],
+                'pos_side': row[3],
+                'action': row[4],
+                'order_side': row[5],
+                'price': row[6],
+                'size': row[7],
+                'amount': row[8],
+                'reason': row[9],
+                'trigger_condition': row[10],
+                'profit_rate': row[11],
+                'executed_at': row[12],
+                'created_at': row[13]
+            })
+        
+        return jsonify({'success': True, 'trades': trades, 'count': len(trades)})
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)})
+
+
+@trading_bp.route('/simulated-trades/record', methods=['POST'])
+def record_simulated_trade():
+    """记录模拟交易"""
+    try:
+        data = request.get_json()
+        
+        conn = sqlite3.connect(DB_PATH, timeout=10.0)
+        cursor = conn.cursor()
+        
+        timestamp = datetime.now(BEIJING_TZ).strftime('%Y-%m-%d %H:%M:%S')
+        
+        cursor.execute('''
+        INSERT INTO simulated_trades (
+            trade_type, inst_id, pos_side, action, order_side,
+            price, size, amount, reason, trigger_condition, profit_rate,
+            executed_at
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ''', (
+            data.get('trade_type', 'normal'),
+            data.get('inst_id'),
+            data.get('pos_side'),
+            data.get('action'),
+            data.get('order_side'),
+            data.get('price'),
+            data.get('size'),
+            data.get('amount'),
+            data.get('reason', ''),
+            data.get('trigger_condition', ''),
+            data.get('profit_rate', 0),
+            timestamp
+        ))
+        
+        conn.commit()
+        conn.close()
+        
+        return jsonify({'success': True, 'message': '模拟交易已记录'})
     except Exception as e:
         return jsonify({'success': False, 'error': str(e)})

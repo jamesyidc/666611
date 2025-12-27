@@ -12345,6 +12345,17 @@ def trading_manager():
     except Exception as e:
         return f"Error loading trading manager: {str(e)}", 500
 
+@app.route('/simulated-trades')
+def simulated_trades():
+    """模拟交易详情界面"""
+    try:
+        with open('/home/user/webapp/templates/simulated_trades.html', 'r', encoding='utf-8') as f:
+            return f.read()
+    except FileNotFoundError:
+        return "Simulated trades template not found", 404
+    except Exception as e:
+        return f"Error loading simulated trades: {str(e)}", 500
+
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=5000, debug=False)
 

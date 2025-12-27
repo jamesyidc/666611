@@ -28,6 +28,7 @@ DEFAULT_CONFIG = {
     "anchor_capital_percent": 10,  # 锚点单资金百分比上限
     "allow_long": False,  # 是否允许开多单
     "allow_short": True,  # 是否允许开空单
+    "allow_anchor": True,  # 是否允许开锚点单 ⭐
     "max_long_position": 500,  # 多单最大仓位（USDT）
     "max_short_position": 600,  # 空单最大仓位（USDT）
     "min_granularity": 1,  # 最小颗粒度（%）
@@ -54,6 +55,7 @@ def init_database():
         anchor_capital_percent REAL NOT NULL,
         allow_long INTEGER NOT NULL DEFAULT 0,
         allow_short INTEGER NOT NULL DEFAULT 1,
+        allow_anchor INTEGER NOT NULL DEFAULT 1,
         max_long_position REAL NOT NULL DEFAULT 500,
         max_short_position REAL NOT NULL DEFAULT 600,
         min_granularity REAL NOT NULL,
@@ -195,9 +197,29 @@ def init_database():
     )
     ''')
     
+    # 9. 模拟交易记录表 ⭐
+    cursor.execute('''
+    CREATE TABLE IF NOT EXISTS simulated_trades (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        trade_type TEXT NOT NULL,
+        inst_id TEXT NOT NULL,
+        pos_side TEXT NOT NULL,
+        action TEXT NOT NULL,
+        order_side TEXT NOT NULL,
+        price REAL NOT NULL,
+        size REAL NOT NULL,
+        amount REAL NOT NULL,
+        reason TEXT,
+        trigger_condition TEXT,
+        profit_rate REAL,
+        executed_at TEXT NOT NULL,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    )
+    ''')
+    
     conn.commit()
     conn.close()
-    print("✅ 交易决策系统数据库初始化完成（包含8张表）")
+    print("✅ 交易决策系统数据库初始化完成（包含9张表）")
 
 
 def load_config():
@@ -259,9 +281,9 @@ def save_market_config(config):
     INSERT INTO market_config (
         market_mode, market_trend, total_capital, position_limit_mode,
         position_limit_percent, anchor_capital_limit, anchor_capital_percent,
-        allow_long, allow_short, max_long_position, max_short_position,
+        allow_long, allow_short, allow_anchor, max_long_position, max_short_position,
         min_granularity, long_granularity, enabled, updated_at
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     ''', (
         config.get('market_mode', 'manual'),
         config.get('market_trend', 'neutral'),
@@ -272,6 +294,7 @@ def save_market_config(config):
         config.get('anchor_capital_percent', 10),
         1 if config.get('allow_long', False) else 0,
         1 if config.get('allow_short', True) else 0,
+        1 if config.get('allow_anchor', True) else 0,
         config.get('max_long_position', 500),
         config.get('max_short_position', 600),
         config.get('min_granularity', 1),
