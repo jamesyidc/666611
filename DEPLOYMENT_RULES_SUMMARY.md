@@ -436,6 +436,7 @@ cursor.execute('''
 3. **[ANCHOR_TRIGGER_GUIDE.md](ANCHOR_TRIGGER_GUIDE.md)** - 锚点触发指南
 4. **[ANCHOR_TRIGGER_EXPLANATION.md](ANCHOR_TRIGGER_EXPLANATION.md)** - 锚点触发说明
 5. **[ADD_POSITION_RULES.md](ADD_POSITION_RULES.md)** - 补仓规则说明
+6. **[ANCHOR_DISPLAY_UPDATE.md](ANCHOR_DISPLAY_UPDATE.md)** - 锚点单独立显示更新说明
 
 ### 验证脚本
 - **verify_pending_rules.py** - Python 验证脚本
@@ -452,11 +453,12 @@ cursor.execute('''
 ## 🔗 快速访问链接
 
 - **交易管理页面**：https://5000-iawcy3xxhnan90u0qd9wq-cc2fbc16.sandbox.novita.ai/trading-manager
+  - ⚓ 锚点单专属标签页（新增）
 - **压力支撑页面**：https://5000-iawcy3xxhnan90u0qd9wq-cc2fbc16.sandbox.novita.ai/support-resistance
 - **仪表板**：https://5000-iawcy3xxhnan90u0qd9wq-cc2fbc16.sandbox.novita.ai/dashboard
 - **GitHub 仓库**：https://github.com/jamesyidc/666611
 - **分支**：genspark_ai_developer
-- **最新提交**：3b6f2d7
+- **最新提交**：828b9f2
 
 ---
 
