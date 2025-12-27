@@ -124,7 +124,7 @@ class PositionManager:
         cursor = conn.cursor()
         
         cursor.execute('''
-        SELECT id, open_size, open_price, timestamp
+        SELECT id, open_size, open_price, is_anchor, timestamp
         FROM position_opens
         WHERE inst_id = ? AND pos_side = ?
         ORDER BY timestamp DESC
@@ -139,7 +139,8 @@ class PositionManager:
                 'id': row[0],
                 'original_size': row[1],
                 'original_price': row[2],
-                'timestamp': row[3]
+                'is_anchor': bool(row[3]),
+                'timestamp': row[4]
             }
         return None
     
@@ -229,6 +230,10 @@ class PositionManager:
         open_record = self.get_position_opens(inst_id, pos_side)
         if not open_record:
             return False, "没有开仓记录", 0
+        
+        # ✨ 新增：只有锚点单才能补仓
+        if not open_record.get('is_anchor'):
+            return False, "非锚点单不能补仓", 0
         
         # 获取补仓记录
         adds = self.get_position_adds(inst_id, pos_side)
