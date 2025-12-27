@@ -1,551 +1,416 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-仓位管理模块 - 开仓和补仓规则
-实现第二阶段功能：开仓法则和补仓规则
+开仓和补仓管理系统
+实现基于颗粒度的自动开仓和补仓策略
 """
 
 import sqlite3
+import json
 from datetime import datetime
 import pytz
+from typing import Dict, List, Optional, Tuple
 
-BEIJING_TZ = pytz.timezone('Asia/Shanghai')
+# 配置
 DB_PATH = '/home/user/webapp/trading_decision.db'
+ANCHOR_DB_PATH = '/home/user/webapp/anchor_system.db'
+BEIJING_TZ = pytz.timezone('Asia/Shanghai')
 
 
-class PositionOpener:
-    """开仓管理器"""
+class PositionManager:
+    """仓位管理器"""
     
-    def __init__(self, db_path=None):
-        """初始化"""
-        self.db_path = db_path or DB_PATH
-    
-    # 多单开仓规则
-    LONG_OPEN_RULES = {
-        'granularity': 10,  # 10%颗粒度
-        'price_interval': 0.5,  # 0.5%价格间隔
-        'max_positions_per_coin': 3,  # 单币最多3份
-        'size_per_position': 10  # 每次10%可开仓额
+    # 颗粒度配置
+    GRANULARITY_CONFIG = {
+        'small': {
+            'name': '小颗粒',
+            'max_coins': 7,  # 最多7个币
+            'add_percent': 1.0,  # 每次补仓1%
+            'total_limit_percent': 3.5,  # 总上限3.5%
+            'triggers': [-1, -2, -3],  # 补仓触发点
+        },
+        'medium': {
+            'name': '中颗粒',
+            'max_coins': 2,  # 最多2个币
+            'add_percent': 3.5,  # 每次补仓3.5%
+            'total_limit_percent': 7.0,  # 总上限7%（3.5% * 2）
+            'triggers': [-7, -9],  # 补仓触发点
+            'prerequisite': -5,  # 前提条件：完成小颗粒后亏损>5%
+        },
+        'large': {
+            'name': '大颗粒',
+            'max_coins': 1,  # 只能1个币
+            'add_percent': 7.0,  # 每次补仓7%
+            'total_limit_percent': 21.0,  # 总上限21%（7% * 3）
+            'triggers': [-15, -18, -21],  # 补仓触发点
+            'prerequisite': -10,  # 前提条件：完成中颗粒后亏损>10%
+        }
     }
     
-    # 空单开仓规则
-    SHORT_OPEN_RULES = {
-        'granularity': 1,  # 1%最小颗粒度
-        'pressure_line_threshold': 8,  # 压力线1+压力线2 >= 8
-        'time_range_hours': [7, 48]  # 7-48小时范围
-    }
-    
-    def check_long_open_condition(self, inst_id, current_price, available_capital):
-        """
-        检查多单开仓条件
-        
-        Args:
-            inst_id: 币种ID
-            current_price: 当前价格
-            available_capital: 可开仓额（USDT）
-        
-        Returns:
-            dict: 开仓决策
-        """
-        # 获取该币种已有的多单数量
-        existing_positions = self._get_existing_long_positions(inst_id)
-        
-        if len(existing_positions) >= self.LONG_OPEN_RULES['max_positions_per_coin']:
-            return {
-                'should_open': False,
-                'reason': f'已达到单币上限{self.LONG_OPEN_RULES["max_positions_per_coin"]}份'
-            }
-        
-        # 计算开仓金额（可开仓额的10%）
-        open_size = available_capital * (self.LONG_OPEN_RULES['size_per_position'] / 100)
-        
-        # 检查价格间隔
-        if existing_positions:
-            last_position = existing_positions[-1]
-            last_price = last_position['open_price']
-            price_diff_percent = abs((current_price - last_price) / last_price * 100)
-            
-            if price_diff_percent < self.LONG_OPEN_RULES['price_interval']:
-                return {
-                    'should_open': False,
-                    'reason': f'价格间隔不足{self.LONG_OPEN_RULES["price_interval"]}%'
-                }
-        
-        return {
-            'should_open': True,
-            'open_size': open_size,
-            'open_price': current_price,
-            'position_count': len(existing_positions) + 1,
-            'granularity': self.LONG_OPEN_RULES['granularity'],
-            'reason': f'满足多单开仓条件：{self.LONG_OPEN_RULES["size_per_position"]}%可开仓额'
-        }
-    
-    def check_short_open_condition(self, inst_id, current_price, pressure_data):
-        """
-        检查空单开仓条件
-        
-        Args:
-            inst_id: 币种ID
-            current_price: 当前价格
-            pressure_data: 压力线数据 {'pressure_1': float, 'pressure_2': float}
-        
-        Returns:
-            dict: 开仓决策
-        """
-        # 检查压力线条件
-        pressure_1 = pressure_data.get('pressure_1', 0)
-        pressure_2 = pressure_data.get('pressure_2', 0)
-        pressure_sum = pressure_1 + pressure_2
-        
-        if pressure_sum < self.SHORT_OPEN_RULES['pressure_line_threshold']:
-            return {
-                'should_open': False,
-                'reason': f'压力线之和{pressure_sum:.1f} < 阈值{self.SHORT_OPEN_RULES["pressure_line_threshold"]}'
-            }
-        
-        # 检查时间范围（7-48小时内满足条件的币种）
-        # TODO: 实现时间范围过滤逻辑
-        
-        # 计算开仓金额（1%最小颗粒度）
-        # 这里需要根据实际可开仓额计算
-        open_size_percent = self.SHORT_OPEN_RULES['granularity']
-        
-        return {
-            'should_open': True,
-            'open_size_percent': open_size_percent,
-            'open_price': current_price,
-            'pressure_sum': pressure_sum,
-            'granularity': self.SHORT_OPEN_RULES['granularity'],
-            'reason': f'压力线之和{pressure_sum:.1f}达标，以{open_size_percent}%颗粒度开仓'
-        }
-    
-    def save_position_open(self, inst_id, pos_side, open_price, open_size, 
-                          open_percent, granularity, total_positions, is_anchor=False):
-        """
-        保存开仓记录
-        
-        Args:
-            inst_id: 币种ID
-            pos_side: 持仓方向 (long/short)
-            open_price: 开仓价格
-            open_size: 开仓数量（USDT）
-            open_percent: 开仓百分比
-            granularity: 颗粒度
-            total_positions: 该币种总仓位数
-            is_anchor: 是否是锚点单
-        """
-        try:
-            conn = sqlite3.connect(self.db_path, timeout=10.0)
-            cursor = conn.cursor()
-            
-            timestamp = datetime.now(BEIJING_TZ).strftime('%Y-%m-%d %H:%M:%S')
-            
-            cursor.execute('''
-            INSERT INTO position_opens (
-                inst_id, pos_side, open_price, open_size, open_percent,
-                granularity, total_positions, is_anchor, timestamp
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-            ''', (inst_id, pos_side, open_price, open_size, open_percent,
-                  granularity, total_positions, 1 if is_anchor else 0, timestamp))
-            
-            conn.commit()
-            conn.close()
-            print(f"✅ 开仓记录已保存: {inst_id} {pos_side} {open_size}U @ {open_price}")
-            return True
-        except Exception as e:
-            print(f"❌ 保存开仓记录失败: {e}")
-            return False
-    
-    def _get_existing_long_positions(self, inst_id):
-        """获取现有的多单仓位"""
-        try:
-            conn = sqlite3.connect(self.db_path, timeout=10.0)
-            cursor = conn.cursor()
-            
-            cursor.execute('''
-            SELECT inst_id, pos_side, open_price, open_size, open_percent, timestamp
-            FROM position_opens
-            WHERE inst_id = ? AND pos_side = 'long'
-            ORDER BY created_at ASC
-            ''', (inst_id,))
-            
-            positions = []
-            for row in cursor.fetchall():
-                positions.append({
-                    'inst_id': row[0],
-                    'pos_side': row[1],
-                    'open_price': row[2],
-                    'open_size': row[3],
-                    'open_percent': row[4],
-                    'timestamp': row[5]
-                })
-            
-            conn.close()
-            return positions
-        except Exception as e:
-            print(f"❌ 获取持仓记录失败: {e}")
-            return []
-
-
-class PositionAdder:
-    """补仓管理器"""
-    
-    def __init__(self, db_path=None):
+    def __init__(self):
         """初始化"""
-        self.db_path = db_path or DB_PATH
+        self.db_path = DB_PATH
+        self.anchor_db_path = ANCHOR_DB_PATH
     
-    # 三级补仓规则
-    ADD_RULES = [
-        # Level 1: 资金单位 < 10U
-        {
-            'level': 1,
-            'capital_range': (0, 10),
-            'triggers': [
-                {'profit_rate': -3, 'add_percent': 1},
-                {'profit_rate': -5, 'add_percent': 1},
-                {'profit_rate': -7, 'add_percent': 1},
-                {'profit_rate': -10, 'add_percent': 1},
-            ]
-        },
-        # Level 2: 资金单位 10-20U
-        {
-            'level': 2,
-            'capital_range': (10, 20),
-            'triggers': [
-                {'profit_rate': -5, 'add_percent': 1},
-                {'profit_rate': -8, 'add_percent': 1},
-                {'profit_rate': -12, 'add_percent': 1},
-                {'profit_rate': -15, 'add_percent': 2},
-            ]
-        },
-        # Level 3: 资金单位 > 20U
-        {
-            'level': 3,
-            'capital_range': (20, float('inf')),
-            'triggers': [
-                {'profit_rate': -5, 'add_percent': 1},
-                {'profit_rate': -10, 'add_percent': 2},
-                {'profit_rate': -15, 'add_percent': 2},
-                {'profit_rate': -20, 'add_percent': 3},
-                {'profit_rate': -25, 'add_percent': 3},
-            ]
+    def get_config(self) -> Dict:
+        """获取配置"""
+        conn = sqlite3.connect(self.db_path, timeout=10.0)
+        cursor = conn.cursor()
+        
+        cursor.execute('''
+        SELECT total_capital, position_limit_percent, 
+               allow_long, allow_short, enabled
+        FROM market_config
+        ORDER BY updated_at DESC
+        LIMIT 1
+        ''')
+        
+        row = cursor.fetchone()
+        conn.close()
+        
+        if row:
+            return {
+                'total_capital': row[0],
+                'position_limit_percent': row[1],
+                'allow_long': bool(row[2]),
+                'allow_short': bool(row[3]),
+                'enabled': bool(row[4])
+            }
+        return {
+            'total_capital': 1000,
+            'position_limit_percent': 60,
+            'allow_long': False,
+            'allow_short': True,
+            'enabled': False
         }
+    
+    def get_available_capital(self) -> float:
+        """获取可开仓资金"""
+        config = self.get_config()
+        total = config['total_capital']
+        percent = config['position_limit_percent']
+        return total * percent / 100
+    
+    def get_current_positions(self) -> List[Dict]:
+        """获取当前持仓（从开仓记录表获取）"""
+        conn = sqlite3.connect(self.db_path, timeout=10.0)
+        cursor = conn.cursor()
+        
+        cursor.execute('''
+        SELECT inst_id, pos_side, open_size AS size, 
+               open_price AS avg_price, granularity
+        FROM position_opens
+        ORDER BY inst_id, pos_side
+        ''')
+        
+        positions = []
+        for row in cursor.fetchall():
+            positions.append({
+                'inst_id': row[0],
+                'pos_side': row[1],
+                'size': float(row[2]) if row[2] else 0,
+                'avg_price': float(row[3]) if row[3] else 0,
+                'granularity': row[4] if row[4] else 'small',
+                'profit_rate': 0,  # 这里可以从实际持仓数据获取
+                'unrealized_pnl': 0
+            })
+        
+        conn.close()
+        return positions
+    
+    def get_position_opens(self, inst_id: str, pos_side: str) -> Dict:
+        """获取开仓记录"""
+        conn = sqlite3.connect(self.db_path, timeout=10.0)
+        cursor = conn.cursor()
+        
+        cursor.execute('''
+        SELECT id, open_size, open_price, timestamp
+        FROM position_opens
+        WHERE inst_id = ? AND pos_side = ?
+        ORDER BY timestamp DESC
+        LIMIT 1
+        ''', (inst_id, pos_side))
+        
+        row = cursor.fetchone()
+        conn.close()
+        
+        if row:
+            return {
+                'id': row[0],
+                'original_size': row[1],
+                'original_price': row[2],
+                'timestamp': row[3]
+            }
+        return None
+    
+    def get_position_adds(self, inst_id: str, pos_side: str) -> List[Dict]:
+        """获取补仓记录"""
+        conn = sqlite3.connect(self.db_path, timeout=10.0)
+        cursor = conn.cursor()
+        
+        cursor.execute('''
+        SELECT add_size, add_price, level, timestamp
+        FROM position_adds
+        WHERE inst_id = ? AND pos_side = ?
+        ORDER BY timestamp ASC
+        ''', (inst_id, pos_side))
+        
+        adds = []
+        for row in cursor.fetchall():
+            adds.append({
+                'add_size': row[0],
+                'add_price': row[1],
+                'add_level': row[2],
+                'timestamp': row[3]
+            })
+        
+        conn.close()
+        return adds
+    
+    def determine_granularity(self, inst_id: str) -> str:
+        """确定币种的颗粒度级别"""
+        # 简单实现：根据市值或波动率确定
+        # 这里可以扩展为更复杂的逻辑
+        
+        # 默认分配：
+        # 大市值币（BTC, ETH）-> 大颗粒
+        # 中等市值 -> 中颗粒
+        # 小市值 -> 小颗粒
+        
+        large_cap = ['BTC-USDT-SWAP', 'ETH-USDT-SWAP']
+        medium_cap = ['BNB-USDT-SWAP', 'SOL-USDT-SWAP', 'XRP-USDT-SWAP']
+        
+        if inst_id in large_cap:
+            return 'large'
+        elif inst_id in medium_cap:
+            return 'medium'
+        else:
+            return 'small'
+    
+    def count_granularity_positions(self, granularity: str) -> int:
+        """统计某个颗粒度级别的持仓数量"""
+        positions = self.get_current_positions()
+        count = 0
+        
+        for pos in positions:
+            # 使用记录的granularity字段
+            pos_granularity = pos.get('granularity', 'small')
+            if pos_granularity == granularity:
+                count += 1
+        
+        return count
+    
+    def can_open_position(self, granularity: str) -> Tuple[bool, str]:
+        """检查是否可以开仓"""
+        config = self.GRANULARITY_CONFIG[granularity]
+        current_count = self.count_granularity_positions(granularity)
+        
+        if current_count >= config['max_coins']:
+            return False, f"{config['name']}已达上限({current_count}/{config['max_coins']})"
+        
+        return True, f"可以开仓({current_count}/{config['max_coins']})"
+    
+    def calculate_open_size(self, inst_id: str, pos_side: str, granularity: str) -> float:
+        """计算开仓数量"""
+        config = self.GRANULARITY_CONFIG[granularity]
+        available = self.get_available_capital()
+        
+        # 开仓金额 = 可开仓资金 * 颗粒度百分比
+        open_amount = available * config['add_percent'] / 100
+        
+        # TODO: 根据inst_id获取当前价格，计算具体数量
+        # 这里先返回金额
+        return open_amount
+    
+    def should_add_position(self, inst_id: str, pos_side: str, 
+                           profit_rate: float) -> Tuple[bool, str, float]:
+        """判断是否需要补仓"""
+        # 获取开仓记录
+        open_record = self.get_position_opens(inst_id, pos_side)
+        if not open_record:
+            return False, "没有开仓记录", 0
+        
+        # 获取补仓记录
+        adds = self.get_position_adds(inst_id, pos_side)
+        
+        # 确定颗粒度
+        granularity = self.determine_granularity(inst_id)
+        config = self.GRANULARITY_CONFIG[granularity]
+        
+        # 找到下一个应该补仓的触发点
+        current_adds = len(adds)
+        
+        if current_adds >= len(config['triggers']):
+            # 当前颗粒度的补仓已完成
+            # 检查是否需要升级到下一个颗粒度
+            if granularity == 'small':
+                # 检查是否可以进入中颗粒
+                medium_config = self.GRANULARITY_CONFIG['medium']
+                if profit_rate <= medium_config['prerequisite']:
+                    return True, "满足中颗粒补仓条件", medium_config['add_percent']
+            elif granularity == 'medium':
+                # 检查是否可以进入大颗粒
+                large_config = self.GRANULARITY_CONFIG['large']
+                if profit_rate <= large_config['prerequisite']:
+                    return True, "满足大颗粒补仓条件", large_config['add_percent']
+            
+            return False, f"{config['name']}补仓已完成", 0
+        
+        # 检查是否触发下一次补仓
+        next_trigger = config['triggers'][current_adds]
+        
+        if profit_rate <= next_trigger:
+            return True, f"触发{config['name']}补仓({next_trigger}%)", config['add_percent']
+        
+        return False, f"未触发补仓(当前{profit_rate:.2f}%, 下次{next_trigger}%)", 0
+    
+    def record_open_position(self, inst_id: str, pos_side: str, 
+                            size: float, price: float, granularity: str, 
+                            open_percent: float = 1.0, is_anchor: bool = False) -> int:
+        """记录开仓"""
+        conn = sqlite3.connect(self.db_path, timeout=10.0)
+        cursor = conn.cursor()
+        
+        timestamp = datetime.now(BEIJING_TZ).strftime('%Y-%m-%d %H:%M:%S')
+        
+        # 获取当前持仓数
+        cursor.execute('SELECT COUNT(*) FROM position_opens')
+        total_positions = cursor.fetchone()[0]
+        
+        cursor.execute('''
+        INSERT INTO position_opens (
+            inst_id, pos_side, open_size, open_price, open_percent,
+            granularity, total_positions, is_anchor, timestamp, created_at
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ''', (inst_id, pos_side, size, price, open_percent,
+              granularity, total_positions + 1, 1 if is_anchor else 0,
+              timestamp, timestamp))
+        
+        position_id = cursor.lastrowid
+        conn.commit()
+        conn.close()
+        
+        return position_id
+    
+    def record_add_position(self, inst_id: str, pos_side: str,
+                           add_size: float, add_price: float, 
+                           add_level: int, profit_rate: float, 
+                           add_percent: float, total_size_after: float) -> int:
+        """记录补仓"""
+        conn = sqlite3.connect(self.db_path, timeout=10.0)
+        cursor = conn.cursor()
+        
+        timestamp = datetime.now(BEIJING_TZ).strftime('%Y-%m-%d %H:%M:%S')
+        
+        cursor.execute('''
+        INSERT INTO position_adds (
+            inst_id, pos_side, add_size, add_price, add_percent,
+            profit_rate_trigger, level, total_size_after, timestamp, created_at
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ''', (inst_id, pos_side, add_size, add_price, add_percent,
+              profit_rate, add_level, total_size_after, timestamp, timestamp))
+        
+        add_id = cursor.lastrowid
+        conn.commit()
+        conn.close()
+        
+        return add_id
+    
+    def get_position_summary(self) -> Dict:
+        """获取仓位概览"""
+        positions = self.get_current_positions()
+        
+        small_count = 0
+        medium_count = 0
+        large_count = 0
+        
+        for pos in positions:
+            granularity = pos.get('granularity', 'small')
+            if granularity == 'small':
+                small_count += 1
+            elif granularity == 'medium':
+                medium_count += 1
+            elif granularity == 'large':
+                large_count += 1
+        
+        return {
+            'total_positions': len(positions),
+            'small_granularity': {
+                'count': small_count,
+                'max': self.GRANULARITY_CONFIG['small']['max_coins'],
+                'percent': f"{small_count}/{self.GRANULARITY_CONFIG['small']['max_coins']}"
+            },
+            'medium_granularity': {
+                'count': medium_count,
+                'max': self.GRANULARITY_CONFIG['medium']['max_coins'],
+                'percent': f"{medium_count}/{self.GRANULARITY_CONFIG['medium']['max_coins']}"
+            },
+            'large_granularity': {
+                'count': large_count,
+                'max': self.GRANULARITY_CONFIG['large']['max_coins'],
+                'percent': f"{large_count}/{self.GRANULARITY_CONFIG['large']['max_coins']}"
+            }
+        }
+
+
+def test_position_manager():
+    """测试仓位管理器"""
+    print("=== 测试仓位管理器 ===\n")
+    
+    manager = PositionManager()
+    
+    # 1. 测试配置获取
+    print("1. 获取配置")
+    config = manager.get_config()
+    print(f"   总本金: {config['total_capital']} USDT")
+    print(f"   可开仓额: {manager.get_available_capital():.2f} USDT")
+    print()
+    
+    # 2. 测试颗粒度判断
+    print("2. 颗粒度判断")
+    test_coins = ['BTC-USDT-SWAP', 'ETH-USDT-SWAP', 'DOGE-USDT-SWAP']
+    for coin in test_coins:
+        granularity = manager.determine_granularity(coin)
+        config = manager.GRANULARITY_CONFIG[granularity]
+        print(f"   {coin}: {config['name']} (最多{config['max_coins']}个币)")
+    print()
+    
+    # 3. 测试开仓检查
+    print("3. 开仓检查")
+    for granularity in ['small', 'medium', 'large']:
+        can_open, message = manager.can_open_position(granularity)
+        config = manager.GRANULARITY_CONFIG[granularity]
+        print(f"   {config['name']}: {message}")
+    print()
+    
+    # 4. 测试补仓判断
+    print("4. 补仓判断")
+    test_cases = [
+        ('BTC-USDT-SWAP', 'short', -1.5),
+        ('BTC-USDT-SWAP', 'short', -7.5),
+        ('BTC-USDT-SWAP', 'short', -15.5),
     ]
     
-    # 止损规则
-    STOP_LOSS_RULE = {
-        'max_loss_percent': -30,  # 最大亏损-30%
-        'keep_anchor_size': 2  # 保留2U锚点仓位
-    }
+    for inst_id, pos_side, profit_rate in test_cases:
+        should_add, reason, add_percent = manager.should_add_position(
+            inst_id, pos_side, profit_rate
+        )
+        print(f"   {inst_id} {pos_side} {profit_rate}%: {reason}")
+        if should_add:
+            print(f"     -> 补仓{add_percent}%")
+    print()
     
-    def check_add_condition(self, inst_id, pos_side, current_size, profit_rate, 
-                           current_price, total_capital):
-        """
-        检查补仓条件
-        
-        Args:
-            inst_id: 币种ID
-            pos_side: 持仓方向
-            current_size: 当前仓位（USDT）
-            profit_rate: 收益率（%）
-            current_price: 当前价格
-            total_capital: 总本金
-        
-        Returns:
-            dict: 补仓决策
-        """
-        # 先检查止损条件
-        if profit_rate <= self.STOP_LOSS_RULE['max_loss_percent']:
-            return {
-                'should_add': False,
-                'should_stop_loss': True,
-                'keep_size': self.STOP_LOSS_RULE['keep_anchor_size'],
-                'close_size': current_size - self.STOP_LOSS_RULE['keep_anchor_size'],
-                'reason': f'亏损达到{profit_rate:.2f}%，触发止损，仅保留{self.STOP_LOSS_RULE["keep_anchor_size"]}U锚点仓位'
-            }
-        
-        # 确定资金级别
-        level_rules = None
-        for rule in self.ADD_RULES:
-            min_capital, max_capital = rule['capital_range']
-            if min_capital <= current_size < max_capital:
-                level_rules = rule
-                break
-        
-        if not level_rules:
-            return {
-                'should_add': False,
-                'reason': '未匹配到补仓规则'
-            }
-        
-        # 检查是否触发补仓点
-        for trigger in level_rules['triggers']:
-            if profit_rate <= trigger['profit_rate']:
-                # 检查是否已经在这个点位补过仓
-                if self._has_added_at_level(inst_id, pos_side, trigger['profit_rate']):
-                    continue
-                
-                # 计算补仓金额
-                add_size = total_capital * (trigger['add_percent'] / 100)
-                
-                return {
-                    'should_add': True,
-                    'add_size': add_size,
-                    'add_percent': trigger['add_percent'],
-                    'add_price': current_price,
-                    'profit_rate_trigger': trigger['profit_rate'],
-                    'level': level_rules['level'],
-                    'total_size_after': current_size + add_size,
-                    'reason': f'Level{level_rules["level"]}补仓：收益率{profit_rate:.2f}% <= {trigger["profit_rate"]}%，加仓{trigger["add_percent"]}%'
-                }
-        
-        return {
-            'should_add': False,
-            'reason': '未触发补仓条件'
-        }
+    # 5. 测试仓位概览
+    print("5. 仓位概览")
+    summary = manager.get_position_summary()
+    print(f"   总持仓: {summary['total_positions']}个")
+    print(f"   小颗粒: {summary['small_granularity']['percent']}")
+    print(f"   中颗粒: {summary['medium_granularity']['percent']}")
+    print(f"   大颗粒: {summary['large_granularity']['percent']}")
+    print()
     
-    def save_position_add(self, inst_id, pos_side, add_price, add_size, 
-                         add_percent, profit_rate_trigger, level, total_size_after):
-        """
-        保存补仓记录
-        
-        Args:
-            inst_id: 币种ID
-            pos_side: 持仓方向
-            add_price: 补仓价格
-            add_size: 补仓数量（USDT）
-            add_percent: 补仓百分比
-            profit_rate_trigger: 触发时的收益率
-            level: 补仓级别
-            total_size_after: 补仓后总仓位
-        """
-        try:
-            conn = sqlite3.connect(self.db_path, timeout=10.0)
-            cursor = conn.cursor()
-            
-            timestamp = datetime.now(BEIJING_TZ).strftime('%Y-%m-%d %H:%M:%S')
-            
-            cursor.execute('''
-            INSERT INTO position_adds (
-                inst_id, pos_side, add_price, add_size, add_percent,
-                profit_rate_trigger, level, total_size_after, timestamp
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-            ''', (inst_id, pos_side, add_price, add_size, add_percent,
-                  profit_rate_trigger, level, total_size_after, timestamp))
-            
-            conn.commit()
-            conn.close()
-            print(f"✅ 补仓记录已保存: {inst_id} Level{level} +{add_size}U @ {add_price}")
-            return True
-        except Exception as e:
-            print(f"❌ 保存补仓记录失败: {e}")
-            return False
-    
-    def _has_added_at_level(self, inst_id, pos_side, profit_rate_trigger):
-        """检查是否已经在该点位补过仓"""
-        try:
-            conn = sqlite3.connect(self.db_path, timeout=10.0)
-            cursor = conn.cursor()
-            
-            cursor.execute('''
-            SELECT COUNT(*) FROM position_adds
-            WHERE inst_id = ? AND pos_side = ? AND profit_rate_trigger = ?
-            ''', (inst_id, pos_side, profit_rate_trigger))
-            
-            count = cursor.fetchone()[0]
-            conn.close()
-            return count > 0
-        except Exception as e:
-            print(f"❌ 查询补仓记录失败: {e}")
-            return False
+    print("✅ 测试完成")
 
 
-class AnchorOrderManager:
-    """锚点单上方挂单管理器"""
-    
-    def __init__(self, db_path=None):
-        """初始化"""
-        self.db_path = db_path or DB_PATH
-    
-    # 锚点单上方挂单规则
-    PENDING_ORDER_RULES = [
-        {
-            'position_percent': 4,  # 锚点单上方4%
-            'order_size': 20,  # 挂20U空单
-            'order_type': 'upper_4'
-        },
-        {
-            'position_percent': 10,  # 锚点单上方10%
-            'order_size': 50,  # 挂50U空单
-            'order_type': 'upper_10'
-        }
-    ]
-    
-    ANCHOR_SIZE = 10  # 锚点单数量
-    
-    def setup_anchor_pending_orders(self, inst_id, anchor_price):
-        """
-        在锚点单上方设置挂单
-        
-        Args:
-            inst_id: 币种ID
-            anchor_price: 锚点价格
-        
-        Returns:
-            list: 挂单列表
-        """
-        orders = []
-        
-        for rule in self.PENDING_ORDER_RULES:
-            target_price = anchor_price * (1 + rule['position_percent'] / 100)
-            price_diff_percent = rule['position_percent']
-            
-            order = {
-                'inst_id': inst_id,
-                'pos_side': 'short',
-                'order_type': rule['order_type'],
-                'anchor_price': anchor_price,
-                'target_price': target_price,
-                'price_diff_percent': price_diff_percent,
-                'order_size': rule['order_size'],
-                'status': 'pending'
-            }
-            
-            orders.append(order)
-            self.save_pending_order(order)
-        
-        return orders
-    
-    def save_pending_order(self, order):
-        """保存挂单记录"""
-        try:
-            conn = sqlite3.connect(self.db_path, timeout=10.0)
-            cursor = conn.cursor()
-            
-            timestamp = datetime.now(BEIJING_TZ).strftime('%Y-%m-%d %H:%M:%S')
-            
-            # 使用 INSERT OR REPLACE 避免重复
-            cursor.execute('''
-            INSERT OR REPLACE INTO pending_orders (
-                inst_id, pos_side, order_type, anchor_price, target_price,
-                price_diff_percent, order_size, status, timestamp
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-            ''', (
-                order['inst_id'], order['pos_side'], order['order_type'],
-                order['anchor_price'], order['target_price'], order['price_diff_percent'],
-                order['order_size'], order['status'], timestamp
-            ))
-            
-            conn.commit()
-            conn.close()
-            print(f"✅ 挂单记录已保存: {order['inst_id']} {order['order_type']} {order['order_size']}U @ {order['target_price']:.4f}")
-            return True
-        except Exception as e:
-            print(f"❌ 保存挂单记录失败: {e}")
-            return False
-    
-    def check_pending_order_triggered(self, inst_id, current_price):
-        """检查挂单是否触发"""
-        try:
-            conn = sqlite3.connect(self.db_path, timeout=10.0)
-            cursor = conn.cursor()
-            
-            cursor.execute('''
-            SELECT id, order_type, target_price, order_size
-            FROM pending_orders
-            WHERE inst_id = ? AND status = 'pending'
-            ''', (inst_id,))
-            
-            triggered_orders = []
-            for row in cursor.fetchall():
-                order_id, order_type, target_price, order_size = row
-                
-                # 检查价格是否达到
-                if current_price >= target_price:
-                    triggered_orders.append({
-                        'order_id': order_id,
-                        'order_type': order_type,
-                        'target_price': target_price,
-                        'order_size': order_size,
-                        'current_price': current_price
-                    })
-            
-            conn.close()
-            return triggered_orders
-        except Exception as e:
-            print(f"❌ 检查挂单触发失败: {e}")
-            return []
-    
-    def update_order_status(self, order_id, new_status):
-        """更新挂单状态"""
-        try:
-            conn = sqlite3.connect(self.db_path, timeout=10.0)
-            cursor = conn.cursor()
-            
-            cursor.execute('''
-            UPDATE pending_orders
-            SET status = ?
-            WHERE id = ?
-            ''', (new_status, order_id))
-            
-            conn.commit()
-            conn.close()
-            return True
-        except Exception as e:
-            print(f"❌ 更新挂单状态失败: {e}")
-            return False
-
-
-# 测试代码
 if __name__ == '__main__':
-    print("=" * 80)
-    print("仓位管理模块测试")
-    print("=" * 80)
-    
-    # 测试开仓规则
-    print("\n【测试1: 多单开仓】")
-    opener = PositionOpener()
-    result = opener.check_long_open_condition(
-        inst_id='BTC-USDT-SWAP',
-        current_price=50000,
-        available_capital=600
-    )
-    print(f"开仓决策: {result}")
-    
-    # 测试补仓规则
-    print("\n【测试2: 空单补仓 - Level 1】")
-    adder = PositionAdder()
-    result = adder.check_add_condition(
-        inst_id='ETH-USDT-SWAP',
-        pos_side='short',
-        current_size=8,
-        profit_rate=-5,
-        current_price=3000,
-        total_capital=1000
-    )
-    print(f"补仓决策: {result}")
-    
-    # 测试止损
-    print("\n【测试3: 止损触发】")
-    result = adder.check_add_condition(
-        inst_id='SOL-USDT-SWAP',
-        pos_side='short',
-        current_size=50,
-        profit_rate=-32,
-        current_price=100,
-        total_capital=1000
-    )
-    print(f"止损决策: {result}")
-    
-    # 测试挂单
-    print("\n【测试4: 锚点单挂单】")
-    anchor_mgr = AnchorOrderManager()
-    orders = anchor_mgr.setup_anchor_pending_orders(
-        inst_id='BTC-USDT-SWAP',
-        anchor_price=50000
-    )
-    print(f"已设置{len(orders)}个挂单:")
-    for order in orders:
-        print(f"  - {order['order_type']}: {order['order_size']}U @ {order['target_price']:.2f} (+{order['price_diff_percent']}%)")
-    
-    print("\n✅ 测试完成")
+    test_position_manager()

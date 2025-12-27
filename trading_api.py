@@ -645,3 +645,74 @@ def record_simulated_trade():
         return jsonify({'success': True, 'message': '模拟交易已记录'})
     except Exception as e:
         return jsonify({'success': False, 'error': str(e)})
+
+
+# ============================================================
+# 仓位管理 API
+# ============================================================
+
+@trading_bp.route('/positions/granularity-summary', methods=['GET'])
+def get_granularity_summary():
+    """获取颗粒度汇总"""
+    try:
+        from position_manager import PositionManager
+        manager = PositionManager()
+        
+        summary = manager.get_position_summary()
+        available = manager.get_available_capital()
+        
+        return jsonify({
+            'success': True,
+            'summary': summary,
+            'available_capital': available
+        })
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)})
+
+
+@trading_bp.route('/positions/can-open', methods=['GET'])
+def check_can_open():
+    """检查是否可以开仓"""
+    try:
+        from position_manager import PositionManager
+        granularity = request.args.get('granularity', 'small')
+        
+        manager = PositionManager()
+        can_open, message = manager.can_open_position(granularity)
+        
+        return jsonify({
+            'success': True,
+            'can_open': can_open,
+            'message': message,
+            'granularity': granularity
+        })
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)})
+
+
+@trading_bp.route('/positions/should-add', methods=['GET'])
+def check_should_add():
+    """检查是否需要补仓"""
+    try:
+        from position_manager import PositionManager
+        inst_id = request.args.get('inst_id')
+        pos_side = request.args.get('pos_side')
+        profit_rate = float(request.args.get('profit_rate', 0))
+        
+        if not inst_id or not pos_side:
+            return jsonify({'success': False, 'error': '缺少必要参数'})
+        
+        manager = PositionManager()
+        should_add, reason, add_percent = manager.should_add_position(
+            inst_id, pos_side, profit_rate
+        )
+        
+        return jsonify({
+            'success': True,
+            'should_add': should_add,
+            'reason': reason,
+            'add_percent': add_percent,
+            'profit_rate': profit_rate
+        })
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)})
