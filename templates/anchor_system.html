@@ -648,10 +648,19 @@
                         ${(item.profit_rate || 0) >= 0 ? '+' : ''}${(item.profit_rate || 0).toFixed(2)}%
                     </td>
                     <td>
-                        ${item.alert_type ? 
-                            `<span class="badge ${item.alert_type === 'profit_target' ? 'badge-profit' : 'badge-loss'}">
-                                ${item.alert_type === 'profit_target' ? '盈利目标' : '止损警告'}
-                            </span>` : '--'}
+                        ${item.alert_type ? (() => {
+                            if (item.alert_type === 'profit_target') {
+                                return '<span class="badge badge-profit">盈利目标</span>';
+                            } else if (item.alert_type === 'loss_limit') {
+                                return '<span class="badge badge-loss">止损警告</span>';
+                            } else if (item.alert_type === 'extreme_max_profit') {
+                                return '<span class="badge badge-profit">最高盈利刷新</span>';
+                            } else if (item.alert_type === 'extreme_max_loss') {
+                                return '<span class="badge badge-loss">最大亏损刷新</span>';
+                            } else {
+                                return '<span class="badge badge-normal">其他告警</span>';
+                            }
+                        })() : '--'}
                     </td>
                     <td>
                         ${item.alert_sent ? 
@@ -739,22 +748,45 @@
                 return;
             }
 
-            alertList.innerHTML = data.map(alert => `
-                <div class="alert-item ${alert.alert_type === 'profit_target' ? 'profit' : 'loss'}">
-                    <div class="alert-header">
-                        <div class="alert-title">
-                            ${alert.alert_type === 'profit_target' ? '🎉 盈利目标达成' : '⚠️ 止损警告'}
+            alertList.innerHTML = data.map(alert => {
+                // 判断告警类型
+                let alertTitle = '';
+                let alertClass = '';
+                
+                if (alert.alert_type === 'profit_target') {
+                    alertTitle = '🎉 盈利目标达成';
+                    alertClass = 'profit';
+                } else if (alert.alert_type === 'loss_limit') {
+                    alertTitle = '⚠️ 止损警告';
+                    alertClass = 'loss';
+                } else if (alert.alert_type === 'extreme_max_profit') {
+                    alertTitle = '🚀 最高盈利极值刷新预警';
+                    alertClass = 'profit';
+                } else if (alert.alert_type === 'extreme_max_loss') {
+                    alertTitle = '📉 最大亏损极值刷新预警';
+                    alertClass = 'loss';
+                } else {
+                    alertTitle = '📢 告警';
+                    alertClass = alert.profit_rate >= 0 ? 'profit' : 'loss';
+                }
+                
+                return `
+                    <div class="alert-item ${alertClass}">
+                        <div class="alert-header">
+                            <div class="alert-title">
+                                ${alertTitle}
+                            </div>
+                            <div class="alert-time">${alert.timestamp}</div>
                         </div>
-                        <div class="alert-time">${alert.timestamp}</div>
+                        <div class="alert-details">
+                            ${alert.inst_id} • ${alert.pos_side === 'short' ? '做空' : '做多'} • 
+                            <strong style="color: ${alert.profit_rate >= 0 ? '#48bb78' : '#f56565'}">
+                                ${alert.profit_rate >= 0 ? '+' : ''}${alert.profit_rate.toFixed(2)}%
+                            </strong>
+                        </div>
                     </div>
-                    <div class="alert-details">
-                        ${alert.inst_id} • ${alert.pos_side === 'short' ? '做空' : '做多'} • 
-                        <strong style="color: ${alert.profit_rate >= 0 ? '#48bb78' : '#f56565'}">
-                            ${alert.profit_rate >= 0 ? '+' : ''}${alert.profit_rate.toFixed(2)}%
-                        </strong>
-                    </div>
-                </div>
-            `).join('');
+                `;
+            }).join('');
         }
 
         // 刷新数据
