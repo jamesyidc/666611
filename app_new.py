@@ -11847,6 +11847,161 @@ def cache_clear():
             'error': str(e)
         })
 
+# ========== 锚点系统（OKEx持仓监控） ==========
+
+@app.route('/anchor-system')
+def anchor_system():
+    """锚点系统主页"""
+    return render_template('anchor_system.html')
+
+@app.route('/api/anchor-system/monitors')
+def get_anchor_monitors():
+    """获取持仓监控记录"""
+    try:
+        limit = request.args.get('limit', 100, type=int)
+        db_path = '/home/user/webapp/anchor_system.db'
+        
+        conn = sqlite3.connect(db_path, timeout=10.0)
+        conn.row_factory = sqlite3.Row
+        cursor = conn.cursor()
+        
+        cursor.execute('''
+        SELECT * FROM anchor_monitors 
+        ORDER BY timestamp DESC 
+        LIMIT ?
+        ''', (limit,))
+        
+        rows = cursor.fetchall()
+        monitors = []
+        for row in rows:
+            monitors.append({
+                'id': row['id'],
+                'timestamp': row['timestamp'],
+                'inst_id': row['inst_id'],
+                'pos_side': row['pos_side'],
+                'pos_size': row['pos_size'],
+                'avg_price': row['avg_price'],
+                'mark_price': row['mark_price'],
+                'upl': row['upl'],
+                'upl_ratio': row['upl_ratio'],
+                'margin': row['margin'],
+                'leverage': row['leverage'],
+                'profit_rate': row['profit_rate'],
+                'alert_type': row['alert_type'],
+                'alert_sent': row['alert_sent']
+            })
+        
+        conn.close()
+        
+        return jsonify({
+            'success': True,
+            'data': monitors,
+            'total': len(monitors)
+        })
+    except Exception as e:
+        return jsonify({
+            'success': False,
+            'error': str(e),
+            'traceback': traceback.format_exc()
+        })
+
+@app.route('/api/anchor-system/alerts')
+def get_anchor_alerts():
+    """获取告警历史"""
+    try:
+        limit = request.args.get('limit', 50, type=int)
+        db_path = '/home/user/webapp/anchor_system.db'
+        
+        conn = sqlite3.connect(db_path, timeout=10.0)
+        conn.row_factory = sqlite3.Row
+        cursor = conn.cursor()
+        
+        cursor.execute('''
+        SELECT * FROM anchor_alerts 
+        ORDER BY timestamp DESC 
+        LIMIT ?
+        ''', (limit,))
+        
+        rows = cursor.fetchall()
+        alerts = []
+        for row in rows:
+            alerts.append({
+                'id': row['id'],
+                'timestamp': row['timestamp'],
+                'inst_id': row['inst_id'],
+                'pos_side': row['pos_side'],
+                'profit_rate': row['profit_rate'],
+                'alert_type': row['alert_type'],
+                'message': row['message'],
+                'sent_status': row['sent_status']
+            })
+        
+        conn.close()
+        
+        return jsonify({
+            'success': True,
+            'data': alerts,
+            'total': len(alerts)
+        })
+    except Exception as e:
+        return jsonify({
+            'success': False,
+            'error': str(e),
+            'traceback': traceback.format_exc()
+        })
+
+@app.route('/api/anchor-system/status')
+def get_anchor_status():
+    """获取系统状态"""
+    try:
+        import json
+        
+        # 读取配置
+        config_path = '/home/user/webapp/anchor_config.json'
+        with open(config_path, 'r', encoding='utf-8') as f:
+            config = json.load(f)
+        
+        # 获取最新监控记录
+        db_path = '/home/user/webapp/anchor_system.db'
+        conn = sqlite3.connect(db_path, timeout=10.0)
+        cursor = conn.cursor()
+        
+        cursor.execute('SELECT COUNT(*) FROM anchor_monitors')
+        total_monitors = cursor.fetchone()[0]
+        
+        cursor.execute('SELECT COUNT(*) FROM anchor_alerts')
+        total_alerts = cursor.fetchone()[0]
+        
+        cursor.execute('''
+        SELECT * FROM anchor_monitors 
+        ORDER BY timestamp DESC 
+        LIMIT 1
+        ''')
+        latest = cursor.fetchone()
+        
+        conn.close()
+        
+        return jsonify({
+            'success': True,
+            'status': {
+                'total_monitors': total_monitors,
+                'total_alerts': total_alerts,
+                'latest_check': latest[1] if latest else None,
+                'config': {
+                    'profit_target': config['monitor']['profit_target'],
+                    'loss_limit': config['monitor']['loss_limit'],
+                    'check_interval': config['monitor']['check_interval'],
+                    'only_short': config['monitor']['only_short_positions']
+                }
+            }
+        })
+    except Exception as e:
+        return jsonify({
+            'success': False,
+            'error': str(e),
+            'traceback': traceback.format_exc()
+        })
+
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=5000, debug=False)
 

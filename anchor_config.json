@@ -1,0 +1,22 @@
+{
+  "okex": {
+    "api_key": "86cd5cc2-d87a-49f4-97fb-d02a78835be1",
+    "secret_key": "B7FE5AB683B648E266689F3E9B2DC79E",
+    "passphrase": "Tencent@123",
+    "base_url": "https://www.okx.com"
+  },
+  "telegram": {
+    "bot_token": "7791232851:AAEkpl1BCKNJQUKrxyL5l-XcQoGlckfGfSE",
+    "chat_id": "1837051033"
+  },
+  "monitor": {
+    "profit_target": 40.0,
+    "loss_limit": -10.0,
+    "check_interval": 60,
+    "alert_cooldown": 30,
+    "only_short_positions": true
+  },
+  "database": {
+    "path": "/home/user/webapp/anchor_system.db"
+  }
+}
