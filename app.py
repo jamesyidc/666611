@@ -1814,5 +1814,19 @@ TRADING_DECISION_HTML = """
 """
 
 
+# 导入交易管理API
+from trading_api import trading_bp
+
+# 注册交易管理Blueprint
+app.register_blueprint(trading_bp)
+
+
+@app.route('/trading-manager')
+def trading_manager():
+    """交易管理界面"""
+    with open('/home/user/webapp/templates/trading_manager.html', 'r', encoding='utf-8') as f:
+        return f.read()
+
+
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=5000, debug=False)

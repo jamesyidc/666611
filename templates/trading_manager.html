@@ -1,0 +1,942 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>交易管理系统</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Microsoft YaHei', 'Arial', sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+        
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 15px;
+            padding: 30px;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.2);
+        }
+        
+        h1 {
+            color: #667eea;
+            margin-bottom: 10px;
+            font-size: 2.5em;
+        }
+        
+        .subtitle {
+            color: #666;
+            margin-bottom: 30px;
+            font-size: 1.1em;
+        }
+        
+        .tabs {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 20px;
+            border-bottom: 2px solid #eee;
+        }
+        
+        .tab {
+            padding: 12px 24px;
+            cursor: pointer;
+            border: none;
+            background: none;
+            font-size: 1em;
+            color: #666;
+            transition: all 0.3s;
+            border-bottom: 3px solid transparent;
+        }
+        
+        .tab.active {
+            color: #667eea;
+            border-bottom-color: #667eea;
+            font-weight: bold;
+        }
+        
+        .tab:hover {
+            color: #667eea;
+        }
+        
+        .tab-content {
+            display: none;
+        }
+        
+        .tab-content.active {
+            display: block;
+        }
+        
+        .card {
+            background: #f8f9fa;
+            border-radius: 10px;
+            padding: 20px;
+            margin-bottom: 20px;
+        }
+        
+        .card h2 {
+            color: #333;
+            margin-bottom: 15px;
+            font-size: 1.3em;
+        }
+        
+        .config-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 15px;
+        }
+        
+        .config-item {
+            background: white;
+            padding: 15px;
+            border-radius: 8px;
+            border-left: 4px solid #667eea;
+        }
+        
+        .config-label {
+            font-size: 0.9em;
+            color: #666;
+            margin-bottom: 5px;
+        }
+        
+        .config-value {
+            font-size: 1.2em;
+            color: #333;
+            font-weight: bold;
+        }
+        
+        .status-badge {
+            display: inline-block;
+            padding: 5px 12px;
+            border-radius: 15px;
+            font-size: 0.9em;
+            font-weight: bold;
+        }
+        
+        .status-enabled {
+            background: #d4edda;
+            color: #155724;
+        }
+        
+        .status-disabled {
+            background: #f8d7da;
+            color: #721c24;
+        }
+        
+        .status-bullish {
+            background: #d1ecf1;
+            color: #0c5460;
+        }
+        
+        .status-bearish {
+            background: #fff3cd;
+            color: #856404;
+        }
+        
+        .status-neutral {
+            background: #e2e3e5;
+            color: #383d41;
+        }
+        
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            background: white;
+            border-radius: 8px;
+            overflow: hidden;
+        }
+        
+        th {
+            background: #667eea;
+            color: white;
+            padding: 12px;
+            text-align: left;
+            font-weight: bold;
+        }
+        
+        td {
+            padding: 12px;
+            border-bottom: 1px solid #eee;
+        }
+        
+        tr:hover {
+            background: #f8f9fa;
+        }
+        
+        .pos-side-long {
+            color: #28a745;
+            font-weight: bold;
+        }
+        
+        .pos-side-short {
+            color: #dc3545;
+            font-weight: bold;
+        }
+        
+        .profit-positive {
+            color: #28a745;
+        }
+        
+        .profit-negative {
+            color: #dc3545;
+        }
+        
+        .btn {
+            padding: 10px 20px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 1em;
+            transition: all 0.3s;
+        }
+        
+        .btn-primary {
+            background: #667eea;
+            color: white;
+        }
+        
+        .btn-primary:hover {
+            background: #5568d3;
+        }
+        
+        .btn-danger {
+            background: #dc3545;
+            color: white;
+        }
+        
+        .btn-danger:hover {
+            background: #c82333;
+        }
+        
+        .btn-success {
+            background: #28a745;
+            color: white;
+        }
+        
+        .btn-success:hover {
+            background: #218838;
+        }
+        
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+        }
+        
+        .stat-box {
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            text-align: center;
+            border-top: 4px solid #667eea;
+        }
+        
+        .stat-value {
+            font-size: 2em;
+            color: #667eea;
+            font-weight: bold;
+        }
+        
+        .stat-label {
+            color: #666;
+            margin-top: 5px;
+        }
+        
+        .form-group {
+            margin-bottom: 15px;
+        }
+        
+        .form-label {
+            display: block;
+            margin-bottom: 5px;
+            color: #333;
+            font-weight: bold;
+        }
+        
+        .form-control {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            font-size: 1em;
+        }
+        
+        .form-control:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+        
+        select.form-control {
+            cursor: pointer;
+        }
+        
+        .alert {
+            padding: 15px;
+            border-radius: 5px;
+            margin-bottom: 20px;
+        }
+        
+        .alert-success {
+            background: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+        
+        .alert-danger {
+            background: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+        
+        .loading {
+            text-align: center;
+            padding: 40px;
+            color: #666;
+        }
+        
+        .empty-state {
+            text-align: center;
+            padding: 40px;
+            color: #999;
+        }
+        
+        .switch-container {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        
+        .switch {
+            position: relative;
+            display: inline-block;
+            width: 60px;
+            height: 34px;
+        }
+        
+        .switch input {
+            opacity: 0;
+            width: 0;
+            height: 0;
+        }
+        
+        .slider {
+            position: absolute;
+            cursor: pointer;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background-color: #ccc;
+            transition: .4s;
+            border-radius: 34px;
+        }
+        
+        .slider:before {
+            position: absolute;
+            content: "";
+            height: 26px;
+            width: 26px;
+            left: 4px;
+            bottom: 4px;
+            background-color: white;
+            transition: .4s;
+            border-radius: 50%;
+        }
+        
+        input:checked + .slider {
+            background-color: #28a745;
+        }
+        
+        input:checked + .slider:before {
+            transform: translateX(26px);
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🤖 自动交易管理系统</h1>
+        <p class="subtitle">第二阶段：开仓规则 | 补仓规则 | 系统配置</p>
+        
+        <div class="tabs">
+            <button class="tab active" onclick="switchTab('config')">⚙️ 系统配置</button>
+            <button class="tab" onclick="switchTab('statistics')">📊 统计数据</button>
+            <button class="tab" onclick="switchTab('positions')">📈 开仓记录</button>
+            <button class="tab" onclick="switchTab('adds')">➕ 补仓记录</button>
+            <button class="tab" onclick="switchTab('orders')">📋 挂单记录</button>
+            <button class="tab" onclick="switchTab('decisions')">🎯 决策记录</button>
+        </div>
+        
+        <!-- 系统配置 -->
+        <div id="config-tab" class="tab-content active">
+            <div class="card">
+                <h2>当前配置</h2>
+                <div id="current-config" class="loading">加载中...</div>
+            </div>
+            
+            <div class="card">
+                <h2>修改配置</h2>
+                <form id="config-form" onsubmit="updateConfig(event)">
+                    <div class="config-grid">
+                        <div class="form-group">
+                            <label class="form-label">市场模式</label>
+                            <select class="form-control" name="market_mode">
+                                <option value="manual">手动</option>
+                                <option value="auto">自动</option>
+                            </select>
+                        </div>
+                        
+                        <div class="form-group">
+                            <label class="form-label">市场趋势</label>
+                            <select class="form-control" name="market_trend">
+                                <option value="neutral">中性</option>
+                                <option value="bullish">多头主导</option>
+                                <option value="bearish">空头主导</option>
+                            </select>
+                        </div>
+                        
+                        <div class="form-group">
+                            <label class="form-label">总本金 (USDT)</label>
+                            <input type="number" class="form-control" name="total_capital" value="1000" step="0.01">
+                        </div>
+                        
+                        <div class="form-group">
+                            <label class="form-label">可开仓百分比 (%)</label>
+                            <input type="number" class="form-control" name="position_limit_percent" value="60" step="1">
+                        </div>
+                        
+                        <div class="form-group">
+                            <label class="form-label">锚点单上限 (USDT)</label>
+                            <input type="number" class="form-control" name="anchor_capital_limit" value="200" step="0.01">
+                        </div>
+                        
+                        <div class="form-group">
+                            <label class="form-label">允许开多单</label>
+                            <div class="switch-container">
+                                <label class="switch">
+                                    <input type="checkbox" name="allow_long" id="allow-long-checkbox">
+                                    <span class="slider"></span>
+                                </label>
+                                <span id="allow-long-text">否</span>
+                            </div>
+                        </div>
+                        
+                        <div class="form-group">
+                            <label class="form-label">系统启用</label>
+                            <div class="switch-container">
+                                <label class="switch">
+                                    <input type="checkbox" name="enabled" id="enabled-checkbox">
+                                    <span class="slider"></span>
+                                </label>
+                                <span id="enabled-text">关闭</span>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div style="margin-top: 20px;">
+                        <button type="submit" class="btn btn-primary">💾 保存配置</button>
+                    </div>
+                </form>
+                <div id="config-message" style="margin-top: 10px;"></div>
+            </div>
+        </div>
+        
+        <!-- 统计数据 -->
+        <div id="statistics-tab" class="tab-content">
+            <div class="card">
+                <h2>统计概览</h2>
+                <div id="statistics-content" class="loading">加载中...</div>
+            </div>
+        </div>
+        
+        <!-- 开仓记录 -->
+        <div id="positions-tab" class="tab-content">
+            <div class="card">
+                <h2>开仓记录</h2>
+                <div id="positions-content" class="loading">加载中...</div>
+            </div>
+        </div>
+        
+        <!-- 补仓记录 -->
+        <div id="adds-tab" class="tab-content">
+            <div class="card">
+                <h2>补仓记录</h2>
+                <div id="adds-content" class="loading">加载中...</div>
+            </div>
+        </div>
+        
+        <!-- 挂单记录 -->
+        <div id="orders-tab" class="tab-content">
+            <div class="card">
+                <h2>挂单记录</h2>
+                <div id="orders-content" class="loading">加载中...</div>
+            </div>
+        </div>
+        
+        <!-- 决策记录 -->
+        <div id="decisions-tab" class="tab-content">
+            <div class="card">
+                <h2>交易决策记录</h2>
+                <div id="decisions-content" class="loading">加载中...</div>
+            </div>
+        </div>
+    </div>
+    
+    <script>
+        // 切换Tab
+        function switchTab(tabName) {
+            // 隐藏所有tab内容
+            document.querySelectorAll('.tab-content').forEach(content => {
+                content.classList.remove('active');
+            });
+            
+            // 移除所有tab的active状态
+            document.querySelectorAll('.tab').forEach(tab => {
+                tab.classList.remove('active');
+            });
+            
+            // 显示选中的tab
+            document.getElementById(tabName + '-tab').classList.add('active');
+            event.target.classList.add('active');
+            
+            // 加载数据
+            loadTabData(tabName);
+        }
+        
+        // 加载Tab数据
+        function loadTabData(tabName) {
+            switch(tabName) {
+                case 'config':
+                    loadConfig();
+                    break;
+                case 'statistics':
+                    loadStatistics();
+                    break;
+                case 'positions':
+                    loadPositions();
+                    break;
+                case 'adds':
+                    loadAdds();
+                    break;
+                case 'orders':
+                    loadOrders();
+                    break;
+                case 'decisions':
+                    loadDecisions();
+                    break;
+            }
+        }
+        
+        // 加载配置
+        function loadConfig() {
+            fetch('/api/trading/config')
+                .then(res => res.json())
+                .then(data => {
+                    if (data.success) {
+                        const config = data.config;
+                        
+                        // 显示当前配置
+                        const html = `
+                            <div class="config-grid">
+                                <div class="config-item">
+                                    <div class="config-label">系统状态</div>
+                                    <div class="config-value">
+                                        <span class="status-badge ${config.enabled ? 'status-enabled' : 'status-disabled'}">
+                                            ${config.enabled ? '✅ 已启用' : '⏸️ 已关闭'}
+                                        </span>
+                                    </div>
+                                </div>
+                                
+                                <div class="config-item">
+                                    <div class="config-label">市场趋势</div>
+                                    <div class="config-value">
+                                        <span class="status-badge status-${config.market_trend}">
+                                            ${config.market_trend === 'bullish' ? '📈 多头主导' : 
+                                              config.market_trend === 'bearish' ? '📉 空头主导' : '➡️ 中性'}
+                                        </span>
+                                    </div>
+                                </div>
+                                
+                                <div class="config-item">
+                                    <div class="config-label">总本金</div>
+                                    <div class="config-value">${config.total_capital} USDT</div>
+                                </div>
+                                
+                                <div class="config-item">
+                                    <div class="config-label">可开仓额</div>
+                                    <div class="config-value">${(config.total_capital * config.position_limit_percent / 100).toFixed(2)} USDT (${config.position_limit_percent}%)</div>
+                                </div>
+                                
+                                <div class="config-item">
+                                    <div class="config-label">锚点单上限</div>
+                                    <div class="config-value">${config.anchor_capital_limit} USDT</div>
+                                </div>
+                                
+                                <div class="config-item">
+                                    <div class="config-label">允许开多单</div>
+                                    <div class="config-value">${config.allow_long ? '✅ 是' : '❌ 否'}</div>
+                                </div>
+                                
+                                <div class="config-item">
+                                    <div class="config-label">空单颗粒度</div>
+                                    <div class="config-value">${config.min_granularity}%</div>
+                                </div>
+                                
+                                <div class="config-item">
+                                    <div class="config-label">多单颗粒度</div>
+                                    <div class="config-value">${config.long_granularity}%</div>
+                                </div>
+                                
+                                <div class="config-item">
+                                    <div class="config-label">最后更新</div>
+                                    <div class="config-value" style="font-size: 0.9em;">${config.updated_at}</div>
+                                </div>
+                            </div>
+                        `;
+                        
+                        document.getElementById('current-config').innerHTML = html;
+                        
+                        // 填充表单
+                        document.querySelector('[name="market_mode"]').value = config.market_mode;
+                        document.querySelector('[name="market_trend"]').value = config.market_trend;
+                        document.querySelector('[name="total_capital"]').value = config.total_capital;
+                        document.querySelector('[name="position_limit_percent"]').value = config.position_limit_percent;
+                        document.querySelector('[name="anchor_capital_limit"]').value = config.anchor_capital_limit;
+                        document.getElementById('allow-long-checkbox').checked = config.allow_long;
+                        document.getElementById('enabled-checkbox').checked = config.enabled;
+                        updateSwitchText();
+                    }
+                })
+                .catch(err => {
+                    document.getElementById('current-config').innerHTML = `<div class="alert alert-danger">加载失败: ${err.message}</div>`;
+                });
+        }
+        
+        // 更新开关文本
+        function updateSwitchText() {
+            const allowLong = document.getElementById('allow-long-checkbox').checked;
+            const enabled = document.getElementById('enabled-checkbox').checked;
+            
+            document.getElementById('allow-long-text').textContent = allowLong ? '是' : '否';
+            document.getElementById('enabled-text').textContent = enabled ? '开启' : '关闭';
+        }
+        
+        // 监听开关变化
+        document.getElementById('allow-long-checkbox').addEventListener('change', updateSwitchText);
+        document.getElementById('enabled-checkbox').addEventListener('change', updateSwitchText);
+        
+        // 更新配置
+        function updateConfig(event) {
+            event.preventDefault();
+            
+            const formData = new FormData(event.target);
+            const config = {
+                market_mode: formData.get('market_mode'),
+                market_trend: formData.get('market_trend'),
+                total_capital: parseFloat(formData.get('total_capital')),
+                position_limit_mode: 'manual',
+                position_limit_percent: parseFloat(formData.get('position_limit_percent')),
+                anchor_capital_limit: parseFloat(formData.get('anchor_capital_limit')),
+                anchor_capital_percent: 10,
+                allow_long: document.getElementById('allow-long-checkbox').checked,
+                min_granularity: 1,
+                long_granularity: 10,
+                enabled: document.getElementById('enabled-checkbox').checked
+            };
+            
+            fetch('/api/trading/config', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify(config)
+            })
+            .then(res => res.json())
+            .then(data => {
+                const msgDiv = document.getElementById('config-message');
+                if (data.success) {
+                    msgDiv.innerHTML = '<div class="alert alert-success">✅ 配置已保存</div>';
+                    loadConfig(); // 重新加载
+                } else {
+                    msgDiv.innerHTML = `<div class="alert alert-danger">❌ 保存失败: ${data.error}</div>`;
+                }
+                
+                setTimeout(() => msgDiv.innerHTML = '', 3000);
+            })
+            .catch(err => {
+                document.getElementById('config-message').innerHTML = `<div class="alert alert-danger">❌ 保存失败: ${err.message}</div>`;
+            });
+        }
+        
+        // 加载统计数据
+        function loadStatistics() {
+            fetch('/api/trading/statistics')
+                .then(res => res.json())
+                .then(data => {
+                    if (data.success) {
+                        const stats = data.statistics;
+                        
+                        const html = `
+                            <div class="stats-grid">
+                                <div class="stat-box">
+                                    <div class="stat-value">${stats.position_opens.count}</div>
+                                    <div class="stat-label">开仓次数</div>
+                                </div>
+                                
+                                <div class="stat-box">
+                                    <div class="stat-value">${stats.position_opens.total_size.toFixed(2)}</div>
+                                    <div class="stat-label">开仓总额 (USDT)</div>
+                                </div>
+                                
+                                <div class="stat-box">
+                                    <div class="stat-value">${stats.position_adds.count}</div>
+                                    <div class="stat-label">补仓次数</div>
+                                </div>
+                                
+                                <div class="stat-box">
+                                    <div class="stat-value">${stats.position_adds.total_size.toFixed(2)}</div>
+                                    <div class="stat-label">补仓总额 (USDT)</div>
+                                </div>
+                                
+                                <div class="stat-box">
+                                    <div class="stat-value">${(stats.pending_orders.pending || 0)}</div>
+                                    <div class="stat-label">待触发挂单</div>
+                                </div>
+                                
+                                <div class="stat-box">
+                                    <div class="stat-value">${Object.values(stats.trading_decisions).reduce((sum, d) => sum + d.total, 0)}</div>
+                                    <div class="stat-label">决策总数</div>
+                                </div>
+                            </div>
+                        `;
+                        
+                        document.getElementById('statistics-content').innerHTML = html;
+                    }
+                })
+                .catch(err => {
+                    document.getElementById('statistics-content').innerHTML = `<div class="alert alert-danger">加载失败: ${err.message}</div>`;
+                });
+        }
+        
+        // 加载开仓记录
+        function loadPositions() {
+            fetch('/api/trading/positions/opens?limit=50')
+                .then(res => res.json())
+                .then(data => {
+                    if (data.success) {
+                        if (data.records.length === 0) {
+                            document.getElementById('positions-content').innerHTML = '<div class="empty-state">暂无开仓记录</div>';
+                            return;
+                        }
+                        
+                        const rows = data.records.map(r => `
+                            <tr>
+                                <td>${r.timestamp}</td>
+                                <td><strong>${r.inst_id}</strong></td>
+                                <td><span class="pos-side-${r.pos_side}">${r.pos_side === 'long' ? '做多' : '做空'}</span></td>
+                                <td>${r.open_price.toFixed(4)}</td>
+                                <td>${r.open_size.toFixed(2)} USDT</td>
+                                <td>${r.open_percent}%</td>
+                                <td>${r.granularity}%</td>
+                                <td>${r.total_positions}</td>
+                                <td>${r.is_anchor ? '✅' : '❌'}</td>
+                            </tr>
+                        `).join('');
+                        
+                        const html = `
+                            <table>
+                                <thead>
+                                    <tr>
+                                        <th>时间</th>
+                                        <th>币种</th>
+                                        <th>方向</th>
+                                        <th>开仓价</th>
+                                        <th>开仓额</th>
+                                        <th>开仓%</th>
+                                        <th>颗粒度</th>
+                                        <th>仓位数</th>
+                                        <th>锚点单</th>
+                                    </tr>
+                                </thead>
+                                <tbody>${rows}</tbody>
+                            </table>
+                        `;
+                        
+                        document.getElementById('positions-content').innerHTML = html;
+                    }
+                })
+                .catch(err => {
+                    document.getElementById('positions-content').innerHTML = `<div class="alert alert-danger">加载失败: ${err.message}</div>`;
+                });
+        }
+        
+        // 加载补仓记录
+        function loadAdds() {
+            fetch('/api/trading/positions/adds?limit=50')
+                .then(res => res.json())
+                .then(data => {
+                    if (data.success) {
+                        if (data.records.length === 0) {
+                            document.getElementById('adds-content').innerHTML = '<div class="empty-state">暂无补仓记录</div>';
+                            return;
+                        }
+                        
+                        const rows = data.records.map(r => `
+                            <tr>
+                                <td>${r.timestamp}</td>
+                                <td><strong>${r.inst_id}</strong></td>
+                                <td><span class="pos-side-${r.pos_side}">${r.pos_side === 'long' ? '做多' : '做空'}</span></td>
+                                <td>Level ${r.level}</td>
+                                <td><span class="profit-negative">${r.profit_rate_trigger}%</span></td>
+                                <td>${r.add_price.toFixed(4)}</td>
+                                <td>${r.add_size.toFixed(2)} USDT</td>
+                                <td>${r.add_percent}%</td>
+                                <td>${r.total_size_after.toFixed(2)} USDT</td>
+                            </tr>
+                        `).join('');
+                        
+                        const html = `
+                            <table>
+                                <thead>
+                                    <tr>
+                                        <th>时间</th>
+                                        <th>币种</th>
+                                        <th>方向</th>
+                                        <th>级别</th>
+                                        <th>触发收益率</th>
+                                        <th>补仓价</th>
+                                        <th>补仓额</th>
+                                        <th>补仓%</th>
+                                        <th>补仓后总额</th>
+                                    </tr>
+                                </thead>
+                                <tbody>${rows}</tbody>
+                            </table>
+                        `;
+                        
+                        document.getElementById('adds-content').innerHTML = html;
+                    }
+                })
+                .catch(err => {
+                    document.getElementById('adds-content').innerHTML = `<div class="alert alert-danger">加载失败: ${err.message}</div>`;
+                });
+        }
+        
+        // 加载挂单记录
+        function loadOrders() {
+            fetch('/api/trading/orders/pending?status=pending')
+                .then(res => res.json())
+                .then(data => {
+                    if (data.success) {
+                        if (data.records.length === 0) {
+                            document.getElementById('orders-content').innerHTML = '<div class="empty-state">暂无挂单记录</div>';
+                            return;
+                        }
+                        
+                        const rows = data.records.map(r => `
+                            <tr>
+                                <td>${r.timestamp}</td>
+                                <td><strong>${r.inst_id}</strong></td>
+                                <td>${r.order_type === 'upper_4' ? '上方4%' : '上方10%'}</td>
+                                <td>${r.anchor_price.toFixed(4)}</td>
+                                <td>${r.target_price.toFixed(4)}</td>
+                                <td>+${r.price_diff_percent}%</td>
+                                <td>${r.order_size} USDT</td>
+                                <td><span class="status-badge ${r.status === 'pending' ? 'status-neutral' : 'status-enabled'}">${r.status === 'pending' ? '待触发' : '已触发'}</span></td>
+                            </tr>
+                        `).join('');
+                        
+                        const html = `
+                            <table>
+                                <thead>
+                                    <tr>
+                                        <th>时间</th>
+                                        <th>币种</th>
+                                        <th>挂单类型</th>
+                                        <th>锚点价格</th>
+                                        <th>目标价格</th>
+                                        <th>价差</th>
+                                        <th>挂单额</th>
+                                        <th>状态</th>
+                                    </tr>
+                                </thead>
+                                <tbody>${rows}</tbody>
+                            </table>
+                        `;
+                        
+                        document.getElementById('orders-content').innerHTML = html;
+                    }
+                })
+                .catch(err => {
+                    document.getElementById('orders-content').innerHTML = `<div class="alert alert-danger">加载失败: ${err.message}</div>`;
+                });
+        }
+        
+        // 加载决策记录
+        function loadDecisions() {
+            fetch('/api/trading/decisions?limit=50')
+                .then(res => res.json())
+                .then(data => {
+                    if (data.success) {
+                        if (data.records.length === 0) {
+                            document.getElementById('decisions-content').innerHTML = '<div class="empty-state">暂无决策记录</div>';
+                            return;
+                        }
+                        
+                        const rows = data.records.map(r => `
+                            <tr>
+                                <td>${r.timestamp}</td>
+                                <td><strong>${r.inst_id}</strong></td>
+                                <td><span class="pos-side-${r.pos_side}">${r.pos_side === 'long' ? '做多' : '做空'}</span></td>
+                                <td>${r.decision_type}</td>
+                                <td><span class="${r.profit_rate >= 0 ? 'profit-positive' : 'profit-negative'}">${r.profit_rate.toFixed(2)}%</span></td>
+                                <td>${r.close_size.toFixed(2)} USDT (${r.close_percent}%)</td>
+                                <td>${r.reason}</td>
+                                <td>${r.executed ? '✅' : '⏳'}</td>
+                            </tr>
+                        `).join('');
+                        
+                        const html = `
+                            <table>
+                                <thead>
+                                    <tr>
+                                        <th>时间</th>
+                                        <th>币种</th>
+                                        <th>方向</th>
+                                        <th>决策类型</th>
+                                        <th>收益率</th>
+                                        <th>平仓额</th>
+                                        <th>原因</th>
+                                        <th>已执行</th>
+                                    </tr>
+                                </thead>
+                                <tbody>${rows}</tbody>
+                            </table>
+                        `;
+                        
+                        document.getElementById('decisions-content').innerHTML = html;
+                    }
+                })
+                .catch(err => {
+                    document.getElementById('decisions-content').innerHTML = `<div class="alert alert-danger">加载失败: ${err.message}</div>`;
+                });
+        }
+        
+        // 页面加载时加载配置
+        window.onload = () => {
+            loadConfig();
+        };
+        
+        // 自动刷新（每60秒）
+        setInterval(() => {
+            const activeTab = document.querySelector('.tab-content.active').id.replace('-tab', '');
+            loadTabData(activeTab);
+        }, 60000);
+    </script>
+</body>
+</html>
