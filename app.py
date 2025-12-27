@@ -1828,5 +1828,12 @@ def trading_manager():
         return f.read()
 
 
+@app.route('/dashboard')
+def dashboard():
+    """实时监控仪表板"""
+    with open('/home/user/webapp/templates/dashboard.html', 'r', encoding='utf-8') as f:
+        return f.read()
+
+
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=5000, debug=False)
