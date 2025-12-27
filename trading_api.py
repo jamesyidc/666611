@@ -716,3 +716,56 @@ def check_should_add():
         })
     except Exception as e:
         return jsonify({'success': False, 'error': str(e)})
+
+
+# ============================================================
+# 平仓管理 API
+# ============================================================
+
+@trading_bp.route('/positions/scan-close', methods=['GET'])
+def scan_close_positions():
+    """扫描并提示需要平仓的仓位"""
+    try:
+        from position_closer import PositionCloser
+        closer = PositionCloser()
+        
+        # 模拟运行，不实际执行
+        result = closer.scan_and_close_positions(dry_run=True)
+        
+        return jsonify(result)
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)})
+
+
+@trading_bp.route('/positions/close-history', methods=['GET'])
+def get_close_history():
+    """获取平仓历史"""
+    try:
+        from position_closer import PositionCloser
+        limit = int(request.args.get('limit', 50))
+        
+        closer = PositionCloser()
+        history = closer.get_close_history(limit=limit)
+        
+        return jsonify({
+            'success': True,
+            'count': len(history),
+            'history': history
+        })
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)})
+
+
+@trading_bp.route('/positions/execute-close', methods=['POST'])
+def execute_close():
+    """执行平仓（实际交易）"""
+    try:
+        from position_closer import PositionCloser
+        
+        # 这个需要谨慎使用，只在确认后执行
+        closer = PositionCloser()
+        result = closer.scan_and_close_positions(dry_run=False)
+        
+        return jsonify(result)
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)})
