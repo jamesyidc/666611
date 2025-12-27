@@ -470,6 +470,12 @@
                         </div>
                         
                         <div class="form-group">
+                            <label class="form-label">💰 单币种最大占比 (%)</label>
+                            <input type="number" class="form-control" name="max_single_coin_percent" value="10" step="0.1" min="0" max="100">
+                            <small style="color: #666;">单个币种最大占可开仓额的百分比（默认10%）</small>
+                        </div>
+                        
+                        <div class="form-group">
                             <label class="form-label">⚡ 系统启用</label>
                             <div class="switch-container">
                                 <label class="switch">
@@ -626,6 +632,26 @@
                                 </div>
                                 
                                 <div class="config-item">
+                                    <div class="config-label">允许开空单</div>
+                                    <div class="config-value">${config.allow_short ? '✅ 是' : '❌ 否'}</div>
+                                </div>
+                                
+                                <div class="config-item">
+                                    <div class="config-label">允许锚点单</div>
+                                    <div class="config-value">${config.allow_anchor ? '✅ 是' : '❌ 否'}</div>
+                                </div>
+                                
+                                <div class="config-item">
+                                    <div class="config-label">单币种最大占比</div>
+                                    <div class="config-value">${config.max_single_coin_percent || 10}%</div>
+                                </div>
+                                
+                                <div class="config-item">
+                                    <div class="config-label">单币种上限</div>
+                                    <div class="config-value">${((config.total_capital * config.position_limit_percent / 100) * ((config.max_single_coin_percent || 10) / 100)).toFixed(2)} USDT</div>
+                                </div>
+                                
+                                <div class="config-item">
                                     <div class="config-label">空单颗粒度</div>
                                     <div class="config-value">${config.min_granularity}%</div>
                                 </div>
@@ -655,6 +681,7 @@
                         document.getElementById('allow-anchor-checkbox').checked = config.allow_anchor !== false;
                         document.querySelector('[name="max_long_position"]').value = config.max_long_position || 500;
                         document.querySelector('[name="max_short_position"]').value = config.max_short_position || 600;
+                        document.querySelector('[name="max_single_coin_percent"]').value = config.max_single_coin_percent || 10;
                         document.getElementById('enabled-checkbox').checked = config.enabled;
                         updateSwitchText();
                     }
