@@ -12137,6 +12137,188 @@ def get_current_positions():
             'traceback': traceback.format_exc()
         })
 
+# ====================交易决策系统路由 ====================
+
+@app.route('/trading-decision')
+def trading_decision_page():
+    """交易决策系统管理页面"""
+    try:
+        with open('/home/user/webapp/trading_decision.html', 'r', encoding='utf-8') as f:
+            return f.read()
+    except Exception as e:
+        return f"Error loading page: {e}", 500
+
+@app.route('/api/trading/config', methods=['GET', 'POST'])
+def trading_config_api():
+    """交易配置API"""
+    config_file = '/home/user/webapp/trading_config.json'
+    
+    if request.method == 'GET':
+        try:
+            with open(config_file, 'r') as f:
+                config = json.load(f)
+            return jsonify({'success': True, 'config': config})
+        except Exception as e:
+            return jsonify({'success': False, 'error': str(e)}), 500
+    
+    elif request.method == 'POST':
+        try:
+            new_config = request.json
+            
+            # 更新数据库中的配置
+            conn = sqlite3.connect('/home/user/webapp/trading_decision.db', timeout=10.0)
+            cursor = conn.cursor()
+            cursor.execute('''
+            UPDATE market_config SET
+                market_mode = ?,
+                market_trend = ?,
+                total_capital = ?,
+                position_limit_percent = ?,
+                anchor_capital_limit = ?,
+                allow_long = ?,
+                enabled = ?,
+                updated_at = CURRENT_TIMESTAMP
+            WHERE id = 1
+            ''', (
+                new_config.get('market_mode'),
+                new_config.get('market_trend'),
+                new_config.get('total_capital'),
+                new_config.get('position_limit_percent'),
+                new_config.get('anchor_capital_limit'),
+                1 if new_config.get('allow_long') else 0,
+                1 if new_config.get('enabled') else 0
+            ))
+            conn.commit()
+            conn.close()
+            
+            # 更新JSON文件
+            with open(config_file, 'w') as f:
+                json.dump(new_config, f, indent=2)
+            
+            return jsonify({'success': True, 'message': '配置更新成功'})
+        except Exception as e:
+            return jsonify({'success': False, 'error': str(e)}), 500
+
+@app.route('/api/trading/decisions')
+def trading_decisions_api():
+    """获取交易决策记录"""
+    try:
+        limit = request.args.get('limit', 50, type=int)
+        
+        conn = sqlite3.connect('/home/user/webapp/trading_decision.db', timeout=10.0)
+        cursor = conn.cursor()
+        cursor.execute(f'''
+        SELECT id, inst_id, pos_side, action, decision_type, current_size,
+               target_size, close_size, close_percent, profit_rate,
+               current_price, reason, executed, timestamp
+        FROM trading_decisions
+        ORDER BY id DESC
+        LIMIT {limit}
+        ''')
+        
+        rows = cursor.fetchall()
+        conn.close()
+        
+        decisions = []
+        for row in rows:
+            decisions.append({
+                'id': row[0],
+                'inst_id': row[1],
+                'pos_side': row[2],
+                'action': row[3],
+                'decision_type': row[4],
+                'current_size': row[5],
+                'target_size': row[6],
+                'close_size': row[7],
+                'close_percent': row[8],
+                'profit_rate': row[9],
+                'current_price': row[10],
+                'reason': row[11],
+                'executed': bool(row[12]),
+                'timestamp': row[13]
+            })
+        
+        return jsonify({'success': True, 'decisions': decisions, 'total': len(decisions)})
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+@app.route('/api/trading/signals')
+def trading_signals_api():
+    """获取交易信号（供其他账号使用）"""
+    try:
+        limit = request.args.get('limit', 50, type=int)
+        
+        conn = sqlite3.connect('/home/user/webapp/trading_decision.db', timeout=10.0)
+        cursor = conn.cursor()
+        cursor.execute(f'''
+        SELECT id, inst_id, signal_type, action, price, size,
+               profit_rate, reason, timestamp
+        FROM trading_signals
+        ORDER BY id DESC
+        LIMIT {limit}
+        ''')
+        
+        rows = cursor.fetchall()
+        conn.close()
+        
+        signals = []
+        for row in rows:
+            signals.append({
+                'id': row[0],
+                'inst_id': row[1],
+                'signal_type': row[2],
+                'action': row[3],
+                'price': row[4],
+                'size': row[5],
+                'profit_rate': row[6],
+                'reason': row[7],
+                'timestamp': row[8]
+            })
+        
+        return jsonify({'success': True, 'signals': signals, 'total': len(signals)})
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+@app.route('/api/trading/maintenance')
+def trading_maintenance_api():
+    """获取锚点单维护记录"""
+    try:
+        limit = request.args.get('limit', 50, type=int)
+        
+        conn = sqlite3.connect('/home/user/webapp/trading_decision.db', timeout=10.0)
+        cursor = conn.cursor()
+        cursor.execute(f'''
+        SELECT id, inst_id, pos_side, original_size, original_price,
+               maintenance_price, maintenance_size, profit_rate,
+               action, status, timestamp
+        FROM anchor_maintenance
+        ORDER BY id DESC
+        LIMIT {limit}
+        ''')
+        
+        rows = cursor.fetchall()
+        conn.close()
+        
+        records = []
+        for row in rows:
+            records.append({
+                'id': row[0],
+                'inst_id': row[1],
+                'pos_side': row[2],
+                'original_size': row[3],
+                'original_price': row[4],
+                'maintenance_price': row[5],
+                'maintenance_size': row[6],
+                'profit_rate': row[7],
+                'action': row[8],
+                'status': row[9],
+                'timestamp': row[10]
+            })
+        
+        return jsonify({'success': True, 'records': records, 'total': len(records)})
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=5000, debug=False)
 
