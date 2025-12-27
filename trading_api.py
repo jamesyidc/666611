@@ -123,28 +123,37 @@ def get_position_opens():
         
         limit = request.args.get('limit', 50, type=int)
         inst_id = request.args.get('inst_id')
+        is_anchor = request.args.get('is_anchor')  # 新增：锚点单过滤
+        
+        # 构建查询条件
+        conditions = []
+        params = []
         
         if inst_id:
-            cursor.execute('''
-            SELECT id, inst_id, pos_side, open_price, open_size, open_percent,
-                   granularity, total_positions, is_anchor, timestamp, created_at
-            FROM position_opens
-            WHERE inst_id = ?
-            ORDER BY created_at DESC
-            LIMIT ?
-            ''', (inst_id, limit))
-        else:
-            cursor.execute('''
-            SELECT id, inst_id, pos_side, open_price, open_size, open_percent,
-                   granularity, total_positions, is_anchor, timestamp, created_at
-            FROM position_opens
-            ORDER BY created_at DESC
-            LIMIT ?
-            ''', (limit,))
+            conditions.append('inst_id = ?')
+            params.append(inst_id)
+        
+        if is_anchor is not None:
+            conditions.append('is_anchor = ?')
+            params.append(1 if is_anchor == '1' else 0)
+        
+        where_clause = 'WHERE ' + ' AND '.join(conditions) if conditions else ''
+        
+        query = f'''
+        SELECT id, inst_id, pos_side, open_price, open_size, open_percent,
+               granularity, total_positions, is_anchor, timestamp, created_at
+        FROM position_opens
+        {where_clause}
+        ORDER BY created_at DESC
+        LIMIT ?
+        '''
+        
+        params.append(limit)
+        cursor.execute(query, tuple(params))
         
         records = []
         for row in cursor.fetchall():
-            records.append({
+            record = {
                 'id': row[0],
                 'inst_id': row[1],
                 'pos_side': row[2],
@@ -156,7 +165,21 @@ def get_position_opens():
                 'is_anchor': bool(row[8]),
                 'timestamp': row[9],
                 'created_at': row[10]
-            })
+            }
+            
+            # 如果是锚点单，额外查询补仓次数和总金额
+            if record['is_anchor']:
+                cursor.execute('''
+                SELECT COUNT(*), COALESCE(SUM(add_size), 0)
+                FROM position_adds
+                WHERE inst_id = ? AND pos_side = ?
+                ''', (record['inst_id'], record['pos_side']))
+                adds_data = cursor.fetchone()
+                record['total_adds'] = adds_data[0] if adds_data else 0
+                record['total_size'] = record['open_size'] + (adds_data[1] if adds_data else 0)
+                record['has_adds'] = record['total_adds'] > 0
+            
+            records.append(record)
         
         conn.close()
         

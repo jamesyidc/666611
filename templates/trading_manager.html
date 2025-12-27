@@ -374,6 +374,7 @@
         <div class="tabs">
             <button class="tab active" onclick="switchTab('config')">⚙️ 系统配置</button>
             <button class="tab" onclick="switchTab('statistics')">📊 统计数据</button>
+            <button class="tab" onclick="switchTab('anchors')">⚓ 锚点单</button>
             <button class="tab" onclick="switchTab('positions')">📈 开仓记录</button>
             <button class="tab" onclick="switchTab('adds')">➕ 补仓记录</button>
             <button class="tab" onclick="switchTab('orders')">📋 挂单记录</button>
@@ -519,6 +520,17 @@
             </div>
         </div>
         
+        <!-- 锚点单记录 -->
+        <div id="anchors-tab" class="tab-content">
+            <div class="card" style="background: linear-gradient(135deg, #fef3c7 0%, #fde68a 100%); border-left: 4px solid #f59e0b;">
+                <h2 style="color: #d97706;">⚓ 锚点单记录</h2>
+                <p style="color: #92400e; margin-bottom: 15px; font-size: 0.95em;">
+                    🔒 锚点单是防护性空单，只在出现逃顶信号时触发 | 只有锚点单才能补仓
+                </p>
+                <div id="anchors-content" class="loading">加载中...</div>
+            </div>
+        </div>
+        
         <!-- 挂单记录 -->
         <div id="orders-tab" class="tab-content">
             <div class="card">
@@ -565,6 +577,9 @@
                     break;
                 case 'statistics':
                     loadStatistics();
+                    break;
+                case 'anchors':
+                    loadAnchors();
                     break;
                 case 'positions':
                     loadPositions();
@@ -807,6 +822,82 @@
         }
         
         // 加载开仓记录
+        // 加载锚点单记录
+        function loadAnchors() {
+            fetch('/api/trading/positions/opens?is_anchor=1&limit=50')
+                .then(res => res.json())
+                .then(data => {
+                    if (data.success) {
+                        if (data.records.length === 0) {
+                            document.getElementById('anchors-content').innerHTML = `
+                                <div class="empty-state">
+                                    <p style="font-size: 1.2em; margin-bottom: 10px;">暂无锚点单记录</p>
+                                    <p style="color: #666; font-size: 0.9em;">锚点单会在出现逃顶信号时自动触发</p>
+                                    <p style="color: #666; font-size: 0.9em;">触发条件：距离压力线1 ≤ 2% + 位置 ≥ 90% + 压力线1&2存在</p>
+                                </div>
+                            `;
+                            return;
+                        }
+                        
+                        const rows = data.records.map(r => {
+                            // 计算当前盈亏（需要后端提供current_price）
+                            const profitRate = r.current_price ? 
+                                ((r.current_price - r.open_price) / r.open_price * 100).toFixed(2) : 'N/A';
+                            const profitClass = parseFloat(profitRate) >= 0 ? 'profit-positive' : 'profit-negative';
+                            
+                            return `
+                                <tr style="background: ${r.has_adds ? '#fef3c7' : 'white'};">
+                                    <td>${r.timestamp}</td>
+                                    <td><strong style="color: #d97706;">${r.inst_id}</strong></td>
+                                    <td><span class="pos-side-${r.pos_side}">🔽 ${r.pos_side === 'short' ? '做空' : '做多'}</span></td>
+                                    <td>${r.open_price.toFixed(4)}</td>
+                                    <td>${r.current_price ? r.current_price.toFixed(4) : 'N/A'}</td>
+                                    <td><span class="${profitClass}">${profitRate}%</span></td>
+                                    <td>${r.open_size.toFixed(2)} USDT</td>
+                                    <td>${r.total_adds || 0}</td>
+                                    <td>${r.total_size ? r.total_size.toFixed(2) : r.open_size.toFixed(2)} USDT</td>
+                                    <td>${r.granularity || 'small'}</td>
+                                    <td><span style="color: #f59e0b;">⚓ 锚点单</span></td>
+                                </tr>
+                            `;
+                        }).join('');
+                        
+                        const html = `
+                            <div style="margin-bottom: 15px; padding: 10px; background: #fef3c7; border-radius: 5px;">
+                                <p style="margin: 0; color: #92400e; font-size: 0.9em;">
+                                    📌 共 <strong>${data.records.length}</strong> 个锚点单 | 
+                                    ⚠️ 只有锚点单才能触发补仓 | 
+                                    🔒 锚点单在逃顶信号时触发，用于防护资金
+                                </p>
+                            </div>
+                            <table>
+                                <thead>
+                                    <tr>
+                                        <th>时间</th>
+                                        <th>币种</th>
+                                        <th>方向</th>
+                                        <th>开仓价</th>
+                                        <th>当前价</th>
+                                        <th>盈亏率</th>
+                                        <th>初始开仓额</th>
+                                        <th>补仓次数</th>
+                                        <th>当前总额</th>
+                                        <th>颗粒度</th>
+                                        <th>类型</th>
+                                    </tr>
+                                </thead>
+                                <tbody>${rows}</tbody>
+                            </table>
+                        `;
+                        
+                        document.getElementById('anchors-content').innerHTML = html;
+                    }
+                })
+                .catch(err => {
+                    document.getElementById('anchors-content').innerHTML = `<div class="alert alert-danger">加载失败: ${err.message}</div>`;
+                });
+        }
+        
         function loadPositions() {
             fetch('/api/trading/positions/opens?limit=50')
                 .then(res => res.json())
