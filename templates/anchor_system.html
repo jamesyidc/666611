@@ -239,6 +239,11 @@
             color: #4a5568;
         }
 
+        .badge-normal {
+            background: #e6fffa;
+            color: #234e52;
+        }
+
         .alert-list {
             max-height: 350px;
             overflow-y: auto;
@@ -414,12 +419,46 @@
             </div>
         </div>
 
-        <!-- 监控记录表 -->
+        <!-- 当前持仓情况 -->
+        <div class="card">
+            <div class="card-header">
+                <div class="card-title">
+                    <span>💼</span>
+                    当前持仓情况
+                </div>
+                <div class="update-time" id="currentPositionTime" style="font-size: 14px; color: #718096;">
+                    最后更新: --
+                </div>
+            </div>
+            <div class="table-container">
+                <table id="currentPositionTable">
+                    <thead>
+                        <tr>
+                            <th>币种</th>
+                            <th>方向</th>
+                            <th>持仓量</th>
+                            <th>开仓均价</th>
+                            <th>标记价格</th>
+                            <th>杠杆</th>
+                            <th>未实现盈亏</th>
+                            <th>保证金</th>
+                            <th>收益率</th>
+                            <th>状态</th>
+                        </tr>
+                    </thead>
+                    <tbody id="currentPositionBody">
+                        <tr><td colspan="10" class="loading">加载中...</td></tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- 历史监控记录 -->
         <div class="card">
             <div class="card-header">
                 <div class="card-title">
                     <span>📋</span>
-                    持仓监控记录
+                    历史监控记录
                 </div>
             </div>
             <div class="table-container">
@@ -489,9 +528,19 @@
                     renderRecordsTable(recordsData.records);
                 }
 
+                // 加载当前持仓情况
+                const positionsRes = await fetch('/api/anchor-system/current-positions');
+                const positionsData = await positionsRes.json();
+                
+                if (positionsData.success) {
+                    renderCurrentPositions(positionsData.positions);
+                }
+
                 // 更新时间
                 const now = new Date();
                 document.getElementById('updateTime').textContent = 
+                    `最后更新: ${now.toLocaleString('zh-CN')}`;
+                document.getElementById('currentPositionTime').textContent = 
                     `最后更新: ${now.toLocaleString('zh-CN')}`;
 
             } catch (error) {
@@ -528,6 +577,47 @@
                     <td>$${(item.avg_price || 0).toFixed(4)}</td>
                     <td>$${(item.mark_price || 0).toFixed(4)}</td>
                     <td>${item.timestamp}</td>
+                </tr>
+            `).join('');
+        }
+
+        // 渲染当前持仓情况
+        function renderCurrentPositions(data) {
+            const tbody = document.getElementById('currentPositionBody');
+            
+            if (data.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="10" class="empty">当前无持仓</td></tr>';
+                return;
+            }
+
+            tbody.innerHTML = data.map(item => `
+                <tr>
+                    <td style="font-weight: 600;">${item.inst_id || '--'}</td>
+                    <td>
+                        <span class="badge ${item.pos_side === 'short' ? 'badge-short' : 'badge-long'}">
+                            ${item.pos_side === 'short' ? '做空' : '做多'}
+                        </span>
+                    </td>
+                    <td>${item.pos_size.toFixed(4)}</td>
+                    <td>$${item.avg_price.toFixed(4)}</td>
+                    <td>$${item.mark_price.toFixed(4)}</td>
+                    <td>${item.lever}x</td>
+                    <td style="color: ${item.upl >= 0 ? '#48bb78' : '#f56565'}; font-weight: 600;">
+                        ${item.upl >= 0 ? '+' : ''}${item.upl.toFixed(4)} USDT
+                    </td>
+                    <td>${item.margin.toFixed(4)} USDT</td>
+                    <td style="color: ${item.profit_rate >= 0 ? '#48bb78' : '#f56565'}; font-weight: 700; font-size: 16px;">
+                        ${item.profit_rate >= 0 ? '+' : ''}${item.profit_rate.toFixed(2)}%
+                    </td>
+                    <td>
+                        <span class="badge ${
+                            item.status_class === 'profit' ? 'badge-profit' : 
+                            item.status_class === 'loss' ? 'badge-loss' : 
+                            'badge-normal'
+                        }">
+                            ${item.status}
+                        </span>
+                    </td>
                 </tr>
             `).join('');
         }

@@ -12071,6 +12071,72 @@ def get_anchor_profit_records():
             'traceback': traceback.format_exc()
         })
 
+@app.route('/api/anchor-system/current-positions')
+def get_current_positions():
+    """获取当前持仓情况"""
+    try:
+        import sys
+        sys.path.append('/home/user/webapp')
+        from anchor_system import get_positions, calculate_profit_rate
+        
+        positions = get_positions()
+        
+        if not positions:
+            return jsonify({
+                'success': True,
+                'positions': [],
+                'total': 0
+            })
+        
+        position_list = []
+        for pos in positions:
+            inst_id = pos.get('instId')
+            pos_side = pos.get('posSide')
+            pos_size = float(pos.get('pos', 0))
+            avg_price = float(pos.get('avgPx', 0))
+            mark_price = float(pos.get('markPx', 0))
+            lever = float(pos.get('lever', 0))
+            upl = float(pos.get('upl', 0))
+            margin = float(pos.get('margin', 0))
+            
+            profit_rate = calculate_profit_rate(pos)
+            
+            # 判断状态
+            status = '监控中'
+            status_class = 'normal'
+            if profit_rate >= 40:
+                status = '接近盈利目标'
+                status_class = 'profit'
+            elif profit_rate <= -10:
+                status = '接近止损'
+                status_class = 'loss'
+            
+            position_list.append({
+                'inst_id': inst_id,
+                'pos_side': pos_side,
+                'pos_size': abs(pos_size),
+                'avg_price': avg_price,
+                'mark_price': mark_price,
+                'lever': lever,
+                'upl': upl,
+                'margin': margin,
+                'profit_rate': profit_rate,
+                'status': status,
+                'status_class': status_class
+            })
+        
+        return jsonify({
+            'success': True,
+            'positions': position_list,
+            'total': len(position_list)
+        })
+    except Exception as e:
+        return jsonify({
+            'success': False,
+            'error': str(e),
+            'traceback': traceback.format_exc()
+        })
+
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=5000, debug=False)
 
