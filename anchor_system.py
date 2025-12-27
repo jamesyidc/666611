@@ -43,6 +43,7 @@ ONLY_SHORT = CONFIG.get('monitor', {}).get('only_short_positions', True)
 
 # 数据库
 DB_PATH = CONFIG.get('database', {}).get('path', '/home/user/webapp/anchor_system.db')
+CRYPTO_DB_PATH = '/home/user/webapp/crypto_data.db'
 
 # 北京时区
 BEIJING_TZ = timezone(timedelta(hours=8))
@@ -270,6 +271,41 @@ def check_alert_sent_recently(inst_id, alert_type, minutes=30):
         return False
 
 
+def get_market_data():
+    """获取最新市场数据（计次、急涨、急跌）"""
+    try:
+        conn = sqlite3.connect(CRYPTO_DB_PATH, timeout=10.0)
+        cursor = conn.cursor()
+        
+        cursor.execute('''
+        SELECT snapshot_time, count, count_score_display, count_score_type,
+               rush_up, rush_down, diff, status
+        FROM crypto_snapshots
+        ORDER BY snapshot_time DESC
+        LIMIT 1
+        ''')
+        
+        row = cursor.fetchone()
+        conn.close()
+        
+        if row:
+            return {
+                'snapshot_time': row[0],
+                'count': row[1],  # 计次
+                'count_score_display': row[2],  # 计次得分显示 (★★★)
+                'count_score_type': row[3],  # 计次得分类型
+                'rush_up': row[4],  # 急涨
+                'rush_down': row[5],  # 急跌
+                'diff': row[6],  # 差值
+                'status': row[7]  # 状态
+            }
+        else:
+            return None
+    except Exception as e:
+        print(f"❌ 获取市场数据失败: {e}")
+        return None
+
+
 def format_alert_message(position, profit_rate, alert_type, cycle_count=None):
     """格式化告警消息"""
     inst_id = position.get('instId')
@@ -296,8 +332,8 @@ def format_alert_message(position, profit_rate, alert_type, cycle_count=None):
         alert_title = "【锚点系统触发 - 开仓空头预警】"
         signal_type = "做空亏损-10%，建议开仓做空"
     
-    # 计算计次得分
-    score = abs(profit_rate)  # 简单使用收益率绝对值作为得分
+    # 获取市场数据
+    market_data = get_market_data()
     
     message = f"""
 {alert_emoji} <b>锚点系统触发</b> {alert_emoji}
@@ -319,11 +355,27 @@ def format_alert_message(position, profit_rate, alert_type, cycle_count=None):
 未实现盈亏: ${upl:.2f} USDT
 保证金: ${margin:.2f} USDT
 <b>收益率: {profit_rate:+.2f}%</b>
-
-📈 <b>计次数据</b>
-检测次数: {cycle_count if cycle_count else '实时'}
-触发得分: {score:.2f}分
-
+"""
+    
+    # 添加市场数据
+    if market_data:
+        message += f"""
+📈 <b>市场计次数据</b>
+计次: {market_data['count']}
+计次得分: {market_data['count_score_display']}
+急涨: {market_data['rush_up']}
+急跌: {market_data['rush_down']}
+差值: {market_data['diff']}
+状态: {market_data['status']}
+数据时间: {market_data['snapshot_time']}
+"""
+    else:
+        message += f"""
+📈 <b>市场计次数据</b>
+暂无数据
+"""
+    
+    message += f"""
 ⏰ <b>触发时间</b>
 {beijing_time} (北京时间)
 
