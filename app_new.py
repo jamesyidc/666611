@@ -12319,6 +12319,28 @@ def trading_maintenance_api():
     except Exception as e:
         return jsonify({'success': False, 'error': str(e)}), 500
 
+@app.route('/dashboard')
+def dashboard():
+    """实时监控仪表板"""
+    try:
+        with open('/home/user/webapp/templates/dashboard.html', 'r', encoding='utf-8') as f:
+            return f.read()
+    except FileNotFoundError:
+        return "Dashboard template not found", 404
+    except Exception as e:
+        return f"Error loading dashboard: {str(e)}", 500
+
+@app.route('/trading-manager')
+def trading_manager():
+    """交易管理界面"""
+    try:
+        with open('/home/user/webapp/templates/trading_manager.html', 'r', encoding='utf-8') as f:
+            return f.read()
+    except FileNotFoundError:
+        return "Trading manager template not found", 404
+    except Exception as e:
+        return f"Error loading trading manager: {str(e)}", 500
+
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=5000, debug=False)
 

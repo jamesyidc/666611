@@ -670,10 +670,11 @@ def index():
     """首页"""
     return render_template_string(HOME_HTML)
 
-@app.route('/dashboard')
-def dashboard():
-    """数据看板"""
-    return render_template_string(DASHBOARD_HTML)
+# 旧的数据看板路由已弃用，改用交易监控仪表板
+# @app.route('/dashboard')
+# def dashboard_old():
+#     """数据看板"""
+#     return render_template_string(DASHBOARD_HTML)
 
 @app.route('/static/dashboard.js')
 def dashboard_js():
