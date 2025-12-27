@@ -8,6 +8,44 @@
 换句话说：
 1. **必须先有锚点单**：在逃顶信号触发时开的空单
 2. **才能挂补仓单**：根据浮亏情况自动补仓
+3. **挂单页面只显示**：有对应锚点单的挂单记录
+
+---
+
+## 🔒 系统强制执行
+
+### 1. 补仓限制
+```python
+# 在 position_manager.py 中
+def should_add_position(inst_id, pos_side, profit_rate):
+    # 检查是否有开仓记录
+    open_record = get_position_opens(inst_id, pos_side)
+    if not open_record:
+        return False, "没有开仓记录"
+    
+    # ✨ 检查是否为锚点单
+    if not open_record['is_anchor']:
+        return False, "非锚点单不能补仓"
+    
+    # ... 继续检查触发条件
+```
+
+### 2. 挂单显示限制
+```python
+# 在 trading_api.py 中
+SELECT * FROM pending_orders p
+WHERE EXISTS (
+    SELECT 1 FROM position_opens o
+    WHERE o.inst_id = p.inst_id 
+      AND o.pos_side = p.pos_side
+      AND o.is_anchor = 1  -- 必须是锚点单
+)
+```
+
+**结果**：
+- ✅ 有锚点单：显示挂单记录
+- ❌ 无锚点单：不显示任何挂单
+- 🛡️ 保护机制：避免误导
 
 ---
 
