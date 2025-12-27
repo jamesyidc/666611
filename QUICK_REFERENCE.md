@@ -1,188 +1,146 @@
-# 快速参考卡 🚀
+# 🚀 交易系统快速参考卡
 
-## 核心命令
+## ⚡ 一句话核心规则
 
-### 每天使用（只需这一条命令！）
+**挂单的前提条件是已开启锚点单！**
+
+---
+
+## 📖 文档索引
+
+| 文档名称 | 用途 | 位置 |
+|----------|------|------|
+| **DEPLOYMENT_RULES_SUMMARY.md** | 部署前必读，避免规则乱掉 | [查看](./DEPLOYMENT_RULES_SUMMARY.md) |
+| **PENDING_ORDERS_RULES.md** | 挂单规则完整说明 | [查看](./PENDING_ORDERS_RULES.md) |
+| **COMPLETE_TRADING_RULES.md** | 完整交易规则 | [查看](./COMPLETE_TRADING_RULES.md) |
+| **ANCHOR_TRIGGER_GUIDE.md** | 锚点触发指南 | [查看](./ANCHOR_TRIGGER_GUIDE.md) |
+| **ANCHOR_TRIGGER_EXPLANATION.md** | 锚点触发说明 | [查看](./ANCHOR_TRIGGER_EXPLANATION.md) |
+| **ADD_POSITION_RULES.md** | 补仓规则说明 | [查看](./ADD_POSITION_RULES.md) |
+
+---
+
+## 🔥 快速验证命令
+
 ```bash
-python3 google_drive_finder.py
-```
+# 1. 验证所有规则
+cd /home/user/webapp && python3 verify_pending_rules.py
 
-### 首次设置
-```bash
-# 1. 安装依赖
-pip3 install -r requirements.txt
+# 2. 查看锚点单
+cd /home/user/webapp && sqlite3 trading_decision.db \
+"SELECT inst_id, pos_side, open_price, is_anchor FROM position_opens WHERE is_anchor = 1 LIMIT 5;"
 
-# 2. 运行设置向导
-python3 setup_guide.py
+# 3. 查看挂单记录
+curl -s http://localhost:5000/api/trading/orders/pending | jq .
 
-# 3. 按向导提示创建 credentials.json
+# 4. 查看配置
+curl -s http://localhost:5000/api/trading/config | jq '{allow_anchor, max_single_coin_percent, enabled}'
 
-# 4. 运行主程序
-python3 google_drive_finder.py
+# 5. 检查数据源
+cd /home/user/webapp && sqlite3 crypto_data.db \
+"SELECT inst_id, current_price, distance_to_pressure_1, position_7d FROM support_resistance_levels ORDER BY timestamp DESC LIMIT 5;"
 ```
 
 ---
 
-## 文件说明
+## ✅ 部署快速检查清单
 
-| 文件 | 用途 | 必需? |
-|------|------|-------|
-| `google_drive_finder.py` | 主程序 | ✅ 是 |
-| `credentials.json` | API凭证 | ✅ 是（需自己创建） |
-| `requirements.txt` | Python依赖 | ✅ 是 |
-| `setup_guide.py` | 设置向导 | 📝 建议使用 |
-| `README.md` | 英文文档 | 📖 参考 |
-| `USAGE_CN.md` | 中文详细说明 | 📖 参考 |
-| `PROJECT_SUMMARY.md` | 项目总结 | 📖 参考 |
-| `quick_start.sh` | 快速开始 | 🚀 可选 |
+### 部署前
+- [ ] 阅读 `DEPLOYMENT_RULES_SUMMARY.md`
+- [ ] 备份数据库
+
+### 部署后
+- [ ] 运行 `python3 verify_pending_rules.py`
+- [ ] 确认结果：`通过检查: 5 / 5`
 
 ---
 
-## 关键信息
+## 🎯 核心规则（必记！）
 
-### Google Drive 主文件夹ID
+### 1. 锚点单触发
 ```
-1j8YV6KysUCmgcmASFOxztWWIE1Vq-kYV
-```
-
-### 文件夹命名格式
-```
-YYYY-MM-DD
-例如：2025-12-02
+数据源: crypto_data.db → support_resistance_levels
+页面: /support-resistance
+条件: 逃顶信号 + 压力线1 + 压力线2
+方向: 只做空 (pos_side = 'short')
+标记: is_anchor = 1
 ```
 
-### 时区设置
+### 2. 挂单（补仓）
 ```
-北京时间 (Asia/Shanghai, UTC+8)
+前提: is_anchor = 1 （必须！）
+检查: position_manager.py → should_add_position()
+API: trading_api.py → /api/trading/orders/pending
+过滤: WHERE ... AND o.is_anchor = 1
+```
+
+### 3. 单币种占比
+```
+字段: max_single_coin_percent
+默认: 10%
+公式: 单币种上限 = 可开仓额 * max_single_coin_percent / 100
 ```
 
 ---
 
-## 常见问题速查
+## 🔗 快速访问链接
 
-### ❌ 未找到凭证文件
+- **交易管理**：https://5000-iawcy3xxhnan90u0qd9wq-cc2fbc16.sandbox.novita.ai/trading-manager
+- **压力支撑**：https://5000-iawcy3xxhnan90u0qd9wq-cc2fbc16.sandbox.novita.ai/support-resistance
+- **GitHub**：https://github.com/jamesyidc/666611
+- **分支**：genspark_ai_developer
+
+---
+
+## 🚨 常见错误快速修复
+
+### 错误：有挂单但无锚点单
 ```bash
-# 检查文件是否存在
-ls -la credentials.json
-
-# 如果不存在，运行设置向导
-python3 setup_guide.py
+# 清理孤立挂单
+cd /home/user/webapp && sqlite3 trading_decision.db << 'EOF'
+DELETE FROM pending_orders
+WHERE NOT EXISTS (
+    SELECT 1 FROM position_opens o
+    WHERE o.inst_id = pending_orders.inst_id
+      AND o.pos_side = pending_orders.pos_side
+      AND o.is_anchor = 1
+);
+EOF
 ```
 
-### ❌ 未找到今天的文件夹
-**原因**:
-1. 文件夹尚未创建
-2. Service Account无权限（未共享）
-3. 文件夹名称格式错误
-
-**解决**: 检查Google Drive中是否有今天日期的文件夹
-
-### ❌ API错误
-**检查**:
-1. Google Drive API是否启用
-2. credentials.json是否正确
-3. 网络连接是否正常
-4. 文件夹是否已共享给Service Account
-
----
-
-## 输出解读
-
-### 成功输出
-```
-🎯 最后更新的txt文件:
-文件名: 数据报告_18-30.txt
-修改时间: 2025-12-02 18:30:45 (北京时间)
-```
-👆 这就是您要的答案！
-
-### 文件列表
-```
-[1] 数据报告_18-30.txt    <- 最新的
-[2] 日志_15-20.txt
-[3] 统计_09-10.txt         <- 最旧的
-```
-👆 按修改时间降序排列
-
----
-
-## 一键命令
-
-### 完整流程（首次）
-```bash
-cd /home/user/webapp && \
-pip3 install -r requirements.txt && \
-python3 setup_guide.py
-```
-
-### 日常使用
-```bash
-cd /home/user/webapp && python3 google_drive_finder.py
-```
-
-### 添加到定时任务（每天9点）
-```bash
-# 编辑crontab
-crontab -e
-
-# 添加以下行
-0 9 * * * cd /home/user/webapp && python3 google_drive_finder.py >> /tmp/drive_finder.log 2>&1
-```
-
----
-
-## 修改配置
-
-### 更改主文件夹
-编辑 `google_drive_finder.py` 第14行：
+### 错误：锚点单数据源错误
 ```python
-MAIN_FOLDER_ID = "你的新文件夹ID"
-```
-
-### 更改时区
-编辑 `google_drive_finder.py` 第21行：
-```python
-beijing_tz = pytz.timezone('Asia/Shanghai')  # 改为其他时区
-```
-
-### 更改日期格式
-编辑 `google_drive_finder.py` 第23行：
-```python
-return beijing_time.strftime('%Y-%m-%d')  # 改为其他格式
+# anchor_trigger.py 第10行
+# 错误：SR_DB_PATH = 'support_resistance.db'
+# 正确：SR_DB_PATH = 'crypto_data.db'
 ```
 
 ---
 
-## 技术支持
-
-1. **查看详细文档**: `USAGE_CN.md`
-2. **运行设置向导**: `python3 setup_guide.py`
-3. **检查项目总结**: `PROJECT_SUMMARY.md`
-
----
-
-## 版本信息
-
-- **版本**: 1.0.0
-- **Python**: 3.7+
-- **创建日期**: 2025-12-02
-- **状态**: ✅ 生产可用
-
----
-
-## 快速测试
+## 📊 数据库快速查询
 
 ```bash
-# 测试Python环境
-python3 --version
+# 查看锚点单
+sqlite3 trading_decision.db "SELECT * FROM position_opens WHERE is_anchor = 1;"
 
-# 测试依赖安装
-python3 -c "import google.auth; import pytz; print('✅ 依赖已安装')"
+# 查看挂单
+sqlite3 trading_decision.db "SELECT * FROM pending_orders WHERE status = 'pending';"
 
-# 测试今天日期
-python3 -c "from datetime import datetime; import pytz; print('今天:', datetime.now(pytz.timezone('Asia/Shanghai')).strftime('%Y-%m-%d'))"
+# 查看配置
+sqlite3 trading_decision.db "SELECT allow_anchor, max_single_coin_percent, enabled FROM market_config ORDER BY updated_at DESC LIMIT 1;"
+
+# 查看压力支撑数据
+sqlite3 crypto_data.db "SELECT inst_id, current_price, distance_to_pressure_1, position_7d FROM support_resistance_levels ORDER BY timestamp DESC LIMIT 10;"
 ```
 
 ---
 
-**记住**: 完成设置后，每天只需一条命令：`python3 google_drive_finder.py` ✨
+## 💡 记住这句话
+
+**挂单的前提条件是已开启锚点单！**
+
+没有锚点单 = 没有挂单记录 = API 返回空列表
+
+---
+
+**最后更新**：2025-12-28  
+**版本**：v1.0
