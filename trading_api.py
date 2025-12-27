@@ -28,7 +28,7 @@ def get_config():
         SELECT market_mode, market_trend, total_capital, position_limit_mode,
                position_limit_percent, anchor_capital_limit, anchor_capital_percent,
                allow_long, allow_short, allow_anchor, max_long_position, max_short_position,
-               min_granularity, long_granularity, enabled, updated_at
+               max_single_coin_percent, min_granularity, long_granularity, enabled, updated_at
         FROM market_config
         ORDER BY updated_at DESC
         LIMIT 1
@@ -53,10 +53,11 @@ def get_config():
                     'allow_anchor': bool(row[9]) if row[9] is not None else True,
                     'max_long_position': row[10] if row[10] is not None else 500,
                     'max_short_position': row[11] if row[11] is not None else 600,
-                    'min_granularity': row[12],
-                    'long_granularity': row[13],
-                    'enabled': bool(row[14]),
-                    'updated_at': row[15]
+                    'max_single_coin_percent': row[12] if row[12] is not None else 10,
+                    'min_granularity': row[13],
+                    'long_granularity': row[14],
+                    'enabled': bool(row[15]),
+                    'updated_at': row[16]
                 }
             })
         else:
@@ -82,8 +83,8 @@ def update_config():
             market_mode, market_trend, total_capital, position_limit_mode,
             position_limit_percent, anchor_capital_limit, anchor_capital_percent,
             allow_long, allow_short, allow_anchor, max_long_position, max_short_position,
-            min_granularity, long_granularity, enabled, updated_at
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            max_single_coin_percent, min_granularity, long_granularity, enabled, updated_at
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         ''', (
             data.get('market_mode', 'manual'),
             data.get('market_trend', 'neutral'),
@@ -97,6 +98,7 @@ def update_config():
             1 if data.get('allow_anchor', True) else 0,
             data.get('max_long_position', 500),
             data.get('max_short_position', 600),
+            data.get('max_single_coin_percent', 10),
             data.get('min_granularity', 1),
             data.get('long_granularity', 10),
             1 if data.get('enabled', False) else 0,
@@ -767,5 +769,70 @@ def execute_close():
         result = closer.scan_and_close_positions(dry_run=False)
         
         return jsonify(result)
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)})
+
+
+# ============================================================
+# 锚点单触发 API
+# ============================================================
+
+@trading_bp.route('/anchor/scan-opportunities', methods=['GET'])
+def scan_anchor_opportunities():
+    """扫描锚点单开仓机会"""
+    try:
+        from anchor_trigger import AnchorTrigger
+        trigger = AnchorTrigger()
+        
+        opportunities = trigger.scan_anchor_opportunities()
+        
+        return jsonify({
+            'success': True,
+            'count': len(opportunities),
+            'opportunities': opportunities
+        })
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)})
+
+
+@trading_bp.route('/anchor/signals', methods=['GET'])
+def get_escape_top_signals():
+    """获取逃顶信号列表"""
+    try:
+        from anchor_trigger import AnchorTrigger
+        trigger = AnchorTrigger()
+        
+        signals = trigger.get_escape_top_signals()
+        
+        return jsonify({
+            'success': True,
+            'count': len(signals),
+            'signals': signals
+        })
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)})
+
+
+@trading_bp.route('/anchor/check-limit', methods=['GET'])
+def check_single_coin_limit():
+    """检查单币种限制"""
+    try:
+        from anchor_trigger import AnchorTrigger
+        inst_id = request.args.get('inst_id')
+        new_value = float(request.args.get('value', 0))
+        
+        if not inst_id:
+            return jsonify({'success': False, 'error': '缺少inst_id参数'})
+        
+        trigger = AnchorTrigger()
+        passed, reason = trigger.check_single_coin_limit(inst_id, new_value)
+        
+        return jsonify({
+            'success': True,
+            'passed': passed,
+            'reason': reason,
+            'inst_id': inst_id,
+            'new_value': new_value
+        })
     except Exception as e:
         return jsonify({'success': False, 'error': str(e)})

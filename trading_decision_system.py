@@ -31,6 +31,7 @@ DEFAULT_CONFIG = {
     "allow_anchor": True,  # 是否允许开锚点单 ⭐
     "max_long_position": 500,  # 多单最大仓位（USDT）
     "max_short_position": 600,  # 空单最大仓位（USDT）
+    "max_single_coin_percent": 10,  # 单个币种最大占比（%）⭐ 新增
     "min_granularity": 1,  # 最小颗粒度（%）
     "long_granularity": 10,  # 多单颗粒度（%）
     "enabled": False  # 是否启用自动交易
