@@ -111,9 +111,11 @@ class AnchorMaintenanceManager:
         计算维护方案
         
         维护流程：
-        1. 买入10倍原持仓（加仓）
+        1. 买入10倍原持仓（投入10倍保证金）
         2. 平掉到剩余1U保证金
         3. 保留1U的仓位
+        
+        注意：10倍杠杆下，投入10倍保证金 = 10倍实际价值
         
         Args:
             position: 持仓信息
@@ -124,10 +126,12 @@ class AnchorMaintenanceManager:
         original_size = position['pos_size']
         original_margin = position['margin']
         current_price = position['mark_price']
+        leverage = position.get('lever', 10)  # 默认10倍杠杆
         
-        # 步骤1：买入10倍持仓
-        buy_size = original_size * 10
-        buy_margin = original_margin * 10
+        # 步骤1：投入10倍保证金买入
+        buy_margin = original_margin * 10  # 投入10倍保证金
+        buy_value = buy_margin * leverage  # 10倍杠杆下的实际价值
+        buy_size = buy_value / current_price  # 买入张数
         
         # 买入后的总仓位
         total_size_after_buy = original_size + buy_size
@@ -150,7 +154,9 @@ class AnchorMaintenanceManager:
                 'action': 'buy',
                 'size': buy_size,
                 'margin': buy_margin,
-                'description': f'买入10倍持仓: {buy_size:.4f} 张 ({buy_margin:.2f} USDT)'
+                'value': buy_value,
+                'leverage': leverage,
+                'description': f'投入10倍保证金: {buy_margin:.2f} USDT ({leverage}x杠杆 = {buy_value:.2f} USDT价值, {buy_size:.4f} 张)'
             },
             'after_buy': {
                 'total_size': total_size_after_buy,
@@ -340,7 +346,7 @@ if __name__ == '__main__':
     # 测试
     manager = AnchorMaintenanceManager()
     
-    # 模拟一个亏损的锚点单
+    # 模拟一个亏损的锚点单（10倍杠杆）
     test_position = {
         'inst_id': 'BTC-USDT-SWAP',
         'pos_side': 'short',
@@ -349,6 +355,7 @@ if __name__ == '__main__':
         'mark_price': 55000.0,  # 价格上涨，空单亏损
         'profit_rate': -12.5,  # 亏损12.5%
         'margin': 0.5,  # 保证金0.5 USDT
+        'lever': 10,  # 10倍杠杆
         'is_anchor': 1
     }
     
