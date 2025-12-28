@@ -1253,3 +1253,142 @@ def get_auto_close_history():
         })
     except Exception as e:
         return jsonify({'success': False, 'error': str(e)})
+
+
+# ============ 锚点单维护 API ============
+
+@trading_bp.route('/anchor-maintenance/scan', methods=['POST'])
+def scan_anchor_maintenance():
+    """扫描锚点单维护需求"""
+    try:
+        from anchor_maintenance_manager import AnchorMaintenanceManager
+        from stop_profit_loss_manager import StopProfitLossManager
+        
+        # 初始化管理器
+        maintenance_manager = AnchorMaintenanceManager()
+        stop_loss_manager = StopProfitLossManager()
+        
+        # 获取所有锚点单持仓
+        all_positions = stop_loss_manager.get_all_positions()
+        anchor_positions = [p for p in all_positions if p.get('is_anchor') == 1]
+        
+        # 扫描需要维护的持仓
+        results = maintenance_manager.scan_positions(anchor_positions)
+        
+        return jsonify({
+            'success': True,
+            'count': len(results),
+            'triggers': results
+        })
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        return jsonify({'success': False, 'error': str(e)})
+
+
+@trading_bp.route('/anchor-maintenance/execute', methods=['POST'])
+def execute_anchor_maintenance():
+    """执行锚点单维护（模拟）"""
+    try:
+        from anchor_maintenance_manager import AnchorMaintenanceManager
+        
+        data = request.get_json() or {}
+        inst_id = data.get('inst_id')
+        pos_side = data.get('pos_side')
+        step = data.get('step', 'buy')  # buy or close
+        dry_run = data.get('dry_run', True)
+        
+        if not inst_id or not pos_side:
+            return jsonify({'success': False, 'error': '缺少必要参数'})
+        
+        manager = AnchorMaintenanceManager()
+        
+        # 获取持仓信息
+        from stop_profit_loss_manager import StopProfitLossManager
+        stop_loss_manager = StopProfitLossManager()
+        all_positions = stop_loss_manager.get_all_positions()
+        
+        position = None
+        for p in all_positions:
+            if p['inst_id'] == inst_id and p['pos_side'] == pos_side:
+                position = p
+                break
+        
+        if not position:
+            return jsonify({'success': False, 'error': '未找到持仓'})
+        
+        # 检查是否需要维护
+        check_result = manager.check_maintenance_needed(position)
+        if not check_result['need_maintenance']:
+            return jsonify({
+                'success': False,
+                'error': check_result['reason']
+            })
+        
+        # 计算维护方案
+        plan = manager.calculate_maintenance_plan(position)
+        
+        # 构建决策日志
+        decision_log = {
+            'step1': f"🔴 触发条件: 锚点单亏损 {position['profit_rate']:.2f}%",
+            'step2': f"📊 原始仓位: {position['pos_size']:.4f} 张 ({position['margin']:.2f} USDT)",
+            'step3': f"🛒 {plan['step1_buy']['description']}",
+            'step4': f"📈 {plan['after_buy']['description']}",
+            'step5': f"💰 {plan['step2_close']['description']}",
+            'step6': f"✅ {plan['step3_remaining']['description']}"
+        }
+        
+        maintenance_data = {
+            'inst_id': position['inst_id'],
+            'pos_side': position['pos_side'],
+            'original_size': position['pos_size'],
+            'original_price': position['avg_price'],
+            'original_margin': position['margin'],
+            'current_price': position['mark_price'],
+            'profit_rate': position['profit_rate'],
+            'trigger_reason': check_result['reason'],
+            'maintenance_plan': plan,
+            'decision_log': decision_log
+        }
+        
+        # 保存日志
+        if not dry_run:
+            log_id = manager.save_maintenance_log(maintenance_data, step=step, status='executed')
+            return jsonify({
+                'success': True,
+                'message': f'锚点单维护已执行（步骤: {step}）',
+                'log_id': log_id,
+                'maintenance_data': maintenance_data
+            })
+        else:
+            return jsonify({
+                'success': True,
+                'message': '模拟执行成功（dry_run模式）',
+                'maintenance_data': maintenance_data
+            })
+            
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        return jsonify({'success': False, 'error': str(e)})
+
+
+@trading_bp.route('/anchor-maintenance/logs', methods=['GET'])
+def get_anchor_maintenance_logs():
+    """获取锚点单维护日志"""
+    try:
+        from anchor_maintenance_manager import AnchorMaintenanceManager
+        
+        limit = int(request.args.get('limit', 50))
+        manager = AnchorMaintenanceManager()
+        logs = manager.get_maintenance_logs(limit=limit)
+        
+        return jsonify({
+            'success': True,
+            'count': len(logs),
+            'logs': logs
+        })
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        return jsonify({'success': False, 'error': str(e)})

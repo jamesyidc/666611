@@ -605,6 +605,28 @@
                 </div>
                 <div id="anchor-decision-logs" class="loading">加载中...</div>
             </div>
+            
+            <!-- 锚点单维护 -->
+            <div class="card" style="margin-top: 20px; background: linear-gradient(135deg, #fee2e2 0%, #fecaca 100%); border-left: 4px solid #ef4444;">
+                <h2 style="color: #b91c1c;">🔧 锚点单维护</h2>
+                <p style="color: #7f1d1d; margin-bottom: 15px; font-size: 0.95em;">
+                    ⚠️  当锚点单亏损≥10%时触发维护：买入10倍持仓 → 平掉到剩余1U | ✅ 锚点单不做止盈止损
+                </p>
+                <div style="margin-bottom: 15px;">
+                    <button class="btn btn-danger" onclick="scanAnchorMaintenance()">🔍 扫描维护需求</button>
+                    <button class="btn btn-success" onclick="loadAnchorMaintenanceLogs()">🔄 刷新日志</button>
+                </div>
+                <div id="anchor-maintenance-triggers" class="loading" style="display:none;">加载中...</div>
+            </div>
+            
+            <!-- 锚点单维护日志 -->
+            <div class="card" style="margin-top: 20px; background: #f8f9fa;">
+                <h2 style="color: #333;">📋 锚点单维护日志</h2>
+                <p style="color: #666; margin-bottom: 15px; font-size: 0.95em;">
+                    📊 记录锚点单维护的完整决策过程和执行结果
+                </p>
+                <div id="anchor-maintenance-logs" class="loading">加载中...</div>
+            </div>
         </div>
         
         <!-- 挂单记录 -->
@@ -670,6 +692,7 @@
                 case 'anchors':
                     loadAnchors();
                     loadAnchorDecisionLogs();
+                    loadAnchorMaintenanceLogs();
                     break;
                 case 'positions':
                     loadPositions();
@@ -1606,6 +1629,192 @@
             
             // 同时加载决策日志
             loadProtectOrderLogs();
+        }
+        
+        // ========== 锚点单维护功能 ==========
+        
+        // 扫描锚点单维护需求
+        function scanAnchorMaintenance() {
+            document.getElementById('anchor-maintenance-triggers').style.display = 'block';
+            document.getElementById('anchor-maintenance-triggers').innerHTML = '<div class="loading">扫描中...</div>';
+            
+            fetch('/api/trading/anchor-maintenance/scan', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'}
+            })
+            .then(res => res.json())
+            .then(data => {
+                if (data.success) {
+                    if (data.count === 0) {
+                        document.getElementById('anchor-maintenance-triggers').innerHTML = `
+                            <div style="background:#d1fae5;padding:20px;border-radius:8px;border-left:4px solid #10b981;">
+                                <strong style="color:#065f46;">✅ 暂无需要维护的锚点单</strong>
+                                <p style="color:#047857;margin-top:10px;margin-bottom:0;">
+                                    所有锚点单亏损都 < -10%，无需维护
+                                </p>
+                            </div>
+                        `;
+                        return;
+                    }
+                    
+                    let html = `
+                        <div style="background:#fee2e2;padding:15px;border-radius:8px;margin-bottom:15px;border-left:4px solid #ef4444;">
+                            <strong style="color:#b91c1c;">⚠️  发现 ${data.count} 个需要维护的锚点单</strong>
+                        </div>
+                    `;
+                    
+                    for (const trigger of data.triggers) {
+                        const decision_log = trigger.decision_log;
+                        const plan = trigger.maintenance_plan;
+                        
+                        html += `
+                            <div style="background:white;border:1px solid #fecaca;border-radius:8px;padding:15px;margin-bottom:15px;border-left:4px solid #ef4444;">
+                                <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">
+                                    <div>
+                                        <strong style="font-size:16px;">${trigger.inst_id}</strong>
+                                        <span style="background:#dc2626;color:white;padding:3px 8px;border-radius:3px;font-size:12px;margin-left:8px;">
+                                            ${trigger.pos_side === 'short' ? '空单' : '多单'}
+                                        </span>
+                                        <span style="background:#991b1b;color:white;padding:3px 8px;border-radius:3px;font-size:12px;margin-left:4px;">
+                                            亏损 ${trigger.profit_rate.toFixed(2)}%
+                                        </span>
+                                    </div>
+                                </div>
+                                
+                                <div style="background:#fef2f2;padding:12px;border-radius:6px;margin-bottom:12px;">
+                                    <div style="font-size:14px;line-height:1.8;">
+                                        ${decision_log.step1}<br>
+                                        ${decision_log.step2}<br>
+                                        ${decision_log.step3}<br>
+                                        ${decision_log.step4}<br>
+                                        ${decision_log.step5}<br>
+                                        ${decision_log.step6}
+                                    </div>
+                                </div>
+                                
+                                <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:10px;margin-bottom:12px;font-size:13px;">
+                                    <div style="background:#f9fafb;padding:8px;border-radius:4px;">
+                                        <span style="color:#666;">原始仓位:</span>
+                                        <strong>${trigger.original_size.toFixed(4)} 张</strong>
+                                    </div>
+                                    <div style="background:#f9fafb;padding:8px;border-radius:4px;">
+                                        <span style="color:#666;">原始保证金:</span>
+                                        <strong>${trigger.original_margin.toFixed(2)} USDT</strong>
+                                    </div>
+                                    <div style="background:#fef3c7;padding:8px;border-radius:4px;">
+                                        <span style="color:#666;">买入10倍:</span>
+                                        <strong style="color:#b45309;">${plan.step1_buy.margin.toFixed(2)} USDT</strong>
+                                    </div>
+                                    <div style="background:#dcfce7;padding:8px;border-radius:4px;">
+                                        <span style="color:#666;">最终保留:</span>
+                                        <strong style="color:#15803d;">${plan.step3_remaining.margin.toFixed(2)} USDT</strong>
+                                    </div>
+                                </div>
+                                
+                                <div style="color:#7f1d1d;font-size:12px;background:#fee2e2;padding:8px;border-radius:4px;">
+                                    ⚠️  注意：这是模拟数据，实际执行需要对接交易所API
+                                </div>
+                            </div>
+                        `;
+                    }
+                    
+                    document.getElementById('anchor-maintenance-triggers').innerHTML = html;
+                } else {
+                    document.getElementById('anchor-maintenance-triggers').innerHTML = `
+                        <div class="alert alert-danger">扫描失败: ${data.error}</div>
+                    `;
+                }
+            })
+            .catch(err => {
+                document.getElementById('anchor-maintenance-triggers').innerHTML = `
+                    <div class="alert alert-danger">请求失败: ${err.message}</div>
+                `;
+            });
+        }
+        
+        // 加载锚点单维护日志
+        function loadAnchorMaintenanceLogs() {
+            fetch('/api/trading/anchor-maintenance/logs?limit=10')
+                .then(res => res.json())
+                .then(data => {
+                    if (data.success) {
+                        if (data.count === 0) {
+                            document.getElementById('anchor-maintenance-logs').innerHTML = '<div class="empty-state">暂无维护日志</div>';
+                            return;
+                        }
+                        
+                        let html = '<div style="max-height: 600px; overflow-y: auto;">';
+                        
+                        for (const log of data.logs) {
+                            const stepBadge = log.step === 'buy' ? 
+                                '<span style="background:#f59e0b;color:white;padding:3px 8px;border-radius:3px;font-size:12px;">🛒 买入</span>' :
+                                log.step === 'close' ? 
+                                '<span style="background:#10b981;color:white;padding:3px 8px;border-radius:3px;font-size:12px;">💰 平仓</span>' :
+                                '<span style="background:#6b7280;color:white;padding:3px 8px;border-radius:3px;font-size:12px;">完成</span>';
+                            
+                            const statusBadge = log.status === 'executed' ? 
+                                '<span style="background:#10b981;color:white;padding:3px 8px;border-radius:3px;font-size:12px;">✅ 已执行</span>' :
+                                '<span style="background:#fbbf24;color:white;padding:3px 8px;border-radius:3px;font-size:12px;">⏳ 待执行</span>';
+                            
+                            const decision_log = typeof log.decision_log === 'string' ? 
+                                JSON.parse(log.decision_log) : log.decision_log;
+                            
+                            html += `
+                                <div style="background:white;border:1px solid #e5e7eb;border-radius:8px;padding:15px;margin-bottom:15px;border-left:4px solid #ef4444;">
+                                    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">
+                                        <div>
+                                            <strong style="font-size:16px;">${log.inst_id}</strong>
+                                            <span style="background:#dc2626;color:white;padding:3px 8px;border-radius:3px;font-size:12px;margin-left:8px;">
+                                                ${log.pos_side === 'short' ? '空单' : '多单'}
+                                            </span>
+                                            ${stepBadge}
+                                            ${statusBadge}
+                                        </div>
+                                        <div style="color:#666;font-size:13px;">${log.created_at}</div>
+                                    </div>
+                                    
+                                    <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:10px;font-size:14px;">
+                                        <div>
+                                            <span style="color:#666;">亏损率:</span>
+                                            <span style="font-weight:bold;color:#dc2626;">${log.profit_rate.toFixed(2)}%</span>
+                                        </div>
+                                        <div>
+                                            <span style="color:#666;">交易数量:</span>
+                                            <span style="font-weight:bold;">${log.trade_size ? log.trade_size.toFixed(4) + ' 张' : 'N/A'}</span>
+                                        </div>
+                                        <div>
+                                            <span style="color:#666;">剩余保证金:</span>
+                                            <span style="font-weight:bold;color:#15803d;">${log.remaining_margin ? log.remaining_margin.toFixed(2) + ' USDT' : 'N/A'}</span>
+                                        </div>
+                                    </div>
+                                    
+                                    ${decision_log ? `
+                                        <div style="background:#f9fafb;padding:10px;border-radius:5px;font-size:13px;line-height:1.6;">
+                                            ${decision_log.step1 || ''}<br>
+                                            ${decision_log.step2 || ''}<br>
+                                            ${decision_log.step3 || ''}<br>
+                                            ${decision_log.step4 || ''}<br>
+                                            ${decision_log.step5 || ''}<br>
+                                            ${decision_log.step6 || ''}
+                                        </div>
+                                    ` : ''}
+                                    
+                                    ${log.trigger_reason ? `
+                                        <div style="color:#7f1d1d;font-size:12px;margin-top:8px;background:#fee2e2;padding:8px;border-radius:4px;">
+                                            ${log.trigger_reason}
+                                        </div>
+                                    ` : ''}
+                                </div>
+                            `;
+                        }
+                        
+                        html += '</div>';
+                        document.getElementById('anchor-maintenance-logs').innerHTML = html;
+                    }
+                })
+                .catch(err => {
+                    document.getElementById('anchor-maintenance-logs').innerHTML = `<div class="alert alert-danger">加载失败: ${err.message}</div>`;
+                });
         }
         
         function loadProtectOrderLogs() {
