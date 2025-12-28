@@ -379,7 +379,6 @@
             <button class="tab" onclick="switchTab('orders')">📋 挂单记录</button>
             <button class="tab" onclick="switchTab('positions')">📈 开仓记录</button>
             <button class="tab" onclick="switchTab('adds')">➕ 补仓记录</button>
-            <button class="tab" onclick="switchTab('decisions')">🎯 决策记录</button>
         </div>
         
         <!-- 系统配置 -->
@@ -633,12 +632,6 @@
         </div>
         
         <!-- 决策记录 -->
-        <div id="decisions-tab" class="tab-content">
-            <div class="card">
-                <h2>交易决策记录</h2>
-                <div id="decisions-content" class="loading">加载中...</div>
-            </div>
-        </div>
     </div>
     
     <script>
@@ -688,9 +681,6 @@
                     break;
                 case 'orders':
                     loadProtectOrders();
-                    break;
-                case 'decisions':
-                    loadDecisions();
                     break;
             }
         }
@@ -1283,54 +1273,6 @@
         }
         
         // 加载决策记录
-        function loadDecisions() {
-            fetch('/api/trading/decisions?limit=50')
-                .then(res => res.json())
-                .then(data => {
-                    if (data.success) {
-                        if (data.records.length === 0) {
-                            document.getElementById('decisions-content').innerHTML = '<div class="empty-state">暂无决策记录</div>';
-                            return;
-                        }
-                        
-                        const rows = data.records.map(r => `
-                            <tr>
-                                <td>${r.timestamp}</td>
-                                <td><strong>${r.inst_id}</strong></td>
-                                <td><span class="pos-side-${r.pos_side}">${r.pos_side === 'long' ? '做多' : '做空'}</span></td>
-                                <td>${r.decision_type}</td>
-                                <td><span class="${r.profit_rate >= 0 ? 'profit-positive' : 'profit-negative'}">${r.profit_rate.toFixed(2)}%</span></td>
-                                <td>${r.close_size.toFixed(2)} USDT (${r.close_percent}%)</td>
-                                <td>${r.reason}</td>
-                                <td>${r.executed ? '✅' : '⏳'}</td>
-                            </tr>
-                        `).join('');
-                        
-                        const html = `
-                            <table>
-                                <thead>
-                                    <tr>
-                                        <th>时间</th>
-                                        <th>币种</th>
-                                        <th>方向</th>
-                                        <th>决策类型</th>
-                                        <th>收益率</th>
-                                        <th>平仓额</th>
-                                        <th>原因</th>
-                                        <th>已执行</th>
-                                    </tr>
-                                </thead>
-                                <tbody>${rows}</tbody>
-                            </table>
-                        `;
-                        
-                        document.getElementById('decisions-content').innerHTML = html;
-                    }
-                })
-                .catch(err => {
-                    document.getElementById('decisions-content').innerHTML = `<div class="alert alert-danger">加载失败: ${err.message}</div>`;
-                });
-        }
         
         // 页面加载时加载配置
         window.onload = () => {
