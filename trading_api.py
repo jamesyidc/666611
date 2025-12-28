@@ -14,7 +14,6 @@ trading_bp = Blueprint('trading', __name__, url_prefix='/api/trading')
 
 BEIJING_TZ = pytz.timezone('Asia/Shanghai')
 DB_PATH = '/home/user/webapp/trading_decision.db'
-ANCHOR_DB_PATH = '/home/user/webapp/anchor_system.db'
 
 
 @trading_bp.route('/config', methods=['GET'])
