@@ -875,3 +875,62 @@ def check_single_coin_limit():
         })
     except Exception as e:
         return jsonify({'success': False, 'error': str(e)})
+
+
+# ============================================================
+# 锚点单自动开仓 API
+# ============================================================
+
+@trading_bp.route('/anchor/auto-scan', methods=['POST'])
+def auto_scan_and_open():
+    """自动扫描并处理锚点单开仓"""
+    try:
+        from anchor_auto_opener import AnchorAutoOpener
+        
+        opener = AnchorAutoOpener()
+        result = opener.scan_and_process()
+        
+        return jsonify(result)
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)})
+
+
+@trading_bp.route('/anchor/trigger-history', methods=['GET'])
+def get_trigger_history():
+    """获取锚点单触发历史"""
+    try:
+        from anchor_auto_opener import AnchorAutoOpener
+        
+        limit = int(request.args.get('limit', 20))
+        opener = AnchorAutoOpener()
+        history = opener.get_trigger_history(limit=limit)
+        
+        return jsonify({
+            'success': True,
+            'count': len(history),
+            'history': history
+        })
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)})
+
+
+@trading_bp.route('/anchor/check-existing', methods=['GET'])
+def check_existing_anchor():
+    """检查是否存在锚点单"""
+    try:
+        from anchor_auto_opener import AnchorAutoOpener
+        
+        inst_id = request.args.get('inst_id')
+        if not inst_id:
+            return jsonify({'success': False, 'error': '缺少inst_id参数'})
+        
+        opener = AnchorAutoOpener()
+        has_anchor, anchor_info = opener.check_existing_anchor(inst_id)
+        
+        return jsonify({
+            'success': True,
+            'has_anchor': has_anchor,
+            'anchor_info': anchor_info if has_anchor else None
+        })
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)})

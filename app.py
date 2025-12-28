@@ -1836,5 +1836,12 @@ def dashboard():
         return f.read()
 
 
+@app.route('/anchor-auto-monitor')
+def anchor_auto_monitor():
+    """锚点单自动开仓监控"""
+    with open('/home/user/webapp/templates/anchor_auto_monitor.html', 'r', encoding='utf-8') as f:
+        return f.read()
+
+
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=5000, debug=False)
