@@ -362,8 +362,23 @@
 </head>
 <body>
     <div class="container">
-        <h1>🤖 自动交易管理系统</h1>
-        <p class="subtitle">第二阶段：开仓规则 | 补仓规则 | 系统配置</p>
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+            <div>
+                <h1>🤖 自动交易管理系统</h1>
+                <p class="subtitle">第二阶段：开仓规则 | 补仓规则 | 系统配置</p>
+            </div>
+            <div style="text-align: right;">
+                <button onclick="manualRefresh()" class="btn btn-primary" style="margin-bottom: 10px;">
+                    🔄 手动刷新
+                </button>
+                <div id="last-update-time" style="color: #666; font-size: 0.9em;">
+                    最后更新: --:--:--
+                </div>
+                <div id="auto-refresh-status" style="color: #999; font-size: 0.85em;">
+                    自动刷新: 30秒
+                </div>
+            </div>
+        </div>
         
         <div style="margin: 15px 0; text-align: center;">
             <a href="/dashboard" style="display: inline-block; padding: 8px 15px; background: #667eea; color: white; text-decoration: none; border-radius: 5px; margin: 0 5px; font-size: 14px;">📊 实时仪表板</a>
@@ -1902,11 +1917,37 @@
             });
         }
         
-        // 自动刷新（每60秒）
+        // 更新最后刷新时间
+        function updateLastRefreshTime() {
+            const now = new Date();
+            const timeStr = now.toLocaleTimeString('zh-CN', { hour12: false });
+            document.getElementById('last-update-time').textContent = `最后更新: ${timeStr}`;
+        }
+        
+        // 手动刷新
+        function manualRefresh() {
+            const activeTab = document.querySelector('.tab-content.active').id.replace('-tab', '');
+            loadTabData(activeTab);
+            updateLastRefreshTime();
+            
+            // 显示刷新提示
+            const btn = event.target;
+            const originalText = btn.textContent;
+            btn.textContent = '✅ 已刷新';
+            setTimeout(() => {
+                btn.textContent = originalText;
+            }, 1000);
+        }
+        
+        // 自动刷新（每30秒）
         setInterval(() => {
             const activeTab = document.querySelector('.tab-content.active').id.replace('-tab', '');
             loadTabData(activeTab);
-        }, 60000);
+            updateLastRefreshTime();
+        }, 30000);
+        
+        // 初始更新时间
+        updateLastRefreshTime();
     </script>
 </body>
 </html>
