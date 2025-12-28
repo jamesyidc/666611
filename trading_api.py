@@ -1197,3 +1197,59 @@ def get_protect_order_decision_logs():
         })
     except Exception as e:
         return jsonify({'success': False, 'error': str(e)})
+
+
+# ==================== 自动平仓接口 ====================
+
+@trading_bp.route('/auto-close/check', methods=['GET'])
+def check_auto_close():
+    """检查需要自动平仓的持仓"""
+    try:
+        from auto_close_positions import AutoClosePositions
+        
+        manager = AutoClosePositions()
+        to_close = manager.check_positions_to_close(dry_run=True)
+        
+        return jsonify({
+            'success': True,
+            'count': len(to_close),
+            'positions': to_close
+        })
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)})
+
+
+@trading_bp.route('/auto-close/execute', methods=['POST'])
+def execute_auto_close():
+    """执行自动平仓"""
+    try:
+        from auto_close_positions import AutoClosePositions
+        
+        data = request.get_json() or {}
+        dry_run = data.get('dry_run', True)
+        
+        manager = AutoClosePositions()
+        result = manager.execute_auto_close(dry_run=dry_run)
+        
+        return jsonify(result)
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)})
+
+
+@trading_bp.route('/auto-close/history', methods=['GET'])
+def get_auto_close_history():
+    """获取自动平仓历史"""
+    try:
+        from auto_close_positions import AutoClosePositions
+        
+        limit = int(request.args.get('limit', 50))
+        manager = AutoClosePositions()
+        history = manager.get_close_history(limit=limit)
+        
+        return jsonify({
+            'success': True,
+            'count': len(history),
+            'history': history
+        })
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)})
