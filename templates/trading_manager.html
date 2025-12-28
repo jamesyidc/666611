@@ -581,12 +581,12 @@
         <!-- 实时仓位 -->
         <div id="realtime-positions-tab" class="tab-content">
             <div class="card">
-                <h2>📊 OKEx 实时持仓（数据校准）</h2>
-                <div style="margin-bottom: 15px; padding: 10px; background: #fff3cd; border-left: 4px solid #ffc107; border-radius: 4px;">
-                    <strong>⚠️ 提示：</strong>
-                    <span style="color: #856404;">
-                        此数据从 OKEx 实时同步，仅用于数据校准和策略参考，不代表实际交易操作。
-                        本系统为模拟交易系统。
+                <h2>📊 模拟交易持仓</h2>
+                <div style="margin-bottom: 15px; padding: 10px; background: #dbeafe; border-left: 4px solid #3b82f6; border-radius: 4px;">
+                    <strong>💡 说明：</strong>
+                    <span style="color: #1e40af;">
+                        这是模拟交易系统的持仓数据，用于测试和验证交易策略。
+                        所有持仓都是模拟的，不涉及实际资金。
                     </span>
                 </div>
                 <div id="realtime-positions-content" class="loading">加载中...</div>
@@ -1420,7 +1420,7 @@
                                 <div style="display: flex; gap: 15px; margin-bottom: 15px;">
                                     <button class="filter-btn active" onclick="filterPositions('all')">全部 (${positions.length})</button>
                                     <button class="filter-btn" onclick="filterPositions('anchor')">🔶 锚点单 (${anchorPositions.length})</button>
-                                    <button class="filter-btn" onclick="filterPositions('normal')">普通持仓 (${normalPositions.length})</button>
+                                    <button class="filter-btn" onclick="filterPositions('normal')">📊 模拟持仓 (${normalPositions.length})</button>
                                 </div>
                             </div>
                             
@@ -1457,7 +1457,7 @@
                             
                             const typeBadge = pos.is_anchor === 1
                                 ? '<span style="background:#f59e0b;color:white;padding:3px 8px;border-radius:3px;font-size:12px;">🔶 锚点单</span>'
-                                : '<span style="background:#6b7280;color:white;padding:3px 8px;border-radius:3px;font-size:12px;">普通</span>';
+                                : '<span style="background:#3b82f6;color:white;padding:3px 8px;border-radius:3px;font-size:12px;">📊 模拟</span>';
                             
                             const rowClass = pos.is_anchor === 1 ? 'class="anchor-row"' : 'class="normal-row"';
                             
