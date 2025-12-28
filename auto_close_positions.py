@@ -156,6 +156,52 @@ class AutoClosePositions:
         
         return to_close
     
+    def record_to_stop_loss_log(self, position: Dict, current_price: float = None):
+        """将自动平仓记录到止盈止损决策日志"""
+        try:
+            conn = sqlite3.connect(DB_PATH)
+            cursor = conn.cursor()
+            
+            # 如果没有当前价格，使用开仓价
+            if current_price is None:
+                current_price = position['avg_price']
+            
+            # 计算收益率
+            if position['pos_side'] == 'short':
+                profit_rate = ((position['avg_price'] - current_price) / position['avg_price']) * 100
+            else:
+                profit_rate = ((current_price - position['avg_price']) / position['avg_price']) * 100
+            
+            now = datetime.now(BEIJING_TZ).strftime('%Y-%m-%d %H:%M:%S')
+            
+            cursor.execute('''
+                INSERT INTO stop_profit_loss_logs (
+                    inst_id, pos_side, decision_type, action,
+                    current_price, profit_rate, remaining_position,
+                    close_amount, close_percent,
+                    decision_steps, trigger_reason, trigger_time, created_at
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ''', (
+                position['inst_id'],
+                position['pos_side'],
+                'config_change',  # 标记为配置变更触发
+                'close',
+                current_price,
+                profit_rate,
+                position['total_size'],
+                position['close_size'],
+                (position['close_size'] / position['total_size'] * 100) if position['total_size'] > 0 else 0,
+                f"⚙️ 系统配置变更\n💰 保留仓位: {position['keep_size']:.2f} USDT\n📊 平仓数量: {position['close_size']:.2f} USDT",
+                position['close_reason'],
+                now,
+                now
+            ))
+            
+            conn.commit()
+            conn.close()
+        except Exception as e:
+            print(f"❌ 记录止盈止损日志失败: {e}")
+    
     def execute_auto_close(self, dry_run: bool = True) -> Dict:
         """执行自动平仓"""
         config = self.get_config()
@@ -185,6 +231,9 @@ class AutoClosePositions:
             cursor = conn.cursor()
             
             for pos in to_close:
+                # 记录到止盈止损决策日志
+                self.record_to_stop_loss_log(pos)
+                
                 # 记录平仓记录
                 cursor.execute('''
                     INSERT INTO auto_close_records (
