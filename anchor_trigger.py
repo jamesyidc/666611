@@ -169,9 +169,9 @@ class AnchorTrigger:
         if not signal.get('pressure1') or not signal.get('pressure2'):
             return False, "压力线不完整", {}
         
-        # 计算开仓金额（锚点单固定1 USDT）
-        # 🔴 锚点单不管可开仓额度多大，固定只开 1 USDT
-        anchor_amount = 1.0  # 固定 1 USDT
+        # 计算开仓金额（锚点单固定10 USDT名义价值）
+        # 🔴 10倍杠杆：10 USDT名义价值 = 1 USDT保证金
+        anchor_amount = 10.0  # 固定 10 USDT（10倍杠杆，实际占用1U保证金）
         
         # 检查5：单币种限制
         passed, reason = self.check_single_coin_limit(inst_id, anchor_amount)

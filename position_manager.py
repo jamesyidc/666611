@@ -230,8 +230,15 @@ class PositionManager:
         锚点单补仓规则（特殊）：
         - 触发条件：持仓亏损超过 -10%
         - 补仓金额：原开仓金额的 10倍
+        - 10倍杠杆：100U名义价值 = 10U保证金
         - 补仓后立即平掉 95%
         - 只补仓一次
+        
+        示例：
+        - 原开仓：10U名义价值（1U保证金）
+        - 补仓：100U名义价值（10U保证金）
+        - 总计：110U名义价值（11U保证金）
+        - 平仓95%：保留5.5U名义价值（0.55U保证金）
         """
         # 获取开仓记录
         open_record = self.get_position_opens(inst_id, pos_side)
@@ -253,7 +260,7 @@ class PositionManager:
         # 检查是否触发锚点单补仓：亏损超过-10%
         if profit_rate <= -10.0:
             # 锚点单补仓：原金额的10倍
-            # 例如：原开仓0.7U，补仓7U（10倍）
+            # 例如：原开仓10U（1U保证金），补仓100U（10U保证金）
             original_amount = open_record.get('open_size', 0) * open_record.get('open_price', 0)
             add_multiplier = 10.0  # 10倍
             
