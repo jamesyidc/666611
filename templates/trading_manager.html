@@ -250,6 +250,31 @@
             margin-top: 5px;
         }
         
+        /* 🚀 加载指示器样式 */
+        .loading-indicator {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 40px;
+            color: #667eea;
+            font-size: 1.1em;
+        }
+        
+        .loading-spinner {
+            border: 3px solid #f3f3f3;
+            border-top: 3px solid #667eea;
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            animation: spin 1s linear infinite;
+            margin-right: 15px;
+        }
+        
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        
         .form-group {
             margin-bottom: 15px;
         }
@@ -420,8 +445,8 @@
                 </p>
             </div>
             <div style="text-align: right;">
-                <button onclick="manualRefresh()" class="btn btn-primary" style="margin-bottom: 10px;">
-                    🔄 手动刷新
+                <button onclick="refreshCurrentTab()" class="btn btn-primary" style="margin-bottom: 10px;">
+                    🔄 刷新当前页
                 </button>
                 <div id="last-update-time" style="color: #666; font-size: 0.9em;">
                     最后更新: --:--:--
@@ -439,14 +464,14 @@
         </div>
         
         <div class="tabs">
-            <button class="tab active" onclick="switchTab('config')">⚙️ 系统配置</button>
-            <button class="tab" onclick="switchTab('realtime-positions')">📊 实时仓位</button>
-            <button class="tab" onclick="switchTab('statistics')">📊 统计数据</button>
-            <button class="tab" onclick="switchTab('stop-profit-loss')">💰 止盈止损</button>
-            <button class="tab" onclick="switchTab('anchors')">⚓ 锚点单</button>
-            <button class="tab" onclick="switchTab('orders')">📋 挂单记录</button>
-            <button class="tab" onclick="switchTab('positions')">📈 开仓记录</button>
-            <button class="tab" onclick="switchTab('adds')">➕ 补仓记录</button>
+            <button class="tab active" onclick="switchTabOptimized('config')">⚙️ 系统配置</button>
+            <button class="tab" onclick="switchTabOptimized('realtime-positions')">📊 实时仓位</button>
+            <button class="tab" onclick="switchTabOptimized('statistics')">📊 统计数据</button>
+            <button class="tab" onclick="switchTabOptimized('stop-profit-loss')">💰 止盈止损</button>
+            <button class="tab" onclick="switchTabOptimized('anchors')">⚓ 锚点单</button>
+            <button class="tab" onclick="switchTabOptimized('orders')">📋 挂单记录</button>
+            <button class="tab" onclick="switchTabOptimized('positions')">📈 开仓记录</button>
+            <button class="tab" onclick="switchTabOptimized('adds')">➕ 补仓记录</button>
         </div>
         
         <!-- 系统配置 -->
@@ -1130,9 +1155,11 @@
                 });
         }
         
-        // 加载开仓记录
         // 加载锚点单记录
         function loadAnchors() {
+            // 显示加载指示器
+            document.getElementById('anchors-content').innerHTML = '<div class="loading-indicator"><div class="loading-spinner"></div>加载中...</div>';
+            
             fetch('/api/trading/positions/opens?is_anchor=1&limit=50')
                 .then(res => res.json())
                 .then(data => {
@@ -1333,6 +1360,9 @@
         }
         
         function loadPositions() {
+            // 显示加载指示器
+            document.getElementById('positions-content').innerHTML = '<div class="loading-indicator"><div class="loading-spinner"></div>加载中...</div>';
+            
             // 只加载非锚点单的开仓记录（is_anchor=0），避免与锚点单标签页重复
             fetch('/api/trading/positions/opens?limit=50&is_anchor=0')
                 .then(res => res.json())
@@ -1395,6 +1425,9 @@
         
         // 加载补仓记录
         function loadAdds() {
+            // 显示加载指示器
+            document.getElementById('adds-content').innerHTML = '<div class="loading-indicator"><div class="loading-spinner"></div>加载中...</div>';
+            
             fetch('/api/trading/positions/adds?limit=50')
                 .then(res => res.json())
                 .then(data => {
@@ -1447,6 +1480,9 @@
         
         // 加载挂单记录
         function loadOrders() {
+            // 显示加载指示器
+            document.getElementById('orders-content').innerHTML = '<div class="loading-indicator"><div class="loading-spinner"></div>加载中...</div>';
+            
             fetch('/api/trading/orders/pending?status=pending')
                 .then(res => res.json())
                 .then(data => {
@@ -1661,10 +1697,109 @@
             });
         }
         
-        // 页面加载时加载配置
+        // 页面加载时只加载配置页
         window.onload = () => {
             loadConfig();
+            window.configLoaded = true;  // 标记已加载
         };
+        
+        // 🚀 数据缓存机制，避免频繁请求
+        window.dataCache = {
+            config: null,
+            anchors: null,
+            positions: null,
+            adds: null,
+            orders: null,
+            lastUpdate: {}
+        };
+        
+        // 检查缓存是否过期（30秒）
+        function isCacheExpired(key) {
+            if (!window.dataCache.lastUpdate[key]) return true;
+            const now = Date.now();
+            const elapsed = now - window.dataCache.lastUpdate[key];
+            return elapsed > 30000; // 30秒过期
+        }
+        
+        // 刷新按钮：强制刷新当前标签页数据
+        function refreshCurrentTab() {
+            const activeTab = document.querySelector('.tab.active');
+            if (!activeTab) return;
+            
+            const tabText = activeTab.textContent.trim();
+            
+            // 清除对应的缓存和加载标记
+            if (tabText.includes('锚点单')) {
+                window.anchorsLoaded = false;
+                window.dataCache.anchors = null;
+                loadAnchors();
+            } else if (tabText.includes('开仓记录')) {
+                window.positionsLoaded = false;
+                window.dataCache.positions = null;
+                loadPositions();
+            } else if (tabText.includes('补仓记录')) {
+                window.addsLoaded = false;
+                window.dataCache.adds = null;
+                loadAdds();
+            } else if (tabText.includes('挂单记录')) {
+                window.ordersLoaded = false;
+                window.dataCache.orders = null;
+                loadOrders();
+            } else if (tabText.includes('系统配置')) {
+                window.configLoaded = false;
+                window.dataCache.config = null;
+                loadConfig();
+            }
+        }
+        
+        // 🚀 优化：按需加载数据，避免一次性加载所有数据
+        function switchTabOptimized(tabName) {
+            switchTab(tabName);
+            
+            // 根据标签页按需加载数据（只加载一次）
+            if (tabName === 'config') {
+                if (!window.configLoaded) {
+                    loadConfig();
+                    window.configLoaded = true;
+                }
+            } else if (tabName === 'anchors') {
+                if (!window.anchorsLoaded) {
+                    loadAnchors();
+                    window.anchorsLoaded = true;
+                }
+            } else if (tabName === 'positions') {
+                if (!window.positionsLoaded) {
+                    loadPositions();
+                    window.positionsLoaded = true;
+                }
+            } else if (tabName === 'adds') {
+                if (!window.addsLoaded) {
+                    loadAdds();
+                    window.addsLoaded = true;
+                }
+            } else if (tabName === 'orders') {
+                if (!window.ordersLoaded) {
+                    loadOrders();
+                    window.ordersLoaded = true;
+                }
+            } else if (tabName === 'statistics') {
+                if (!window.statisticsLoaded) {
+                    loadStatistics();
+                    window.statisticsLoaded = true;
+                }
+            } else if (tabName === 'realtime-positions') {
+                if (!window.realtimeLoaded) {
+                    loadRealtimePositions();
+                    window.realtimeLoaded = true;
+                }
+            } else if (tabName === 'stop-profit-loss') {
+                if (!window.stopProfitLossLoaded) {
+                    loadStopProfitLossLogs();
+                    window.stopProfitLossLoaded = true;
+                }
+            }
+            // 其他标签页也可以添加类似逻辑
+        }
         
         
         // ==================== 止盈止损相关函数 ====================
