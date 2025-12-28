@@ -1075,6 +1075,12 @@
                                     <td>${r.total_size ? r.total_size.toFixed(2) : r.open_size.toFixed(2)} USDT</td>
                                     <td>${r.granularity || 'small'}</td>
                                     <td><span style="color: #f59e0b;">⚓ 锚点单</span></td>
+                                    <td>
+                                        <button class="btn btn-danger" style="padding: 5px 10px; font-size: 0.85em;" 
+                                                onclick="closeAnchorPosition(${r.id}, '${r.inst_id}', 1.0)">
+                                            平仓保留1U
+                                        </button>
+                                    </td>
                                 </tr>
                             `;
                         }).join('');
@@ -1101,6 +1107,7 @@
                                         <th>当前总额</th>
                                         <th>颗粒度</th>
                                         <th>类型</th>
+                                        <th>操作</th>
                                     </tr>
                                 </thead>
                                 <tbody>${rows}</tbody>
@@ -1439,6 +1446,7 @@
                                             <th>盈亏率</th>
                                             <th>类型</th>
                                             <th>更新时间</th>
+                                            <th>操作</th>
                                         </tr>
                                     </thead>
                                     <tbody id="positions-table-body">
@@ -1462,7 +1470,7 @@
                             const rowClass = pos.is_anchor === 1 ? 'class="anchor-row"' : 'class="normal-row"';
                             
                             html += `
-                                <tr ${rowClass}>
+                                <tr ${rowClass} data-id="${pos.id || ''}">
                                     <td><strong>${pos.inst_id}</strong></td>
                                     <td>${posSideBadge}</td>
                                     <td>${parseFloat(pos.open_size).toFixed(4)}</td>
@@ -1474,6 +1482,14 @@
                                     <td style="color: ${profitRateColor}; font-weight: bold;">${profitRateSign}${parseFloat(pos.profit_rate || 0).toFixed(2)}%</td>
                                     <td>${typeBadge}</td>
                                     <td>${pos.updated_time || '-'}</td>
+                                    <td>
+                                        ${pos.is_anchor === 1 ? `
+                                            <button class="btn btn-danger" style="padding: 5px 10px; font-size: 0.85em;" 
+                                                    onclick="closeAnchorPosition(${pos.id || 0}, '${pos.inst_id}', 1.0)">
+                                                平仓保留1U
+                                            </button>
+                                        ` : '-'}
+                                    </td>
                                 </tr>
                             `;
                         });
@@ -2179,6 +2195,38 @@
         
         // 初始更新时间
         updateLastRefreshTime();
+        
+        // ==================== 手动平仓锚点单 ====================
+        
+        function closeAnchorPosition(positionId, instId, keepAmount) {
+            if (!confirm(`确认平仓锚点单？\n\n币种: ${instId}\n保留保证金: ${keepAmount} USDT\n\n⚠️ 此操作将平掉大部分仓位，仅保留${keepAmount}U保证金。`)) {
+                return;
+            }
+            
+            fetch('/api/trading/anchor/close-position', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({
+                    id: positionId,
+                    keep_amount: keepAmount
+                })
+            })
+            .then(res => res.json())
+            .then(data => {
+                if (data.success) {
+                    alert(`✅ 平仓成功！\n\n币种: ${data.inst_id}\n原始保证金: ${data.original_margin} USDT\n平仓保证金: ${data.closed_margin} USDT\n保留保证金: ${data.keep_margin} USDT\n保留名义: ${data.keep_nominal} USDT\n\n${data.note}`);
+                    
+                    // 刷新数据
+                    loadAnchors();
+                    loadRealtimePositions();
+                } else {
+                    alert(`❌ 平仓失败: ${data.error}`);
+                }
+            })
+            .catch(err => {
+                alert(`❌ 请求失败: ${err.message}`);
+            });
+        }
     </script>
 </body>
 </html>
