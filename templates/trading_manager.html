@@ -634,6 +634,54 @@
         <div id="positions-tab" class="tab-content">
             <div class="card">
                 <h2>开仓记录（不包含锚点单维护）</h2>
+                
+                <!-- 开仓条件说明 -->
+                <div style="margin-bottom: 20px; padding: 15px; background: linear-gradient(135deg, #f0fdf4 0%, #dcfce7 100%); border-radius: 8px; border-left: 4px solid #22c55e;">
+                    <h3 style="color: #15803d; margin-top: 0; margin-bottom: 15px; font-size: 1.1em;">
+                        📋 开仓条件说明
+                    </h3>
+                    
+                    <!-- 做多条件 -->
+                    <div style="margin-bottom: 15px; padding: 12px; background: white; border-radius: 6px; border: 1px solid #86efac;">
+                        <h4 style="color: #16a34a; margin: 0 0 10px 0; font-size: 1em;">
+                            🔺 做多开仓条件
+                        </h4>
+                        <ul style="margin: 0; padding-left: 20px; color: #166534; font-size: 0.9em; line-height: 1.8;">
+                            <li><strong>大前提</strong>: 系统配置允许开多单（allow_long = true）</li>
+                            <li><strong>触发条件</strong>: 锚点单盈利 ≥ +40%</li>
+                            <li><strong>币种选择</strong>: 优先考虑前6个币种（按市值/交易量排序）</li>
+                            <li><strong>开仓逻辑</strong>: 当锚点单达到40%盈利时，判断为超跌反弹机会</li>
+                        </ul>
+                    </div>
+                    
+                    <!-- 做空条件 -->
+                    <div style="padding: 12px; background: white; border-radius: 6px; border: 1px solid #fca5a5;">
+                        <h4 style="color: #dc2626; margin: 0 0 10px 0; font-size: 1em;">
+                            🔻 做空开仓条件（锚点单）
+                        </h4>
+                        <ul style="margin: 0; padding-left: 20px; color: #991b1b; font-size: 0.9em; line-height: 1.8;">
+                            <li><strong>大前提</strong>: 系统配置允许开空单（allow_short = true）</li>
+                            <li><strong>触发条件</strong>: 在逃顶的高潮期介入</li>
+                            <li><strong>具体指标</strong>: 
+                                <ul style="margin: 5px 0; padding-left: 20px;">
+                                    <li>压力线1 + 压力线2 距离 ≥ 18%</li>
+                                    <li>当前价格位置 ≥ 90%（接近压力线1）</li>
+                                    <li>距离压力线1 ≤ 2%</li>
+                                </ul>
+                            </li>
+                            <li><strong>币种选择</strong>: 优先考虑前6个币种</li>
+                            <li><strong>开仓逻辑</strong>: 在价格冲高、即将见顶时做空防护</li>
+                        </ul>
+                    </div>
+                    
+                    <!-- 优先级币种 -->
+                    <div style="margin-top: 15px; padding: 10px; background: #fef3c7; border-radius: 6px; border: 1px solid #fbbf24;">
+                        <p style="margin: 0; color: #92400e; font-size: 0.9em;">
+                            ⭐ <strong>优先级前6个币种示例</strong>: CFX, FIL, CELO, UNI, CRV, LDO（根据市值/交易量动态排序）
+                        </p>
+                    </div>
+                </div>
+                
                 <div id="positions-content" class="loading">加载中...</div>
             </div>
             
