@@ -420,19 +420,96 @@ def get_statistics():
         conn = sqlite3.connect(DB_PATH, timeout=10.0)
         cursor = conn.cursor()
         
-        # 开仓统计
-        cursor.execute('SELECT COUNT(*), SUM(open_size) FROM position_opens')
-        opens_count, opens_total = cursor.fetchone()
-        
-        # 补仓统计
-        cursor.execute('SELECT COUNT(*), SUM(add_size) FROM position_adds')
-        adds_count, adds_total = cursor.fetchone()
-        
-        # 决策统计
+        # 1. 开仓统计（包含名义价值计算）
         cursor.execute('''
-        SELECT decision_type, COUNT(*), SUM(CASE WHEN executed = 1 THEN 1 ELSE 0 END)
-        FROM trading_decisions
-        GROUP BY decision_type
+            SELECT 
+                COUNT(*) as count,
+                SUM(open_size * open_price) as total_nominal,
+                SUM(open_size) as total_size
+            FROM position_opens
+        ''')
+        opens_data = cursor.fetchone()
+        opens_count = opens_data[0] or 0
+        opens_nominal = opens_data[1] or 0
+        opens_size = opens_data[2] or 0
+        
+        # 2. 锚点单统计
+        cursor.execute('''
+            SELECT 
+                COUNT(*) as count,
+                SUM(open_size * open_price) as total_nominal
+            FROM position_opens
+            WHERE is_anchor = 1
+        ''')
+        anchor_data = cursor.fetchone()
+        anchor_count = anchor_data[0] or 0
+        anchor_nominal = anchor_data[1] or 0
+        
+        # 3. 补仓统计
+        cursor.execute('''
+            SELECT 
+                COUNT(*) as count,
+                SUM(add_size * add_price) as total_nominal
+            FROM position_adds
+            WHERE status = 'active'
+        ''')
+        adds_data = cursor.fetchone()
+        adds_count = adds_data[0] or 0
+        adds_nominal = adds_data[1] or 0
+        
+        # 4. 计算未平仓盈亏（需要获取当前价格）
+        total_unrealized_pnl = 0
+        cursor.execute('SELECT inst_id, pos_side, open_price, open_size FROM position_opens')
+        positions = cursor.fetchall()
+        
+        try:
+            crypto_conn = sqlite3.connect('/home/user/webapp/crypto_data.db', timeout=5.0)
+            crypto_cursor = crypto_conn.cursor()
+            
+            for pos in positions:
+                inst_id, pos_side, open_price, open_size = pos
+                symbol = inst_id.replace('-USDT-SWAP', 'USDT')
+                
+                crypto_cursor.execute('''
+                    SELECT current_price FROM support_resistance_levels 
+                    WHERE symbol = ? 
+                    ORDER BY record_time DESC LIMIT 1
+                ''', (symbol,))
+                
+                price_row = crypto_cursor.fetchone()
+                if price_row and price_row[0]:
+                    current_price = float(price_row[0])
+                    nominal = open_size * open_price
+                    leverage = 10
+                    
+                    if pos_side == 'short':
+                        price_change = (open_price - current_price) / open_price
+                    else:
+                        price_change = (current_price - open_price) / open_price
+                    
+                    unrealized_pnl = nominal * price_change
+                    total_unrealized_pnl += unrealized_pnl
+            
+            crypto_conn.close()
+        except Exception as e:
+            print(f"计算未平仓盈亏失败: {e}")
+        
+        # 5. 止盈止损统计（从position_closes表）
+        cursor.execute('''
+            SELECT 
+                SUM(CASE WHEN close_reason LIKE '%止盈%' THEN unrealized_pnl ELSE 0 END) as profit_amount,
+                SUM(CASE WHEN close_reason LIKE '%止损%' THEN unrealized_pnl ELSE 0 END) as loss_amount
+            FROM position_closes
+        ''')
+        stop_data = cursor.fetchone()
+        stop_profit = stop_data[0] or 0
+        stop_loss = stop_data[1] or 0
+        
+        # 6. 决策统计
+        cursor.execute('''
+            SELECT decision_type, COUNT(*), SUM(CASE WHEN executed = 1 THEN 1 ELSE 0 END)
+            FROM trading_decisions
+            GROUP BY decision_type
         ''')
         decisions_stats = {}
         for row in cursor.fetchall():
@@ -441,11 +518,11 @@ def get_statistics():
                 'executed': row[2]
             }
         
-        # 挂单统计
+        # 7. 挂单统计
         cursor.execute('''
-        SELECT status, COUNT(*)
-        FROM pending_orders
-        GROUP BY status
+            SELECT status, COUNT(*)
+            FROM pending_orders
+            GROUP BY status
         ''')
         orders_stats = {}
         for row in cursor.fetchall():
@@ -457,13 +534,22 @@ def get_statistics():
             'success': True,
             'statistics': {
                 'position_opens': {
-                    'count': opens_count or 0,
-                    'total_size': opens_total or 0
+                    'count': opens_count,
+                    'total_size': round(opens_size, 2),
+                    'total_nominal': round(opens_nominal, 2),  # 开仓总额（USDT）
+                    'total_margin': round(opens_nominal / 10, 2)  # 保证金（10x杠杆）
+                },
+                'anchor_positions': {
+                    'count': anchor_count,
+                    'total_nominal': round(anchor_nominal, 2)  # 锚点单开单金额
                 },
                 'position_adds': {
-                    'count': adds_count or 0,
-                    'total_size': adds_total or 0
+                    'count': adds_count,
+                    'total_nominal': round(adds_nominal, 2)  # 补仓总额（USDT）
                 },
+                'unrealized_pnl': round(total_unrealized_pnl, 2),  # 未平仓盈亏
+                'stop_profit': round(stop_profit, 2),  # 止盈金额
+                'stop_loss': round(stop_loss, 2),  # 止损金额
                 'trading_decisions': decisions_stats,
                 'pending_orders': orders_stats
             }
