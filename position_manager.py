@@ -225,49 +225,45 @@ class PositionManager:
     
     def should_add_position(self, inst_id: str, pos_side: str, 
                            profit_rate: float) -> Tuple[bool, str, float]:
-        """判断是否需要补仓"""
+        """判断是否需要补仓
+        
+        锚点单补仓规则（特殊）：
+        - 触发条件：持仓亏损超过 -10%
+        - 补仓金额：原开仓金额的 10倍
+        - 补仓后立即平掉 95%
+        - 只补仓一次
+        """
         # 获取开仓记录
         open_record = self.get_position_opens(inst_id, pos_side)
         if not open_record:
             return False, "没有开仓记录", 0
         
-        # ✨ 新增：只有锚点单才能补仓
+        # ✨ 只有锚点单才能补仓
         if not open_record.get('is_anchor'):
             return False, "非锚点单不能补仓", 0
         
         # 获取补仓记录
         adds = self.get_position_adds(inst_id, pos_side)
         
-        # 确定颗粒度
-        granularity = self.determine_granularity(inst_id)
-        config = self.GRANULARITY_CONFIG[granularity]
+        # 🔴 锚点单特殊补仓逻辑
+        # 锚点单只补仓一次，且在亏损超过-10%时触发
+        if len(adds) > 0:
+            return False, "锚点单已完成补仓（只补仓一次）", 0
         
-        # 找到下一个应该补仓的触发点
-        current_adds = len(adds)
-        
-        if current_adds >= len(config['triggers']):
-            # 当前颗粒度的补仓已完成
-            # 检查是否需要升级到下一个颗粒度
-            if granularity == 'small':
-                # 检查是否可以进入中颗粒
-                medium_config = self.GRANULARITY_CONFIG['medium']
-                if profit_rate <= medium_config['prerequisite']:
-                    return True, "满足中颗粒补仓条件", medium_config['add_percent']
-            elif granularity == 'medium':
-                # 检查是否可以进入大颗粒
-                large_config = self.GRANULARITY_CONFIG['large']
-                if profit_rate <= large_config['prerequisite']:
-                    return True, "满足大颗粒补仓条件", large_config['add_percent']
+        # 检查是否触发锚点单补仓：亏损超过-10%
+        if profit_rate <= -10.0:
+            # 锚点单补仓：原金额的10倍
+            # 例如：原开仓0.7U，补仓7U（10倍）
+            original_amount = open_record.get('open_size', 0) * open_record.get('open_price', 0)
+            add_multiplier = 10.0  # 10倍
             
-            return False, f"{config['name']}补仓已完成", 0
+            # 返回补仓金额（以原金额百分比表示）
+            # 例如：原开仓1%，补仓10%（10倍）
+            add_percent = open_record.get('open_percent', 1.0) * add_multiplier
+            
+            return True, f"触发锚点单补仓（亏损{profit_rate:.2f}%，补仓{add_multiplier}倍）", add_percent
         
-        # 检查是否触发下一次补仓
-        next_trigger = config['triggers'][current_adds]
-        
-        if profit_rate <= next_trigger:
-            return True, f"触发{config['name']}补仓({next_trigger}%)", config['add_percent']
-        
-        return False, f"未触发补仓(当前{profit_rate:.2f}%, 下次{next_trigger}%)", 0
+        return False, f"未触发锚点单补仓（当前{profit_rate:.2f}%，触发点-10%）", 0
     
     def record_open_position(self, inst_id: str, pos_side: str, 
                             size: float, price: float, granularity: str, 
@@ -320,6 +316,37 @@ class PositionManager:
         conn.close()
         
         return add_id
+    
+    def should_close_after_anchor_add(self, inst_id: str, pos_side: str) -> Tuple[bool, float, str]:
+        """判断锚点单补仓后是否需要立即平仓
+        
+        锚点单补仓后平仓规则：
+        - 补仓后立即平掉 95%
+        - 保留 5% 作为底仓
+        
+        Returns:
+            Tuple[bool, float, str]: (是否平仓, 平仓百分比, 原因说明)
+        """
+        # 获取开仓记录
+        open_record = self.get_position_opens(inst_id, pos_side)
+        if not open_record:
+            return False, 0, "没有开仓记录"
+        
+        # 只处理锚点单
+        if not open_record.get('is_anchor'):
+            return False, 0, "非锚点单不需要自动平仓"
+        
+        # 获取补仓记录
+        adds = self.get_position_adds(inst_id, pos_side)
+        
+        # 只在刚完成补仓后立即平仓
+        if len(adds) == 1:
+            # 刚完成第一次补仓（锚点单只补仓一次）
+            close_percent = 95.0  # 平掉95%
+            reason = f"锚点单补仓后立即平仓{close_percent}%（保留5%底仓）"
+            return True, close_percent, reason
+        
+        return False, 0, "锚点单已处理完补仓平仓"
     
     def get_position_summary(self) -> Dict:
         """获取仓位概览"""
