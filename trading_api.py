@@ -1432,6 +1432,78 @@ def adjust_anchor_margin():
         import traceback
         traceback.print_exc()
         return jsonify({'success': False, 'error': str(e)})
+
+
+@trading_bp.route('/anchor/trigger-logs', methods=['GET'])
+def get_anchor_trigger_logs():
+    """获取锚点单触发日志
+    
+    查询参数:
+    - limit: 返回记录数量，默认20
+    - inst_id: 筛选特定币种
+    - action_taken: 筛选特定动作 (created/monitored/skipped/failed)
+    """
+    try:
+        conn = sqlite3.connect(DB_PATH, timeout=10.0)
+        cursor = conn.cursor()
+        
+        # 获取查询参数
+        limit = request.args.get('limit', 20, type=int)
+        inst_id = request.args.get('inst_id', type=str)
+        action_taken = request.args.get('action_taken', type=str)
+        
+        # 构建查询
+        query = '''
+        SELECT id, inst_id, trigger_type, has_existing_anchor,
+               pressure1, pressure2, current_price, open_amount,
+               action_taken, skip_reason, trigger_reason, 
+               timestamp, created_at
+        FROM anchor_triggers
+        WHERE 1=1
+        '''
+        params = []
+        
+        if inst_id:
+            query += ' AND inst_id = ?'
+            params.append(inst_id)
+        
+        if action_taken:
+            query += ' AND action_taken = ?'
+            params.append(action_taken)
+        
+        query += ' ORDER BY created_at DESC LIMIT ?'
+        params.append(limit)
+        
+        cursor.execute(query, params)
+        
+        records = []
+        for row in cursor.fetchall():
+            records.append({
+                'id': row[0],
+                'inst_id': row[1],
+                'trigger_type': row[2],
+                'has_existing_anchor': bool(row[3]),
+                'pressure1': row[4],
+                'pressure2': row[5],
+                'current_price': row[6],
+                'open_amount': row[7],
+                'action_taken': row[8],
+                'skip_reason': row[9],
+                'trigger_reason': row[10],
+                'timestamp': row[11],
+                'created_at': row[12]
+            })
+        
+        conn.close()
+        
+        return jsonify({
+            'success': True,
+            'total': len(records),
+            'records': records
+        })
+        
+    except Exception as e:
         import traceback
         traceback.print_exc()
+        return jsonify({'success': False, 'error': str(e)})
         return jsonify({'success': False, 'error': str(e)})
