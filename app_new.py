@@ -2,7 +2,7 @@
 """
 加密货币数据分析系统 - 完全仿照参考页面风格
 """
-from flask import Flask, render_template_string, render_template, request, jsonify, send_from_directory, make_response
+from flask import Flask, render_template_string, render_template, request, jsonify, send_from_directory, make_response, redirect
 import sqlite3
 from datetime import datetime, timedelta
 import json
@@ -12145,12 +12145,8 @@ def get_current_positions():
 
 @app.route('/trading-decision')
 def trading_decision_page():
-    """交易决策系统管理页面"""
-    try:
-        with open('/home/user/webapp/trading_decision.html', 'r', encoding='utf-8') as f:
-            return f.read()
-    except Exception as e:
-        return f"Error loading page: {e}", 500
+    """交易决策系统管理页面 - 重定向到统一管理页面"""
+    return redirect('/trading-manager')
 
 @app.route('/api/trading/config', methods=['GET', 'POST'])
 def trading_config_api():
@@ -12336,10 +12332,17 @@ def dashboard():
 
 @app.route('/trading-manager')
 def trading_manager():
-    """交易管理界面"""
+    """交易管理界面 - 模拟交易系统"""
     try:
         with open('/home/user/webapp/templates/trading_manager.html', 'r', encoding='utf-8') as f:
-            return f.read()
+            content = f.read()
+        
+        # 添加缓存控制头，强制浏览器刷新
+        response = make_response(content)
+        response.headers['Cache-Control'] = 'no-store, no-cache, must-revalidate, max-age=0'
+        response.headers['Pragma'] = 'no-cache'
+        response.headers['Expires'] = '0'
+        return response
     except FileNotFoundError:
         return "Trading manager template not found", 404
     except Exception as e:
