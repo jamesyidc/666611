@@ -660,7 +660,8 @@
                             🔻 做空开仓条件（锚点单）
                         </h4>
                         <ul style="margin: 0; padding-left: 20px; color: #991b1b; font-size: 0.9em; line-height: 1.8;">
-                            <li><strong>大前提</strong>: 系统配置允许开空单（allow_short = true）</li>
+                            <li><strong>大前提1</strong>: 系统配置允许开空单（allow_short = true）</li>
+                            <li><strong>大前提2</strong>: ⚠️ <span style="background: #fee; padding: 2px 6px; border-radius: 3px; font-weight: bold;">锚点单处于亏损状态（当前价格 > 锚点单开仓价格）</span></li>
                             <li><strong>触发条件</strong>: 在逃顶的高潮期介入</li>
                             <li><strong>具体指标</strong>: 
                                 <ul style="margin: 5px 0; padding-left: 20px;">
@@ -670,7 +671,7 @@
                                 </ul>
                             </li>
                             <li><strong>币种选择</strong>: 优先考虑前6个币种</li>
-                            <li><strong>开仓逻辑</strong>: 在价格冲高、即将见顶时做空防护</li>
+                            <li><strong>开仓逻辑</strong>: 在锚点单亏损、价格冲高时做空防护</li>
                         </ul>
                     </div>
                     
