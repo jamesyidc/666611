@@ -8,7 +8,11 @@ import sqlite3
 import time
 import logging
 from datetime import datetime
+import pytz
 from anchor_system import get_positions, calculate_profit_rate
+
+# 北京时区
+BEIJING_TZ = pytz.timezone('Asia/Shanghai')
 
 # 配置日志
 logging.basicConfig(
@@ -104,12 +108,12 @@ class PositionSyncer:
                             updated_time = ?
                         WHERE inst_id = ? AND pos_side = ?
                     ''', (mark_price, profit_rate, upl, pos_size, margin, lever,
-                          datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
+                          datetime.now(BEIJING_TZ).strftime('%Y-%m-%d %H:%M:%S'),
                           inst_id, pos_side))
                     updated_count += 1
                 else:
                     # 新增持仓（使用原表结构）
-                    now = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+                    now = datetime.now(BEIJING_TZ).strftime('%Y-%m-%d %H:%M:%S')
                     
                     # 判断是否为锚点单：空单且保证金≤2 USDT
                     # 注意：锚点单保证金不能大于2U，超过2U需要调整到1U
