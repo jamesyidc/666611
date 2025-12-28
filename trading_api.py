@@ -1649,7 +1649,7 @@ def close_anchor_position():
         cursor.execute('''
             UPDATE position_opens
             SET open_size = ?,
-                updated_at = ?
+                updated_time = ?
             WHERE id = ?
         ''', (new_size, timestamp, position_id))
         
