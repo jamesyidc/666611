@@ -110,6 +110,10 @@ class PositionSyncer:
                 else:
                     # 新增持仓（使用原表结构）
                     now = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+                    
+                    # 判断是否为锚点单：空单且保证金<2 USDT
+                    is_anchor = 1 if (pos_side == 'short' and margin < 2.0) else 0
+                    
                     cursor.execute('''
                         INSERT INTO position_opens (
                             inst_id, pos_side, open_price, open_size,
@@ -119,7 +123,7 @@ class PositionSyncer:
                         ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                     ''', (inst_id, pos_side, avg_price, pos_size,
                           0.0, 0.0, 0,  # 默认值
-                          0, now, now,  # 非锚点单
+                          is_anchor, now, now,  # 根据规则判断是否为锚点单
                           lever, margin, mark_price, profit_rate, upl, now))
                     synced_count += 1
             
