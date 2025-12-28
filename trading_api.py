@@ -1597,16 +1597,29 @@ def close_anchor_position():
         keep_nominal = keep_margin * leverage  # 保留的名义价值
         
         # 计算需要平仓的金额
-        close_nominal = current_nominal - keep_nominal  # 平掉的名义价值
-        close_margin = close_nominal / leverage  # 平掉的保证金
-        close_size = close_nominal / position_info['open_price']  # 平仓数量
-        
-        if close_nominal <= 0:
-            conn.close()
-            return jsonify({
-                'success': False, 
-                'error': f'当前持仓名义价值({current_nominal:.2f}U)已小于等于要保留的名义价值({keep_nominal:.2f}U)'
-            })
+        # 计算要平掉的部分
+        # 如果当前名义价值 < 10U，则全部平仓（旧的小额持仓）
+        if current_nominal < 10.0:
+            close_nominal = current_nominal
+            close_margin = current_margin
+            close_size = total_size
+            keep_nominal = 0
+            keep_margin = 0
+            new_size = 0
+            is_full_close = True
+        else:
+            # 标准流程：保留10U名义（1U保证金）
+            close_nominal = current_nominal - keep_nominal  # 平掉的名义价值
+            close_margin = close_nominal / leverage  # 平掉的保证金
+            close_size = close_nominal / position_info['open_price']  # 平仓数量
+            is_full_close = False
+            
+            if close_nominal <= 0:
+                conn.close()
+                return jsonify({
+                    'success': False, 
+                    'error': f'当前持仓名义价值({current_nominal:.2f}U)已小于等于要保留的名义价值({keep_nominal:.2f}U)'
+                })
         
         # 获取当前市场价格（尝试从crypto_data.db获取）
         current_market_price = position_info['open_price']  # 默认用开仓价
@@ -1644,16 +1657,24 @@ def close_anchor_position():
         
         # === 开始数据库更新 ===
         
-        # 1. 更新position_opens表（减少持仓数量）
-        new_size = keep_nominal / position_info['open_price']
-        cursor.execute('''
-            UPDATE position_opens
-            SET open_size = ?,
-                updated_time = ?
-            WHERE id = ?
-        ''', (new_size, timestamp, position_id))
+        # 1. 更新或删除position_opens表
+        if is_full_close:
+            # 全部平仓：删除记录
+            cursor.execute('''
+                DELETE FROM position_opens
+                WHERE id = ?
+            ''', (position_id,))
+        else:
+            # 部分平仓：减少持仓数量
+            cursor.execute('''
+                UPDATE position_opens
+                SET open_size = ?,
+                    updated_time = ?
+                WHERE id = ?
+            ''', (new_size, timestamp, position_id))
         
         # 2. 记录平仓到position_closes表
+        close_reason = f'手动全部平仓（持仓过小<10U）' if is_full_close else f'手动平仓保留{keep_amount}U保证金（{keep_nominal:.2f}U名义）'
         cursor.execute('''
             INSERT INTO position_closes 
             (inst_id, pos_side, close_size, close_price, close_reason, 
@@ -1664,7 +1685,7 @@ def close_anchor_position():
             position_info['pos_side'],
             close_size,
             current_market_price,
-            f'手动平仓保留{keep_amount}U保证金（{keep_nominal:.2f}U名义）',
+            close_reason,
             round(profit_rate, 2),
             round(unrealized_pnl, 4),
             timestamp
@@ -1720,7 +1741,7 @@ def close_anchor_position():
             (close_size / total_size * 100) if total_size > 0 else 0,
             profit_rate,
             current_market_price,
-            f'手动平仓锚点单，保留{keep_amount}U保证金。盈亏: {unrealized_pnl:.2f}U',
+            f'手动平仓锚点单，{"全部平仓（持仓过小<10U）" if is_full_close else f"保留{keep_amount}U保证金"}。盈亏: {unrealized_pnl:.2f}U',
             1,
             timestamp,
             timestamp
@@ -1731,7 +1752,8 @@ def close_anchor_position():
         
         return jsonify({
             'success': True,
-            'message': '✅ 手动平仓成功并更新数据库',
+            'message': '✅ 手动全部平仓成功' if is_full_close else '✅ 手动平仓成功并更新数据库',
+            'is_full_close': is_full_close,
             'position_id': position_id,
             'inst_id': position_info['inst_id'],
             'pos_side': position_info['pos_side'],

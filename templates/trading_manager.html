@@ -2214,7 +2214,11 @@
             .then(res => res.json())
             .then(data => {
                 if (data.success) {
-                    alert(`✅ 平仓成功！\n\n币种: ${data.inst_id}\n原始保证金: ${data.original_margin} USDT\n平仓保证金: ${data.closed_margin} USDT\n保留保证金: ${data.keep_margin} USDT\n保留名义: ${data.keep_nominal} USDT\n\n${data.note}`);
+                    const message = data.is_full_close ? 
+                        `✅ 全部平仓成功！\n\n币种: ${data.inst_id}\n原因: 持仓过小(<10U)\n原始名义: ${data.original_nominal} USDT\n原始保证金: ${data.original_margin} USDT\n盈亏率: ${data.profit_rate}%\n实际盈亏: ${data.unrealized_pnl} USDT\n\n持仓已完全清除` :
+                        `✅ 平仓成功！\n\n币种: ${data.inst_id}\n原始保证金: ${data.original_margin} USDT\n平仓保证金: ${data.closed_margin} USDT\n保留保证金: ${data.keep_margin} USDT\n保留名义: ${data.keep_nominal} USDT\n盈亏率: ${data.profit_rate}%\n实际盈亏: ${data.unrealized_pnl} USDT`;
+                    
+                    alert(message);
                     
                     // 刷新数据
                     loadAnchors();
