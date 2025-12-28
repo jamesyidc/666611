@@ -1612,6 +1612,7 @@ def close_anchor_position():
             close_nominal = current_nominal - keep_nominal  # 平掉的名义价值
             close_margin = close_nominal / leverage  # 平掉的保证金
             close_size = close_nominal / position_info['open_price']  # 平仓数量
+            new_size = keep_nominal / position_info['open_price']  # 保留的数量
             is_full_close = False
             
             if close_nominal <= 0:
