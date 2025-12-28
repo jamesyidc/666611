@@ -12321,14 +12321,8 @@ def trading_maintenance_api():
 
 @app.route('/dashboard')
 def dashboard():
-    """实时监控仪表板"""
-    try:
-        with open('/home/user/webapp/templates/dashboard.html', 'r', encoding='utf-8') as f:
-            return f.read()
-    except FileNotFoundError:
-        return "Dashboard template not found", 404
-    except Exception as e:
-        return f"Error loading dashboard: {str(e)}", 500
+    """实时监控仪表板 - 重定向到统一管理页面"""
+    return redirect('/trading-manager')
 
 @app.route('/trading-manager')
 def trading_manager():
