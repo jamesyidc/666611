@@ -1004,7 +1004,7 @@
                                 </div>
                                 
                                 <div class="stat-box">
-                                    <div class="stat-value">${stats.position_opens.total_size.toFixed(2)}</div>
+                                    <div class="stat-value">${stats.position_opens.total_nominal.toFixed(2)}</div>
                                     <div class="stat-label">开仓总额 (USDT)</div>
                                 </div>
                                 
@@ -1014,13 +1014,43 @@
                                 </div>
                                 
                                 <div class="stat-box">
-                                    <div class="stat-value">${stats.position_adds.total_size.toFixed(2)}</div>
+                                    <div class="stat-value">${stats.position_adds.total_nominal.toFixed(2)}</div>
                                     <div class="stat-label">补仓总额 (USDT)</div>
+                                </div>
+                                
+                                <div class="stat-box">
+                                    <div class="stat-value" style="color: ${stats.unrealized_pnl >= 0 ? '#10b981' : '#ef4444'}">${stats.unrealized_pnl >= 0 ? '+' : ''}${stats.unrealized_pnl.toFixed(2)}</div>
+                                    <div class="stat-label">未平仓盈亏 (USDT)</div>
+                                </div>
+                                
+                                <div class="stat-box">
+                                    <div class="stat-value">${stats.stop_profit.toFixed(2)}</div>
+                                    <div class="stat-label">止盈金额 (USDT)</div>
+                                </div>
+                                
+                                <div class="stat-box">
+                                    <div class="stat-value">${stats.stop_loss.toFixed(2)}</div>
+                                    <div class="stat-label">止损金额 (USDT)</div>
+                                </div>
+                                
+                                <div class="stat-box">
+                                    <div class="stat-value" style="color: #f59e0b;">${stats.anchor_positions.count}</div>
+                                    <div class="stat-label">锚点单数量</div>
+                                </div>
+                                
+                                <div class="stat-box">
+                                    <div class="stat-value" style="color: #f59e0b;">${stats.anchor_positions.total_nominal.toFixed(2)}</div>
+                                    <div class="stat-label">锚点单开单金额 (USDT)</div>
                                 </div>
                                 
                                 <div class="stat-box">
                                     <div class="stat-value">${(stats.pending_orders.pending || 0)}</div>
                                     <div class="stat-label">待触发挂单</div>
+                                </div>
+                                
+                                <div class="stat-box">
+                                    <div class="stat-value">${stats.position_opens.total_margin.toFixed(2)}</div>
+                                    <div class="stat-label">保证金占用 (USDT)</div>
                                 </div>
                                 
                                 <div class="stat-box">
