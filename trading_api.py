@@ -173,11 +173,12 @@ def get_position_opens():
             try:
                 crypto_conn = sqlite3.connect('/home/user/webapp/crypto_data.db', timeout=5.0)
                 crypto_cursor = crypto_conn.cursor()
-                symbol = record['inst_id'].replace('-SWAP', '')
+                # 转换symbol格式: LDO-USDT-SWAP -> LDOUSDT
+                symbol = record['inst_id'].replace('-USDT-SWAP', 'USDT')
                 crypto_cursor.execute('''
-                    SELECT last_price FROM ticker 
+                    SELECT current_price FROM support_resistance_levels 
                     WHERE symbol = ? 
-                    ORDER BY timestamp DESC LIMIT 1
+                    ORDER BY record_time DESC LIMIT 1
                 ''', (symbol,))
                 price_row = crypto_cursor.fetchone()
                 if price_row and price_row[0]:
