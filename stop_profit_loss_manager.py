@@ -149,16 +149,21 @@ class StopProfitLossManager:
         conn.row_factory = sqlite3.Row
         cursor = conn.cursor()
         
+        # 直接使用同步的数据，包括mark_price和profit_rate
         cursor.execute('''
             SELECT 
                 inst_id,
                 pos_side,
-                SUM(open_size) as total_size,
-                SUM(open_size * open_price) / SUM(open_size) as avg_price,
-                MAX(open_time) as latest_open_time
+                open_size as total_size,
+                open_price as avg_price,
+                mark_price,
+                profit_rate,
+                upl,
+                lever,
+                margin,
+                timestamp as latest_open_time
             FROM position_opens
-            WHERE status = 'open'
-            GROUP BY inst_id, pos_side
+            ORDER BY timestamp DESC
         ''')
         
         positions = [dict(row) for row in cursor.fetchall()]
@@ -176,7 +181,7 @@ class StopProfitLossManager:
             SELECT open_price
             FROM position_opens
             WHERE inst_id = ?
-            ORDER BY open_time DESC
+            ORDER BY timestamp DESC
             LIMIT 1
         ''', (inst_id,))
         
@@ -256,13 +261,19 @@ class StopProfitLossManager:
             avg_price = pos['avg_price']
             total_size = pos['total_size']
             
-            # 获取当前价格
-            current_price = self.get_current_price(inst_id)
+            # 使用同步的mark_price和profit_rate
+            current_price = pos.get('mark_price')
+            profit_rate = pos.get('profit_rate')
+            
+            # 如果没有同步数据，尝试获取
+            if not current_price:
+                current_price = self.get_current_price(inst_id)
             if not current_price:
                 continue
             
-            # 计算盈亏率
-            profit_rate = self.calculate_profit_rate(pos_side, avg_price, current_price)
+            # 如果没有profit_rate，计算它
+            if profit_rate is None:
+                profit_rate = self.calculate_profit_rate(pos_side, avg_price, current_price)
             
             decision_log = []
             
