@@ -806,7 +806,8 @@
                     loadAddDecisionLogs();
                     break;
                 case 'orders':
-                    loadProtectOrders();
+                    loadConditionalOrders();  // 加载条件单
+                    loadProtectOrders();       // 加载保护挂单
                     break;
             }
         }
