@@ -326,10 +326,17 @@ class AnchorAutoOpener:
         # 计算当前盈亏率
         open_price = anchor_info['open_price']
         current_price = signal['current_price']
-        profit_rate = ((open_price - current_price) / open_price) * 100  # 做空
+        
+        # 🔴 重要：10倍杠杆下的盈亏计算
+        # 做空：价格上涨1% → 亏损10%（1% × 10倍杠杆）
+        # 做空：价格下跌1% → 盈利10%（1% × 10倍杠杆）
+        price_change_rate = ((current_price - open_price) / open_price) * 100  # 价格变动%
+        leverage = 10  # 10倍杠杆
+        profit_rate = -price_change_rate * leverage  # 做空：价格涨→亏损，价格跌→盈利
         
         result['decision_log'].append(f"📊 已有锚点单: 开仓价={open_price:.4f}, 当前价={current_price:.4f}")
-        result['decision_log'].append(f"📊 当前盈亏率: {profit_rate:.2f}%")
+        result['decision_log'].append(f"📊 价格变动: {price_change_rate:+.2f}%")
+        result['decision_log'].append(f"📊 杠杆盈亏率: {profit_rate:+.2f}% (10倍杠杆)")  
         
         # 检查是否需要补仓
         if not RULES['check_add_position']:
@@ -378,7 +385,7 @@ class AnchorAutoOpener:
                 result['action'] = 'add_position_ready'
                 result['reason'] = f"🔄 准备补仓: {add_amount} USDT (原{original_amount} USDT × 10倍)"
                 result['decision_log'].append(f"🔄 执行补仓: {add_amount} USDT")
-                result['decision_log'].append(f"📝 补仓后需立即平掉95%")
+                result['decision_log'].append(f"📝 补仓后需立即平掉100 USDT，保留10 USDT名义（1U保证金）")
                 
                 self.record_trigger(inst_id, 'maintain', signal, 'add_position_ready', result['reason'], add_amount)
                 print(f"🔄 {inst_id} 满足补仓条件: 盈亏 {profit_rate:.2f}%, 补仓 {add_amount} USDT")

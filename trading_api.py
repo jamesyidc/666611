@@ -1506,4 +1506,128 @@ def get_anchor_trigger_logs():
         import traceback
         traceback.print_exc()
         return jsonify({'success': False, 'error': str(e)})
+
+@trading_bp.route('/anchor/close-position', methods=['POST'])
+def close_anchor_position():
+    """手动平仓锚点单（保留1U）
+    
+    请求参数:
+    {
+        "id": 123,  # position_opens表的ID
+        "keep_amount": 1.0  # 保留的保证金金额（USDT），默认1.0
+    }
+    
+    返回:
+    {
+        "success": true,
+        "message": "手动平仓成功",
+        "position_id": 123,
+        "inst_id": "BTC-USDT-SWAP",
+        "original_margin": 10.0,
+        "closed_margin": 9.0,
+        "keep_margin": 1.0,
+        "keep_nominal": 10.0
+    }
+    """
+    try:
+        data = request.get_json()
+        position_id = data.get('id')
+        keep_amount = data.get('keep_amount', 1.0)  # 默认保留1U保证金
+        
+        if not position_id:
+            return jsonify({'success': False, 'error': '缺少position_id参数'})
+        
+        conn = sqlite3.connect(DB_PATH, timeout=10.0)
+        cursor = conn.cursor()
+        
+        # 查询锚点单信息
+        cursor.execute('''
+            SELECT id, inst_id, pos_side, open_size, open_price, 
+                   open_percent, is_anchor, created_at
+            FROM position_opens
+            WHERE id = ? AND is_anchor = 1
+        ''', (position_id,))
+        
+        row = cursor.fetchone()
+        if not row:
+            conn.close()
+            return jsonify({'success': False, 'error': '未找到该锚点单或该单不是锚点单'})
+        
+        position_info = {
+            'id': row[0],
+            'inst_id': row[1],
+            'pos_side': row[2],
+            'open_size': row[3],
+            'open_price': row[4],
+            'open_percent': row[5],
+            'is_anchor': row[6],
+            'created_at': row[7]
+        }
+        
+        # 计算当前名义价值和保证金
+        leverage = 10  # 10倍杠杆
+        current_nominal = position_info['open_size'] * position_info['open_price']  # 当前名义价值
+        current_margin = current_nominal / leverage  # 当前保证金
+        
+        # 计算需要保留的名义价值
+        keep_margin = keep_amount  # 保留的保证金
+        keep_nominal = keep_margin * leverage  # 保留的名义价值
+        
+        # 计算需要平仓的金额
+        close_nominal = current_nominal - keep_nominal  # 平掉的名义价值
+        close_margin = close_nominal / leverage  # 平掉的保证金
+        
+        if close_nominal <= 0:
+            conn.close()
+            return jsonify({
+                'success': False, 
+                'error': f'当前持仓名义价值({current_nominal:.2f}U)已小于等于要保留的名义价值({keep_nominal:.2f}U)'
+            })
+        
+        # 执行平仓操作（这里只是记录操作，实际平仓需要调用OKX API）
+        # TODO: 实际环境需要调用OKX API进行平仓
+        
+        # 更新数据库记录（减少open_size）
+        new_size = (keep_nominal / position_info['open_price'])
+        cursor.execute('''
+            UPDATE position_opens
+            SET open_size = ?,
+                updated_at = datetime('now', '+8 hours')
+            WHERE id = ?
+        ''', (new_size, position_id))
+        
+        # 记录平仓历史
+        cursor.execute('''
+            INSERT INTO position_closes 
+            (inst_id, pos_side, close_size, close_price, close_reason, created_at)
+            VALUES (?, ?, ?, ?, ?, datetime('now', '+8 hours'))
+        ''', (
+            position_info['inst_id'],
+            position_info['pos_side'],
+            (close_nominal / position_info['open_price']),  # 平仓数量
+            position_info['open_price'],
+            f'手动平仓保留{keep_amount}U'
+        ))
+        
+        conn.commit()
+        conn.close()
+        
+        return jsonify({
+            'success': True,
+            'message': '手动平仓成功',
+            'position_id': position_id,
+            'inst_id': position_info['inst_id'],
+            'original_nominal': round(current_nominal, 2),
+            'original_margin': round(current_margin, 2),
+            'closed_nominal': round(close_nominal, 2),
+            'closed_margin': round(close_margin, 2),
+            'keep_nominal': round(keep_nominal, 2),
+            'keep_margin': round(keep_margin, 2),
+            'new_size': round(new_size, 4),
+            'note': '⚠️ 此操作仅更新数据库，实际平仓需要调用OKX API'
+        })
+        
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
         return jsonify({'success': False, 'error': str(e)})
