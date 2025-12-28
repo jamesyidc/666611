@@ -212,8 +212,144 @@
         
         <!-- 止盈止损 -->
         <div id="stop-profit-loss-tab" class="tab-content">
+            <!-- 止盈规则说明 -->
+            <div class="card" style="background: linear-gradient(135deg, #fef3c7 0%, #fde68a 100%); border-left: 4px solid #f59e0b; margin-bottom: 20px;">
+                <h2 style="color: #92400e;">📋 止盈止损规则说明</h2>
+                <p style="color: #78350f; margin-bottom: 15px; font-size: 0.95em;">
+                    ⚙️ 根据<strong>市场配置</strong>和<strong>仓位方向</strong>自动选择合适的止盈规则
+                </p>
+                
+                <!-- 空单止盈规则 -->
+                <div style="margin-bottom: 20px; padding: 15px; background: white; border-radius: 8px; border: 1px solid #fbbf24;">
+                    <h3 style="color: #dc2626; margin-top: 0; margin-bottom: 15px; font-size: 1.1em;">
+                        🔻 空单止盈规则
+                    </h3>
+                    
+                    <!-- 允许开多单（保守） -->
+                    <div style="margin-bottom: 15px; padding: 12px; background: #fef2f2; border-radius: 6px; border-left: 3px solid #ef4444;">
+                        <h4 style="color: #b91c1c; margin: 0 0 10px 0; font-size: 1em;">
+                            场景1：允许开多单（市场看空不强烈）- 保守止盈
+                        </h4>
+                        <table style="width: 100%; font-size: 0.9em; margin-top: 10px;">
+                            <thead>
+                                <tr style="background: #fee2e2;">
+                                    <th style="padding: 8px; text-align: center; color: #991b1b;">盈利率</th>
+                                    <th style="padding: 8px; text-align: center; color: #991b1b;">止盈比例</th>
+                                    <th style="padding: 8px; text-align: center; color: #991b1b;">保留仓位</th>
+                                    <th style="padding: 8px; text-align: left; color: #991b1b;">说明</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr><td style="text-align: center; padding: 6px;">10%</td><td style="text-align: center; color: #dc2626; font-weight: bold;">20%</td><td style="text-align: center;">80%</td><td>止盈剩余总仓位的20%</td></tr>
+                                <tr><td style="text-align: center; padding: 6px;">20%</td><td style="text-align: center; color: #dc2626; font-weight: bold;">25%</td><td style="text-align: center;">75%</td><td>止盈剩余总仓位的25%</td></tr>
+                                <tr><td style="text-align: center; padding: 6px;">30%</td><td style="text-align: center; color: #dc2626; font-weight: bold;">35%</td><td style="text-align: center;">65%</td><td>止盈剩余总仓位的35%</td></tr>
+                                <tr><td style="text-align: center; padding: 6px;">40%</td><td style="text-align: center; color: #dc2626; font-weight: bold;">75%</td><td style="text-align: center;">25%</td><td>止盈剩余总仓位的75%</td></tr>
+                                <tr style="background: #fef3c7;"><td style="text-align: center; padding: 6px; font-weight: bold;">50%</td><td style="text-align: center; color: #dc2626; font-weight: bold;">全部-2U</td><td style="text-align: center; font-weight: bold;">2U</td><td style="font-weight: bold;">留2U底仓，其他全部止盈</td></tr>
+                            </tbody>
+                        </table>
+                        <p style="margin-top: 10px; color: #7c2d12; font-size: 0.85em;">
+                            💡 <strong>示例</strong>：初始100U → 盈利10%止盈20U(剩80U) → 盈利20%止盈20U(剩60U) → 盈利30%止盈21U(剩39U) → 盈利40%止盈29.25U(剩9.75U) → 盈利50%止盈7.75U(剩2U)
+                        </p>
+                    </div>
+                    
+                    <!-- 不允许开多单（激进） -->
+                    <div style="padding: 12px; background: #fef2f2; border-radius: 6px; border-left: 3px solid #dc2626;">
+                        <h4 style="color: #991b1b; margin: 0 0 10px 0; font-size: 1em;">
+                            场景2：不允许开多单（市场强烈看空）- 激进止盈
+                        </h4>
+                        <table style="width: 100%; font-size: 0.9em; margin-top: 10px;">
+                            <thead>
+                                <tr style="background: #fee2e2;">
+                                    <th style="padding: 8px; text-align: center; color: #991b1b;">盈利率</th>
+                                    <th style="padding: 8px; text-align: center; color: #991b1b;">止盈比例</th>
+                                    <th style="padding: 8px; text-align: center; color: #991b1b;">保留仓位</th>
+                                    <th style="padding: 8px; text-align: left; color: #991b1b;">说明</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr style="background: #fffbeb;"><td style="text-align: center; padding: 6px; font-weight: bold;">5%</td><td style="text-align: center; color: #dc2626; font-weight: bold;">25%</td><td style="text-align: center;">75%</td><td>⭐ 更早止盈</td></tr>
+                                <tr><td style="text-align: center; padding: 6px;">10%</td><td style="text-align: center; color: #dc2626; font-weight: bold;">30%</td><td style="text-align: center;">70%</td><td>止盈剩余总仓位的30%</td></tr>
+                                <tr><td style="text-align: center; padding: 6px;">20%</td><td style="text-align: center; color: #dc2626; font-weight: bold;">40%</td><td style="text-align: center;">60%</td><td>止盈剩余总仓位的40%</td></tr>
+                                <tr><td style="text-align: center; padding: 6px;">30%</td><td style="text-align: center; color: #dc2626; font-weight: bold;">50%</td><td style="text-align: center;">50%</td><td>止盈剩余总仓位的50%</td></tr>
+                                <tr><td style="text-align: center; padding: 6px;">40%</td><td style="text-align: center; color: #dc2626; font-weight: bold;">75%</td><td style="text-align: center;">25%</td><td>止盈剩余总仓位的75%</td></tr>
+                                <tr style="background: #fef3c7;"><td style="text-align: center; padding: 6px; font-weight: bold;">50%</td><td style="text-align: center; color: #dc2626; font-weight: bold;">全部-2U</td><td style="text-align: center; font-weight: bold;">2U</td><td style="font-weight: bold;">留2U底仓，其他全部止盈</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+                
+                <!-- 多单止盈规则 -->
+                <div style="padding: 15px; background: white; border-radius: 8px; border: 1px solid #fbbf24;">
+                    <h3 style="color: #16a34a; margin-top: 0; margin-bottom: 15px; font-size: 1.1em;">
+                        🔺 多单止盈规则
+                    </h3>
+                    
+                    <!-- 允许开多单（激进） -->
+                    <div style="margin-bottom: 15px; padding: 12px; background: #f0fdf4; border-radius: 6px; border-left: 3px solid #22c55e;">
+                        <h4 style="color: #15803d; margin: 0 0 10px 0; font-size: 1em;">
+                            场景1：允许开多单（市场看多强烈）- 激进止盈
+                        </h4>
+                        <table style="width: 100%; font-size: 0.9em; margin-top: 10px;">
+                            <thead>
+                                <tr style="background: #dcfce7;">
+                                    <th style="padding: 8px; text-align: center; color: #166534;">盈利率</th>
+                                    <th style="padding: 8px; text-align: center; color: #166534;">止盈比例</th>
+                                    <th style="padding: 8px; text-align: center; color: #166534;">保留仓位</th>
+                                    <th style="padding: 8px; text-align: left; color: #166534;">说明</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr><td style="text-align: center; padding: 6px;">10%</td><td style="text-align: center; color: #16a34a; font-weight: bold;">20%</td><td style="text-align: center;">80%</td><td>止盈剩余总仓位的20%</td></tr>
+                                <tr><td style="text-align: center; padding: 6px;">20%</td><td style="text-align: center; color: #16a34a; font-weight: bold;">50%</td><td style="text-align: center;">50%</td><td>止盈剩余总仓位的50%</td></tr>
+                                <tr><td style="text-align: center; padding: 6px;">30%</td><td style="text-align: center; color: #16a34a; font-weight: bold;">75%</td><td style="text-align: center;">25%</td><td>止盈剩余总仓位的75%</td></tr>
+                                <tr style="background: #fef3c7;"><td style="text-align: center; padding: 6px; font-weight: bold;">40%</td><td style="text-align: center; color: #16a34a; font-weight: bold;">100%</td><td style="text-align: center; font-weight: bold;">0</td><td style="font-weight: bold;">⭐ 全部止盈，不留底仓</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+                    
+                    <!-- 不允许开多单（更激进） -->
+                    <div style="padding: 12px; background: #f0fdf4; border-radius: 6px; border-left: 3px solid #16a34a;">
+                        <h4 style="color: #166534; margin: 0 0 10px 0; font-size: 1em;">
+                            场景2：不允许开多单（市场看多不强烈）- 更激进止盈
+                        </h4>
+                        <table style="width: 100%; font-size: 0.9em; margin-top: 10px;">
+                            <thead>
+                                <tr style="background: #dcfce7;">
+                                    <th style="padding: 8px; text-align: center; color: #166534;">盈利率</th>
+                                    <th style="padding: 8px; text-align: center; color: #166534;">止盈比例</th>
+                                    <th style="padding: 8px; text-align: center; color: #166534;">保留仓位</th>
+                                    <th style="padding: 8px; text-align: left; color: #166534;">说明</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr style="background: #fffbeb;"><td style="text-align: center; padding: 6px; font-weight: bold;">5%</td><td style="text-align: center; color: #16a34a; font-weight: bold;">25%</td><td style="text-align: center;">75%</td><td>⭐ 更早止盈</td></tr>
+                                <tr><td style="text-align: center; padding: 6px;">10%</td><td style="text-align: center; color: #16a34a; font-weight: bold;">50%</td><td style="text-align: center;">50%</td><td>止盈剩余总仓位的50%</td></tr>
+                                <tr><td style="text-align: center; padding: 6px;">20%</td><td style="text-align: center; color: #16a34a; font-weight: bold;">75%</td><td style="text-align: center;">25%</td><td>止盈剩余总仓位的75%</td></tr>
+                                <tr><td style="text-align: center; padding: 6px;">30%</td><td style="text-align: center; color: #16a34a; font-weight: bold;">75%</td><td style="text-align: center;">25%</td><td>止盈剩余总仓位的75%</td></tr>
+                                <tr style="background: #fef3c7;"><td style="text-align: center; padding: 6px; font-weight: bold;">40%</td><td style="text-align: center; color: #16a34a; font-weight: bold;">100%</td><td style="text-align: center; font-weight: bold;">0</td><td style="font-weight: bold;">⭐ 全部止盈，不留底仓</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+                
+                <!-- 规则特点 -->
+                <div style="margin-top: 15px; padding: 12px; background: #e0f2fe; border-radius: 6px; border-left: 3px solid #0284c7;">
+                    <h4 style="color: #075985; margin: 0 0 10px 0; font-size: 1em;">
+                        🎯 规则特点
+                    </h4>
+                    <ul style="margin: 0; padding-left: 20px; color: #0c4a6e; font-size: 0.9em; line-height: 1.8;">
+                        <li><strong>分级止盈</strong>：随着盈利增加，逐步止盈锁定利润</li>
+                        <li><strong>动态调整</strong>：根据市场配置(allow_long)自动切换规则</li>
+                        <li><strong>累积计算</strong>：每次止盈基于剩余仓位计算，不是初始仓位</li>
+                        <li><strong>保底机制</strong>：空单50%盈利留2U底仓，多单40%全部止盈</li>
+                        <li><strong>⚠️ 锚点单例外</strong>：锚点单不做止盈止损，只做维护（亏损≥10%触发）</li>
+                    </ul>
+                </div>
+            </div>
+            
+            <!-- 止盈止损监控 -->
             <div class="card" style="background: linear-gradient(135deg, #d1fae5 0%, #a7f3d0 100%); border-left: 4px solid #10b981;">
-                <h2 style="color: #047857;">💰 止盈止损管理</h2>
+                <h2 style="color: #047857;">💰 止盈止损监控</h2>
                 <p style="color: #065f46; margin-bottom: 15px; font-size: 0.95em;">
                     📊 自动监控仓位盈亏，按规则分批止盈止损
                 </p>
