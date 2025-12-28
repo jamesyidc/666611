@@ -1705,14 +1705,24 @@ def close_anchor_position():
         
         cursor.execute('''
             INSERT INTO trading_decisions
-            (inst_id, decision_type, decision, reason, details, created_at)
-            VALUES (?, ?, ?, ?, ?, ?)
+            (inst_id, pos_side, action, decision_type, current_size, target_size, 
+             close_size, close_percent, profit_rate, current_price, reason, 
+             executed, timestamp, created_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         ''', (
             position_info['inst_id'],
+            position_info['pos_side'],
+            'close',
             'manual_close',
-            'executed',
-            f'手动平仓锚点单，保留{keep_amount}U保证金',
-            str(decision_log),
+            total_size,
+            new_size,
+            close_size,
+            (close_size / total_size * 100) if total_size > 0 else 0,
+            profit_rate,
+            current_market_price,
+            f'手动平仓锚点单，保留{keep_amount}U保证金。盈亏: {unrealized_pnl:.2f}U',
+            1,
+            timestamp,
             timestamp
         ))
         
