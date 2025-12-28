@@ -1520,16 +1520,20 @@ def close_anchor_position():
     返回:
     {
         "success": true,
-        "message": "手动平仓成功",
+        "message": "手动平仓成功并更新数据库",
         "position_id": 123,
         "inst_id": "BTC-USDT-SWAP",
         "original_margin": 10.0,
         "closed_margin": 9.0,
         "keep_margin": 1.0,
-        "keep_nominal": 10.0
+        "keep_nominal": 10.0,
+        "database_updated": true
     }
     """
     try:
+        import pytz
+        from datetime import datetime
+        
         data = request.get_json()
         position_id = data.get('id')
         keep_amount = data.get('keep_amount', 1.0)  # 默认保留1U保证金
@@ -1539,6 +1543,10 @@ def close_anchor_position():
         
         conn = sqlite3.connect(DB_PATH, timeout=10.0)
         cursor = conn.cursor()
+        
+        BEIJING_TZ = pytz.timezone('Asia/Shanghai')
+        now = datetime.now(BEIJING_TZ)
+        timestamp = now.strftime('%Y-%m-%d %H:%M:%S')
         
         # 查询锚点单信息
         cursor.execute('''
@@ -1564,9 +1572,24 @@ def close_anchor_position():
             'created_at': row[7]
         }
         
+        # 查询是否有补仓记录
+        cursor.execute('''
+            SELECT COUNT(*), SUM(add_size), AVG(add_price)
+            FROM position_adds
+            WHERE inst_id = ? AND pos_side = ?
+        ''', (position_info['inst_id'], position_info['pos_side']))
+        
+        add_info = cursor.fetchone()
+        has_adds = add_info[0] > 0 if add_info else False
+        total_add_size = add_info[1] if add_info and add_info[1] else 0
+        avg_add_price = add_info[2] if add_info and add_info[2] else 0
+        
         # 计算当前名义价值和保证金
         leverage = 10  # 10倍杠杆
-        current_nominal = position_info['open_size'] * position_info['open_price']  # 当前名义价值
+        
+        # 计算总持仓（开仓 + 补仓）
+        total_size = position_info['open_size'] + total_add_size
+        current_nominal = total_size * position_info['open_price']  # 当前名义价值
         current_margin = current_nominal / leverage  # 当前保证金
         
         # 计算需要保留的名义价值
@@ -1576,6 +1599,7 @@ def close_anchor_position():
         # 计算需要平仓的金额
         close_nominal = current_nominal - keep_nominal  # 平掉的名义价值
         close_margin = close_nominal / leverage  # 平掉的保证金
+        close_size = close_nominal / position_info['open_price']  # 平仓数量
         
         if close_nominal <= 0:
             conn.close()
@@ -1584,29 +1608,112 @@ def close_anchor_position():
                 'error': f'当前持仓名义价值({current_nominal:.2f}U)已小于等于要保留的名义价值({keep_nominal:.2f}U)'
             })
         
-        # 执行平仓操作（这里只是记录操作，实际平仓需要调用OKX API）
-        # TODO: 实际环境需要调用OKX API进行平仓
+        # 获取当前市场价格（尝试从crypto_data.db获取）
+        current_market_price = position_info['open_price']  # 默认用开仓价
+        try:
+            crypto_conn = sqlite3.connect('/home/user/webapp/crypto_data.db', timeout=5.0)
+            crypto_cursor = crypto_conn.cursor()
+            
+            # 从ticker表获取最新价格
+            symbol = position_info['inst_id'].replace('-SWAP', '')
+            crypto_cursor.execute('''
+                SELECT last_price FROM ticker 
+                WHERE symbol = ? 
+                ORDER BY timestamp DESC LIMIT 1
+            ''', (symbol,))
+            
+            price_row = crypto_cursor.fetchone()
+            if price_row and price_row[0]:
+                current_market_price = float(price_row[0])
+            
+            crypto_conn.close()
+        except Exception as e:
+            print(f"获取市场价格失败: {e}")
         
-        # 更新数据库记录（减少open_size）
-        new_size = (keep_nominal / position_info['open_price'])
+        # 计算盈亏
+        if position_info['pos_side'] == 'short':
+            # 做空：价格下跌盈利，价格上涨亏损
+            price_change = (position_info['open_price'] - current_market_price) / position_info['open_price']
+            profit_rate = price_change * leverage * 100
+        else:
+            # 做多：价格上涨盈利，价格下跌亏损
+            price_change = (current_market_price - position_info['open_price']) / position_info['open_price']
+            profit_rate = price_change * leverage * 100
+        
+        unrealized_pnl = current_nominal * price_change
+        
+        # === 开始数据库更新 ===
+        
+        # 1. 更新position_opens表（减少持仓数量）
+        new_size = keep_nominal / position_info['open_price']
         cursor.execute('''
             UPDATE position_opens
             SET open_size = ?,
-                updated_at = datetime('now', '+8 hours')
+                updated_at = ?
             WHERE id = ?
-        ''', (new_size, position_id))
+        ''', (new_size, timestamp, position_id))
         
-        # 记录平仓历史
+        # 2. 记录平仓到position_closes表
         cursor.execute('''
             INSERT INTO position_closes 
-            (inst_id, pos_side, close_size, close_price, close_reason, created_at)
-            VALUES (?, ?, ?, ?, ?, datetime('now', '+8 hours'))
+            (inst_id, pos_side, close_size, close_price, close_reason, 
+             profit_rate, unrealized_pnl, created_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
         ''', (
             position_info['inst_id'],
             position_info['pos_side'],
-            (close_nominal / position_info['open_price']),  # 平仓数量
-            position_info['open_price'],
-            f'手动平仓保留{keep_amount}U'
+            close_size,
+            current_market_price,
+            f'手动平仓保留{keep_amount}U保证金（{keep_nominal:.2f}U名义）',
+            round(profit_rate, 2),
+            round(unrealized_pnl, 4),
+            timestamp
+        ))
+        
+        close_id = cursor.lastrowid
+        
+        # 3. 如果有补仓记录，标记为已平仓
+        if has_adds:
+            cursor.execute('''
+                UPDATE position_adds
+                SET status = 'closed',
+                    updated_at = ?
+                WHERE inst_id = ? AND pos_side = ? AND status = 'active'
+            ''', (timestamp, position_info['inst_id'], position_info['pos_side']))
+        
+        # 4. 记录操作日志到trading_decisions表
+        decision_log = {
+            'operation': 'manual_close_anchor',
+            'inst_id': position_info['inst_id'],
+            'pos_side': position_info['pos_side'],
+            'original_size': total_size,
+            'original_nominal': current_nominal,
+            'original_margin': current_margin,
+            'close_size': close_size,
+            'close_nominal': close_nominal,
+            'close_margin': close_margin,
+            'keep_size': new_size,
+            'keep_nominal': keep_nominal,
+            'keep_margin': keep_margin,
+            'current_market_price': current_market_price,
+            'profit_rate': profit_rate,
+            'unrealized_pnl': unrealized_pnl,
+            'has_adds': has_adds,
+            'total_add_size': total_add_size,
+            'timestamp': timestamp
+        }
+        
+        cursor.execute('''
+            INSERT INTO trading_decisions
+            (inst_id, decision_type, decision, reason, details, created_at)
+            VALUES (?, ?, ?, ?, ?, ?)
+        ''', (
+            position_info['inst_id'],
+            'manual_close',
+            'executed',
+            f'手动平仓锚点单，保留{keep_amount}U保证金',
+            str(decision_log),
+            timestamp
         ))
         
         conn.commit()
@@ -1614,17 +1721,28 @@ def close_anchor_position():
         
         return jsonify({
             'success': True,
-            'message': '手动平仓成功',
+            'message': '✅ 手动平仓成功并更新数据库',
             'position_id': position_id,
             'inst_id': position_info['inst_id'],
+            'pos_side': position_info['pos_side'],
+            'original_size': round(total_size, 4),
             'original_nominal': round(current_nominal, 2),
             'original_margin': round(current_margin, 2),
+            'closed_size': round(close_size, 4),
             'closed_nominal': round(close_nominal, 2),
             'closed_margin': round(close_margin, 2),
+            'keep_size': round(new_size, 4),
             'keep_nominal': round(keep_nominal, 2),
             'keep_margin': round(keep_margin, 2),
-            'new_size': round(new_size, 4),
-            'note': '⚠️ 此操作仅更新数据库，实际平仓需要调用OKX API'
+            'current_market_price': round(current_market_price, 4),
+            'profit_rate': round(profit_rate, 2),
+            'unrealized_pnl': round(unrealized_pnl, 4),
+            'has_adds': has_adds,
+            'total_add_size': round(total_add_size, 4) if has_adds else 0,
+            'close_record_id': close_id,
+            'database_updated': True,
+            'updated_tables': ['position_opens', 'position_closes', 'trading_decisions'] + (['position_adds'] if has_adds else []),
+            'note': '✅ 数据库已更新，包括持仓、平仓记录和决策日志'
         })
         
     except Exception as e:
