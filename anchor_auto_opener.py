@@ -21,8 +21,12 @@ BEIJING_TZ = pytz.timezone('Asia/Shanghai')
 
 # 规则配置（根据用户确认后修改）
 RULES = {
-    'maintain_action': 'monitor_only',  # 'open_new' 或 'monitor_only'
-    'maintain_on_profit': False,        # True: 盈利时也维护, False: 只在亏损时维护
+    # 维护锚点单规则：
+    # 1. 满足逃顶信号 + 没有锚点单 → 开新锚点单
+    # 2. 满足逃顶信号 + 已有锚点单 + 满足补仓条件(-10%) → 执行补仓
+    # 3. 满足逃顶信号 + 已有锚点单 + 不满足补仓条件 → 只监控
+    'check_add_position': True,         # True: 检查补仓条件, False: 只监控不补仓
+    'add_position_trigger': -10.0,      # 补仓触发：亏损达到-10%
     'min_amount_handling': 'dynamic',   # 'dynamic': 动态调整, 'skip': 跳过
     'prevent_duplicate_minutes': 5,     # 防止重复触发的时间间隔（分钟）
 }
@@ -206,39 +210,57 @@ class AnchorAutoOpener:
             'success': False,
             'action': 'skipped',
             'reason': '',
-            'open_amount': 0
+            'open_amount': 0,
+            'decision_log': []  # 新增：决策日志
         }
+        
+        result['decision_log'].append(f"🎯 检测到逃顶信号")
+        result['decision_log'].append(f"📍 压力线1: {signal['pressure1']:.4f}")
+        result['decision_log'].append(f"📍 压力线2: {signal['pressure2']:.4f}")
+        result['decision_log'].append(f"💰 当前价: {signal['current_price']:.4f}")
+        result['decision_log'].append(f"📊 距离压力线1: {signal['distance_to_resistance_1']:.2f}%")
         
         # 检查1：重复触发防护
         if self.check_duplicate_trigger(inst_id, RULES['prevent_duplicate_minutes']):
             result['reason'] = f"⏳ {RULES['prevent_duplicate_minutes']}分钟内已触发过，跳过"
+            result['decision_log'].append(f"⏳ 重复触发防护: {RULES['prevent_duplicate_minutes']}分钟内已触发")
             self.record_trigger(inst_id, 'new', signal, 'skipped', result['reason'])
             return result
+        
+        result['decision_log'].append(f"✅ 重复触发检查通过")
         
         # 检查2：计算开仓金额
         open_amount, amount_note = self.calculate_open_amount(
             inst_id, signal['current_price']
         )
         result['open_amount'] = open_amount
+        result['decision_log'].append(f"💰 开仓金额: {open_amount} USDT ({amount_note})")
         
         # 检查3：单币种限制
         passed, reason = self.trigger.check_single_coin_limit(inst_id, open_amount)
         if not passed:
             result['reason'] = f"❌ 单币种限制: {reason}"
+            result['decision_log'].append(f"❌ 单币种限制检查失败: {reason}")
             self.record_trigger(inst_id, 'new', signal, 'failed', result['reason'], open_amount)
             return result
+        
+        result['decision_log'].append(f"✅ 单币种限制检查通过: {reason}")
         
         # 检查4：获取配置
         config = self.trigger.get_config()
         if not config['allow_anchor']:
             result['reason'] = "❌ 系统未启用锚点单"
+            result['decision_log'].append("❌ 配置检查: allow_anchor=False")
             self.record_trigger(inst_id, 'new', signal, 'skipped', result['reason'], open_amount)
             return result
         
         if not config['enabled']:
             result['reason'] = "❌ 系统未启用"
+            result['decision_log'].append("❌ 配置检查: enabled=False")
             self.record_trigger(inst_id, 'new', signal, 'skipped', result['reason'], open_amount)
             return result
+        
+        result['decision_log'].append("✅ 系统配置检查通过")
         
         # 执行开仓
         try:
@@ -264,6 +286,10 @@ class AnchorAutoOpener:
             result['success'] = True
             result['action'] = 'created'
             result['reason'] = f"✅ 锚点单创建成功 (ID: {position_id}, 金额: {open_amount} USDT)"
+            result['decision_log'].append(f"✅ 锚点单已创建")
+            result['decision_log'].append(f"📝 仓位ID: {position_id}")
+            result['decision_log'].append(f"📝 方向: 做空(short)")
+            result['decision_log'].append(f"📝 标记: 锚点单(is_anchor=True)")
             
             # 记录触发日志
             self.record_trigger(inst_id, 'new', signal, 'created', None, open_amount)
@@ -272,6 +298,7 @@ class AnchorAutoOpener:
             
         except Exception as e:
             result['reason'] = f"❌ 创建失败: {str(e)}"
+            result['decision_log'].append(f"❌ 执行失败: {str(e)}")
             self.record_trigger(inst_id, 'new', signal, 'failed', result['reason'], open_amount)
         
         return result
@@ -279,6 +306,9 @@ class AnchorAutoOpener:
     def process_maintain_anchor(self, inst_id: str, signal: Dict, anchor_info: Dict) -> Dict:
         """
         处理维护锚点单
+        新规则：
+        1. 满足逃顶信号 + 已有锚点单 + 满足补仓条件(-10%) → 执行补仓
+        2. 满足逃顶信号 + 已有锚点单 + 不满足补仓条件 → 只监控
         
         Returns:
             处理结果字典
@@ -289,7 +319,8 @@ class AnchorAutoOpener:
             'success': False,
             'action': 'monitored',
             'reason': '',
-            'open_amount': 0
+            'open_amount': 0,
+            'decision_log': []  # 新增：决策日志
         }
         
         # 计算当前盈亏率
@@ -297,24 +328,74 @@ class AnchorAutoOpener:
         current_price = signal['current_price']
         profit_rate = ((open_price - current_price) / open_price) * 100  # 做空
         
-        # 检查：是否在亏损状态
-        if not RULES['maintain_on_profit'] and profit_rate >= 0:
-            result['reason'] = f"💰 当前盈利 {profit_rate:.2f}%，不触发维护"
-            self.record_trigger(inst_id, 'maintain', signal, 'skipped', result['reason'])
-            return result
+        result['decision_log'].append(f"📊 已有锚点单: 开仓价={open_price:.4f}, 当前价={current_price:.4f}")
+        result['decision_log'].append(f"📊 当前盈亏率: {profit_rate:.2f}%")
         
-        # 根据规则决定执行方案
-        if RULES['maintain_action'] == 'monitor_only':
+        # 检查是否需要补仓
+        if not RULES['check_add_position']:
             result['action'] = 'monitored'
-            result['reason'] = f"👁️ 监控模式: 当前盈亏 {profit_rate:.2f}%，不开新仓"
+            result['reason'] = f"👁️ 监控模式: 当前盈亏 {profit_rate:.2f}%，不检查补仓条件"
+            result['decision_log'].append("⚙️ 配置: check_add_position=False，只监控不补仓")
             self.record_trigger(inst_id, 'maintain', signal, 'monitored', result['reason'])
             print(f"👁️ {inst_id} 维护监控: 盈亏 {profit_rate:.2f}%")
+            result['success'] = True
+            return result
+        
+        # 检查补仓条件：亏损是否达到触发值
+        add_trigger = RULES['add_position_trigger']
+        result['decision_log'].append(f"⚙️ 补仓触发设置: {add_trigger}%")
+        
+        if profit_rate <= add_trigger:
+            # 满足补仓条件
+            result['decision_log'].append(f"✅ 满足补仓条件: {profit_rate:.2f}% <= {add_trigger}%")
             
-        elif RULES['maintain_action'] == 'open_new':
-            # 执行开新锚点单的逻辑（类似新建）
-            result['reason'] = f"🔄 维护开仓: 当前盈亏 {profit_rate:.2f}%，开新锚点单"
-            # TODO: 实现开新锚点单逻辑
-            self.record_trigger(inst_id, 'maintain', signal, 'created', result['reason'])
+            # 计算补仓金额（原金额的10倍）
+            original_amount = anchor_info['open_size']
+            add_amount = original_amount * 10
+            result['open_amount'] = add_amount
+            
+            result['decision_log'].append(f"💰 补仓金额计算: {original_amount} × 10 = {add_amount} USDT")
+            
+            # 检查单币种限制
+            passed, reason = self.trigger.check_single_coin_limit(inst_id, add_amount)
+            if not passed:
+                result['action'] = 'failed'
+                result['reason'] = f"❌ 单币种限制: {reason}"
+                result['decision_log'].append(f"❌ 单币种限制检查失败: {reason}")
+                self.record_trigger(inst_id, 'maintain', signal, 'failed', result['reason'], add_amount)
+                return result
+            
+            result['decision_log'].append(f"✅ 单币种限制检查通过")
+            
+            # 执行补仓
+            try:
+                from position_manager import PositionManager
+                manager = PositionManager()
+                
+                # 调用补仓逻辑
+                # 注意：这里需要实际的补仓执行逻辑
+                # 暂时记录为待执行
+                result['action'] = 'add_position_ready'
+                result['reason'] = f"🔄 准备补仓: {add_amount} USDT (原{original_amount} USDT × 10倍)"
+                result['decision_log'].append(f"🔄 执行补仓: {add_amount} USDT")
+                result['decision_log'].append(f"📝 补仓后需立即平掉95%")
+                
+                self.record_trigger(inst_id, 'maintain', signal, 'add_position_ready', result['reason'], add_amount)
+                print(f"🔄 {inst_id} 满足补仓条件: 盈亏 {profit_rate:.2f}%, 补仓 {add_amount} USDT")
+                
+            except Exception as e:
+                result['action'] = 'failed'
+                result['reason'] = f"❌ 补仓失败: {str(e)}"
+                result['decision_log'].append(f"❌ 执行失败: {str(e)}")
+                self.record_trigger(inst_id, 'maintain', signal, 'failed', result['reason'], add_amount)
+        else:
+            # 不满足补仓条件
+            result['action'] = 'monitored'
+            result['reason'] = f"👁️ 监控中: 盈亏 {profit_rate:.2f}% > {add_trigger}%，未达补仓条件"
+            result['decision_log'].append(f"❌ 未满足补仓条件: {profit_rate:.2f}% > {add_trigger}%")
+            result['decision_log'].append(f"👁️ 继续监控，等待触发")
+            self.record_trigger(inst_id, 'maintain', signal, 'monitored', result['reason'])
+            print(f"👁️ {inst_id} 继续监控: 盈亏 {profit_rate:.2f}%")
         
         result['success'] = True
         return result

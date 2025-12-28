@@ -543,6 +543,20 @@
                 </p>
                 <div id="anchors-content" class="loading">加载中...</div>
             </div>
+            
+            <!-- 锚点单决策日志 -->
+            <div class="card" style="margin-top: 20px; background: #f8f9fa;">
+                <h2 style="color: #333;">📋 锚点单决策日志</h2>
+                <p style="color: #666; margin-bottom: 15px; font-size: 0.95em;">
+                    📊 实时展示锚点单开仓和补仓的决策过程
+                </p>
+                <div style="margin-bottom: 15px;">
+                    <button class="btn btn-primary" onclick="scanAnchorOpportunities()">🔍 手动扫描</button>
+                    <button class="btn btn-success" onclick="loadAnchorDecisionLogs()">🔄 刷新日志</button>
+                    <a href="/anchor-auto-monitor" target="_blank" class="btn btn-primary" style="margin-left: 10px;">📊 打开监控页面</a>
+                </div>
+                <div id="anchor-decision-logs" class="loading">加载中...</div>
+            </div>
         </div>
         
         <!-- 挂单记录 -->
@@ -594,6 +608,7 @@
                     break;
                 case 'anchors':
                     loadAnchors();
+                    loadAnchorDecisionLogs();
                     break;
                 case 'positions':
                     loadPositions();
@@ -924,6 +939,124 @@
                 .catch(err => {
                     document.getElementById('anchors-content').innerHTML = `<div class="alert alert-danger">加载失败: ${err.message}</div>`;
                 });
+        }
+        
+        // 加载锚点单决策日志
+        function loadAnchorDecisionLogs() {
+            fetch('/api/trading/anchor/trigger-history?limit=10')
+                .then(res => res.json())
+                .then(data => {
+                    if (data.success) {
+                        if (data.history.length === 0) {
+                            document.getElementById('anchor-decision-logs').innerHTML = '<div class="empty-state">暂无决策日志</div>';
+                            return;
+                        }
+                        
+                        let html = '<div style="max-height: 600px; overflow-y: auto;">';
+                        
+                        for (const log of data.history) {
+                            const typeBadge = log.trigger_type === 'new' ? 
+                                '<span style="background:#8b5cf6;color:white;padding:3px 8px;border-radius:3px;font-size:12px;">新建</span>' :
+                                '<span style="background:#f59e0b;color:white;padding:3px 8px;border-radius:3px;font-size:12px;">维护</span>';
+                            
+                            let actionBadge = '';
+                            if (log.action_taken === 'created') {
+                                actionBadge = '<span style="background:#10b981;color:white;padding:3px 8px;border-radius:3px;font-size:12px;">✅ 已创建</span>';
+                            } else if (log.action_taken === 'add_position_ready') {
+                                actionBadge = '<span style="background:#3b82f6;color:white;padding:3px 8px;border-radius:3px;font-size:12px;">🔄 准备补仓</span>';
+                            } else if (log.action_taken === 'monitored') {
+                                actionBadge = '<span style="background:#6b7280;color:white;padding:3px 8px;border-radius:3px;font-size:12px;">👁️ 监控</span>';
+                            } else if (log.action_taken === 'skipped') {
+                                actionBadge = '<span style="background:#9ca3af;color:white;padding:3px 8px;border-radius:3px;font-size:12px;">⏭️ 跳过</span>';
+                            } else if (log.action_taken === 'failed') {
+                                actionBadge = '<span style="background:#ef4444;color:white;padding:3px 8px;border-radius:3px;font-size:12px;">❌ 失败</span>';
+                            }
+                            
+                            html += `
+                                <div style="background:white;border:1px solid #e5e7eb;border-radius:8px;padding:15px;margin-bottom:15px;border-left:4px solid ${log.action_taken === 'created' || log.action_taken === 'add_position_ready' ? '#10b981' : '#6b7280'};">
+                                    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">
+                                        <div>
+                                            <strong style="font-size:16px;">${log.inst_id}</strong>
+                                            ${typeBadge}
+                                            ${actionBadge}
+                                        </div>
+                                        <div style="color:#666;font-size:13px;">${log.timestamp}</div>
+                                    </div>
+                                    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;margin-bottom:10px;font-size:14px;">
+                                        <div>
+                                            <span style="color:#666;">压力线1:</span>
+                                            <span style="font-weight:bold;">${log.pressure1.toFixed(4)}</span>
+                                        </div>
+                                        <div>
+                                            <span style="color:#666;">压力线2:</span>
+                                            <span style="font-weight:bold;">${log.pressure2.toFixed(4)}</span>
+                                        </div>
+                                        <div>
+                                            <span style="color:#666;">当前价:</span>
+                                            <span style="font-weight:bold;">${log.current_price.toFixed(4)}</span>
+                                        </div>
+                                        ${log.open_amount ? `<div>
+                                            <span style="color:#666;">开仓金额:</span>
+                                            <span style="font-weight:bold;color:#10b981;">${log.open_amount.toFixed(2)} USDT</span>
+                                        </div>` : ''}
+                                        <div>
+                                            <span style="color:#666;">已有锚点单:</span>
+                                            <span style="font-weight:bold;">${log.has_existing_anchor ? '✅ 是' : '❌ 否'}</span>
+                                        </div>
+                                    </div>
+                                    ${log.skip_reason ? `
+                                        <div style="background:#fef3c7;padding:10px;border-radius:5px;margin-top:10px;font-size:13px;color:#92400e;">
+                                            <strong>原因:</strong> ${log.skip_reason}
+                                        </div>
+                                    ` : ''}
+                                    ${log.trigger_reason ? `
+                                        <div style="color:#666;font-size:13px;margin-top:5px;">
+                                            ${log.trigger_reason}
+                                        </div>
+                                    ` : ''}
+                                </div>
+                            `;
+                        }
+                        
+                        html += '</div>';
+                        document.getElementById('anchor-decision-logs').innerHTML = html;
+                    }
+                })
+                .catch(err => {
+                    document.getElementById('anchor-decision-logs').innerHTML = `<div class="alert alert-danger">加载失败: ${err.message}</div>`;
+                });
+        }
+        
+        // 手动扫描锚点单机会
+        function scanAnchorOpportunities() {
+            if (!confirm('确认执行锚点单扫描？\n\n系统将：\n1. 获取当前逃顶信号\n2. 检查每个币种的锚点单状态\n3. 根据规则决定是否创建/补仓\n4. 记录详细决策日志')) {
+                return;
+            }
+            
+            document.getElementById('anchor-decision-logs').innerHTML = '<div class="loading">扫描中...</div>';
+            
+            fetch('/api/trading/anchor/auto-scan', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'}
+            })
+            .then(res => res.json())
+            .then(data => {
+                if (data.success) {
+                    alert(`✅ 扫描完成！\n\n${data.summary}`);
+                    // 刷新日志
+                    setTimeout(() => {
+                        loadAnchorDecisionLogs();
+                        loadAnchors();
+                    }, 1000);
+                } else {
+                    alert('❌ 扫描失败: ' + data.error);
+                    document.getElementById('anchor-decision-logs').innerHTML = `<div class="alert alert-danger">扫描失败: ${data.error}</div>`;
+                }
+            })
+            .catch(err => {
+                alert('❌ 扫描失败: ' + err.message);
+                document.getElementById('anchor-decision-logs').innerHTML = `<div class="alert alert-danger">扫描失败: ${err.message}</div>`;
+            });
         }
         
         function loadPositions() {

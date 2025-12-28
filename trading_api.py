@@ -934,3 +934,24 @@ def check_existing_anchor():
         })
     except Exception as e:
         return jsonify({'success': False, 'error': str(e)})
+
+
+@trading_bp.route('/anchor/decision-logs', methods=['GET'])
+def get_anchor_decision_logs():
+    """获取锚点单决策日志（最新一次扫描的详细日志）"""
+    try:
+        # 这里返回缓存的最新决策日志
+        # 暂时返回触发历史的详细信息
+        from anchor_auto_opener import AnchorAutoOpener
+        
+        limit = int(request.args.get('limit', 5))
+        opener = AnchorAutoOpener()
+        history = opener.get_trigger_history(limit=limit)
+        
+        return jsonify({
+            'success': True,
+            'count': len(history),
+            'logs': history
+        })
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)})
