@@ -1283,12 +1283,18 @@
         }
         
         function loadPositions() {
-            fetch('/api/trading/positions/opens?limit=50')
+            // 只加载非锚点单的开仓记录（is_anchor=0），避免与锚点单标签页重复
+            fetch('/api/trading/positions/opens?limit=50&is_anchor=0')
                 .then(res => res.json())
                 .then(data => {
                     if (data.success) {
                         if (data.records.length === 0) {
-                            document.getElementById('positions-content').innerHTML = '<div class="empty-state">暂无开仓记录</div>';
+                            document.getElementById('positions-content').innerHTML = `
+                                <div class="empty-state">
+                                    <p style="font-size: 1.2em; margin-bottom: 10px;">暂无非锚点单的开仓记录</p>
+                                    <p style="color: #666; font-size: 0.9em;">锚点单请查看"⚓ 锚点单"标签页</p>
+                                </div>
+                            `;
                             return;
                         }
                         
@@ -1302,11 +1308,16 @@
                                 <td>${r.open_percent}%</td>
                                 <td>${r.granularity}%</td>
                                 <td>${r.total_positions}</td>
-                                <td>${r.is_anchor ? '✅' : '❌'}</td>
                             </tr>
                         `).join('');
                         
                         const html = `
+                            <div style="margin-bottom: 15px; padding: 10px; background: #e0f2fe; border-radius: 5px;">
+                                <p style="margin: 0; color: #0c4a6e; font-size: 0.9em;">
+                                    📊 共 <strong>${data.records.length}</strong> 条非锚点单开仓记录 | 
+                                    ⚓ 锚点单请查看"锚点单"标签页
+                                </p>
+                            </div>
                             <table>
                                 <thead>
                                     <tr>
@@ -1318,7 +1329,6 @@
                                         <th>开仓%</th>
                                         <th>颗粒度</th>
                                         <th>仓位数</th>
-                                        <th>锚点单</th>
                                     </tr>
                                 </thead>
                                 <tbody>${rows}</tbody>
