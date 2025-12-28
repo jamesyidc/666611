@@ -144,12 +144,13 @@ class StopProfitLossManager:
         }
     
     def get_all_positions(self) -> List[Dict]:
-        """获取所有持仓"""
+        """获取所有持仓（排除锚点单）"""
         conn = sqlite3.connect(DB_PATH)
         conn.row_factory = sqlite3.Row
         cursor = conn.cursor()
         
         # 直接使用同步的数据，包括mark_price和profit_rate
+        # 排除锚点单：is_anchor = 0 或 NULL
         cursor.execute('''
             SELECT 
                 inst_id,
@@ -161,8 +162,10 @@ class StopProfitLossManager:
                 upl,
                 lever,
                 margin,
+                is_anchor,
                 timestamp as latest_open_time
             FROM position_opens
+            WHERE (is_anchor = 0 OR is_anchor IS NULL)
             ORDER BY timestamp DESC
         ''')
         
