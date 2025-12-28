@@ -955,3 +955,245 @@ def get_anchor_decision_logs():
         })
     except Exception as e:
         return jsonify({'success': False, 'error': str(e)})
+
+
+# ==================== 止盈止损相关接口 ====================
+
+@trading_bp.route('/stop-profit-loss/scan', methods=['POST'])
+def scan_stop_profit_loss():
+    """扫描止盈止损触发"""
+    try:
+        from stop_profit_loss_manager import StopProfitLossManager
+        
+        manager = StopProfitLossManager()
+        results = manager.scan_positions(dry_run=True)
+        
+        return jsonify({
+            'success': True,
+            'count': len(results),
+            'triggers': results
+        })
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)})
+
+
+@trading_bp.route('/stop-profit-loss/decision-logs', methods=['GET'])
+def get_stop_profit_loss_decision_logs():
+    """获取止盈止损决策日志"""
+    try:
+        from stop_profit_loss_manager import StopProfitLossManager
+        
+        limit = int(request.args.get('limit', 50))
+        manager = StopProfitLossManager()
+        logs = manager.get_decision_logs(limit=limit)
+        
+        return jsonify({
+            'success': True,
+            'count': len(logs),
+            'logs': logs
+        })
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)})
+
+
+@trading_bp.route('/stop-profit-loss/execute', methods=['POST'])
+def execute_stop_profit_loss():
+    """执行止盈止损（模拟）"""
+    try:
+        from stop_profit_loss_manager import StopProfitLossManager
+        
+        data = request.get_json()
+        inst_id = data.get('inst_id')
+        pos_side = data.get('pos_side')
+        close_amount = data.get('close_amount')
+        trigger_type = data.get('trigger_type')
+        profit_rate = data.get('profit_rate')
+        current_price = data.get('current_price')
+        avg_price = data.get('avg_price')
+        
+        manager = StopProfitLossManager()
+        result = manager.execute_close(
+            inst_id, pos_side, close_amount,
+            trigger_type, profit_rate, current_price, avg_price
+        )
+        
+        return jsonify(result)
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)})
+
+
+# ==================== 开仓决策日志接口 ====================
+
+@trading_bp.route('/open/decision-logs', methods=['GET'])
+def get_open_decision_logs():
+    """获取开仓决策日志"""
+    try:
+        from open_decision_logger import OpenPositionDecisionLogger
+        
+        limit = int(request.args.get('limit', 50))
+        logger = OpenPositionDecisionLogger()
+        logs = logger.get_decision_logs(limit=limit)
+        
+        return jsonify({
+            'success': True,
+            'count': len(logs),
+            'logs': logs
+        })
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)})
+
+
+@trading_bp.route('/open/check-conditions', methods=['GET'])
+def check_open_conditions():
+    """检查开仓条件"""
+    try:
+        from open_decision_logger import OpenPositionDecisionLogger
+        
+        inst_id = request.args.get('inst_id')
+        if not inst_id:
+            return jsonify({'success': False, 'error': '缺少inst_id参数'})
+        
+        logger = OpenPositionDecisionLogger()
+        result = logger.check_short_open_conditions(inst_id)
+        
+        # 记录决策日志
+        logger.record_open_decision(inst_id, 'short', result, action='check')
+        
+        return jsonify({
+            'success': True,
+            'result': result
+        })
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)})
+
+
+# ==================== 补仓决策日志接口 ====================
+
+@trading_bp.route('/add/decision-logs', methods=['GET'])
+def get_add_decision_logs():
+    """获取补仓决策日志"""
+    try:
+        from add_decision_logger import AddPositionDecisionLogger
+        
+        limit = int(request.args.get('limit', 50))
+        logger = AddPositionDecisionLogger()
+        logs = logger.get_decision_logs(limit=limit)
+        
+        return jsonify({
+            'success': True,
+            'count': len(logs),
+            'logs': logs
+        })
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)})
+
+
+@trading_bp.route('/add/check-conditions', methods=['GET'])
+def check_add_conditions():
+    """检查补仓条件"""
+    try:
+        from add_decision_logger import AddPositionDecisionLogger
+        
+        inst_id = request.args.get('inst_id')
+        pos_side = request.args.get('pos_side', 'short')
+        
+        if not inst_id:
+            return jsonify({'success': False, 'error': '缺少inst_id参数'})
+        
+        logger = AddPositionDecisionLogger()
+        
+        if pos_side == 'short':
+            result = logger.check_short_add_conditions(inst_id)
+        else:
+            result = logger.check_long_add_conditions(inst_id)
+        
+        # 记录决策日志
+        logger.record_add_decision(inst_id, pos_side, result)
+        
+        return jsonify({
+            'success': True,
+            'result': result
+        })
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)})
+
+
+# ==================== 保护挂单接口 ====================
+
+@trading_bp.route('/protect-orders/create', methods=['POST'])
+def create_protect_orders():
+    """为锚点单创建保护挂单"""
+    try:
+        from anchor_protect_orders import AnchorProtectOrderManager
+        
+        data = request.get_json()
+        inst_id = data.get('inst_id')
+        dry_run = data.get('dry_run', True)
+        
+        if not inst_id:
+            return jsonify({'success': False, 'error': '缺少inst_id参数'})
+        
+        manager = AnchorProtectOrderManager()
+        result = manager.create_protect_orders(inst_id, dry_run=dry_run)
+        
+        return jsonify(result)
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)})
+
+
+@trading_bp.route('/protect-orders/list', methods=['GET'])
+def get_protect_orders():
+    """获取保护挂单列表"""
+    try:
+        from anchor_protect_orders import AnchorProtectOrderManager
+        
+        inst_id = request.args.get('inst_id')
+        limit = int(request.args.get('limit', 50))
+        
+        manager = AnchorProtectOrderManager()
+        orders = manager.get_protect_orders(inst_id=inst_id, limit=limit)
+        
+        return jsonify({
+            'success': True,
+            'count': len(orders),
+            'orders': orders
+        })
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)})
+
+
+@trading_bp.route('/protect-orders/scan-trigger', methods=['POST'])
+def scan_protect_order_trigger():
+    """扫描保护挂单触发条件"""
+    try:
+        from anchor_protect_orders import AnchorProtectOrderManager
+        
+        manager = AnchorProtectOrderManager()
+        results = manager.scan_trigger_conditions()
+        
+        return jsonify({
+            'success': True,
+            'count': len(results),
+            'triggers': results
+        })
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)})
+
+
+@trading_bp.route('/protect-orders/decision-logs', methods=['GET'])
+def get_protect_order_decision_logs():
+    """获取保护挂单决策日志"""
+    try:
+        from anchor_protect_orders import AnchorProtectOrderManager
+        
+        limit = int(request.args.get('limit', 50))
+        manager = AnchorProtectOrderManager()
+        logs = manager.get_decision_logs(limit=limit)
+        
+        return jsonify({
+            'success': True,
+            'count': len(logs),
+            'logs': logs
+        })
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)})
