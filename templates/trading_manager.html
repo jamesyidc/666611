@@ -358,6 +358,55 @@
         input:checked + .slider:before {
             transform: translateX(26px);
         }
+        
+        /* 实时仓位样式 */
+        .filter-btn {
+            padding: 8px 16px;
+            background: #f3f4f6;
+            border: 1px solid #e5e7eb;
+            border-radius: 6px;
+            cursor: pointer;
+            transition: all 0.3s;
+            font-size: 14px;
+            color: #374151;
+        }
+        
+        .filter-btn:hover {
+            background: #e5e7eb;
+        }
+        
+        .filter-btn.active {
+            background: #667eea;
+            color: white;
+            border-color: #667eea;
+        }
+        
+        .stat-card {
+            padding: 20px;
+            background: #f9fafb;
+            border-radius: 8px;
+            border: 1px solid #e5e7eb;
+        }
+        
+        .stat-label {
+            font-size: 14px;
+            color: #6b7280;
+            margin-bottom: 8px;
+        }
+        
+        .stat-value {
+            font-size: 24px;
+            font-weight: bold;
+            color: #111827;
+        }
+        
+        .anchor-row {
+            background-color: #fffbeb !important;
+        }
+        
+        .normal-row {
+            background-color: white;
+        }
     </style>
 </head>
 <body>
@@ -391,6 +440,7 @@
         
         <div class="tabs">
             <button class="tab active" onclick="switchTab('config')">⚙️ 系统配置</button>
+            <button class="tab" onclick="switchTab('realtime-positions')">📊 实时仓位</button>
             <button class="tab" onclick="switchTab('statistics')">📊 统计数据</button>
             <button class="tab" onclick="switchTab('stop-profit-loss')">💰 止盈止损</button>
             <button class="tab" onclick="switchTab('anchors')">⚓ 锚点单</button>
@@ -525,6 +575,26 @@
                     </div>
                 </form>
                 <div id="config-message" style="margin-top: 10px;"></div>
+            </div>
+        </div>
+        
+        <!-- 实时仓位 -->
+        <div id="realtime-positions-tab" class="tab-content">
+            <div class="card">
+                <h2>📊 OKEx 实时持仓（数据校准）</h2>
+                <div style="margin-bottom: 15px; padding: 10px; background: #fff3cd; border-left: 4px solid #ffc107; border-radius: 4px;">
+                    <strong>⚠️ 提示：</strong>
+                    <span style="color: #856404;">
+                        此数据从 OKEx 实时同步，仅用于数据校准和策略参考，不代表实际交易操作。
+                        本系统为模拟交易系统。
+                    </span>
+                </div>
+                <div id="realtime-positions-content" class="loading">加载中...</div>
+            </div>
+            
+            <div class="card">
+                <h2>📈 持仓统计</h2>
+                <div id="positions-stats-content" class="loading">加载中...</div>
             </div>
         </div>
         
@@ -700,6 +770,9 @@
             switch(tabName) {
                 case 'config':
                     loadConfig();
+                    break;
+                case 'realtime-positions':
+                    loadRealtimePositions();
                     break;
                 case 'statistics':
                     loadStatistics();
@@ -1314,6 +1387,161 @@
         }
         
         // 加载决策记录
+        
+        // ==================== 实时仓位相关函数 ====================
+        
+        function loadRealtimePositions() {
+            // 加载实时持仓
+            fetch('/api/trading/positions/opens?limit=100')
+                .then(res => res.json())
+                .then(data => {
+                    if (data.success) {
+                        const positions = data.positions || [];
+                        
+                        if (positions.length === 0) {
+                            document.getElementById('realtime-positions-content').innerHTML = '<div class="empty-state">暂无持仓</div>';
+                            document.getElementById('positions-stats-content').innerHTML = '<div class="empty-state">暂无数据</div>';
+                            return;
+                        }
+                        
+                        // 分类持仓
+                        const anchorPositions = positions.filter(p => p.is_anchor === 1);
+                        const normalPositions = positions.filter(p => p.is_anchor !== 1);
+                        
+                        // 计算统计数据
+                        const totalMargin = positions.reduce((sum, p) => sum + parseFloat(p.margin || 0), 0);
+                        const totalPnL = positions.reduce((sum, p) => sum + parseFloat(p.upl || 0), 0);
+                        const avgProfitRate = positions.length > 0 ? 
+                            positions.reduce((sum, p) => sum + parseFloat(p.profit_rate || 0), 0) / positions.length : 0;
+                        
+                        // 渲染持仓表格
+                        let html = `
+                            <div style="margin-bottom: 20px;">
+                                <div style="display: flex; gap: 15px; margin-bottom: 15px;">
+                                    <button class="filter-btn active" onclick="filterPositions('all')">全部 (${positions.length})</button>
+                                    <button class="filter-btn" onclick="filterPositions('anchor')">🔶 锚点单 (${anchorPositions.length})</button>
+                                    <button class="filter-btn" onclick="filterPositions('normal')">普通持仓 (${normalPositions.length})</button>
+                                </div>
+                            </div>
+                            
+                            <div style="overflow-x: auto;">
+                                <table class="data-table">
+                                    <thead>
+                                        <tr>
+                                            <th>合约</th>
+                                            <th>方向</th>
+                                            <th>数量</th>
+                                            <th>开仓均价</th>
+                                            <th>标记价格</th>
+                                            <th>保证金(USDT)</th>
+                                            <th>杠杆</th>
+                                            <th>未实现盈亏(USDT)</th>
+                                            <th>盈亏率</th>
+                                            <th>类型</th>
+                                            <th>更新时间</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="positions-table-body">
+                        `;
+                        
+                        positions.forEach(pos => {
+                            const posSideBadge = pos.pos_side === 'long' 
+                                ? '<span style="background:#3b82f6;color:white;padding:3px 8px;border-radius:3px;font-size:12px;">做多</span>'
+                                : '<span style="background:#f59e0b;color:white;padding:3px 8px;border-radius:3px;font-size:12px;">做空</span>';
+                            
+                            const profitRateColor = parseFloat(pos.profit_rate || 0) >= 0 ? '#10b981' : '#ef4444';
+                            const profitRateSign = parseFloat(pos.profit_rate || 0) >= 0 ? '+' : '';
+                            
+                            const uplColor = parseFloat(pos.upl || 0) >= 0 ? '#10b981' : '#ef4444';
+                            const uplSign = parseFloat(pos.upl || 0) >= 0 ? '+' : '';
+                            
+                            const typeBadge = pos.is_anchor === 1
+                                ? '<span style="background:#f59e0b;color:white;padding:3px 8px;border-radius:3px;font-size:12px;">🔶 锚点单</span>'
+                                : '<span style="background:#6b7280;color:white;padding:3px 8px;border-radius:3px;font-size:12px;">普通</span>';
+                            
+                            const rowClass = pos.is_anchor === 1 ? 'class="anchor-row"' : 'class="normal-row"';
+                            
+                            html += `
+                                <tr ${rowClass}>
+                                    <td><strong>${pos.inst_id}</strong></td>
+                                    <td>${posSideBadge}</td>
+                                    <td>${parseFloat(pos.open_size).toFixed(4)}</td>
+                                    <td>${parseFloat(pos.avg_price || 0).toFixed(4)}</td>
+                                    <td>${parseFloat(pos.mark_price || 0).toFixed(4)}</td>
+                                    <td><strong>${parseFloat(pos.margin || 0).toFixed(4)}</strong></td>
+                                    <td>${pos.lever || '-'}x</td>
+                                    <td style="color: ${uplColor}; font-weight: bold;">${uplSign}${parseFloat(pos.upl || 0).toFixed(4)}</td>
+                                    <td style="color: ${profitRateColor}; font-weight: bold;">${profitRateSign}${parseFloat(pos.profit_rate || 0).toFixed(2)}%</td>
+                                    <td>${typeBadge}</td>
+                                    <td>${pos.updated_time || '-'}</td>
+                                </tr>
+                            `;
+                        });
+                        
+                        html += `
+                                    </tbody>
+                                </table>
+                            </div>
+                        `;
+                        
+                        document.getElementById('realtime-positions-content').innerHTML = html;
+                        
+                        // 渲染统计数据
+                        const statsHtml = `
+                            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px;">
+                                <div class="stat-card">
+                                    <div class="stat-label">总持仓数</div>
+                                    <div class="stat-value">${positions.length}</div>
+                                </div>
+                                <div class="stat-card">
+                                    <div class="stat-label">锚点单数量</div>
+                                    <div class="stat-value" style="color: #f59e0b;">${anchorPositions.length}</div>
+                                </div>
+                                <div class="stat-card">
+                                    <div class="stat-label">总保证金</div>
+                                    <div class="stat-value">${totalMargin.toFixed(2)} USDT</div>
+                                </div>
+                                <div class="stat-card">
+                                    <div class="stat-label">总未实现盈亏</div>
+                                    <div class="stat-value" style="color: ${totalPnL >= 0 ? '#10b981' : '#ef4444'};">
+                                        ${totalPnL >= 0 ? '+' : ''}${totalPnL.toFixed(2)} USDT
+                                    </div>
+                                </div>
+                                <div class="stat-card">
+                                    <div class="stat-label">平均盈亏率</div>
+                                    <div class="stat-value" style="color: ${avgProfitRate >= 0 ? '#10b981' : '#ef4444'};">
+                                        ${avgProfitRate >= 0 ? '+' : ''}${avgProfitRate.toFixed(2)}%
+                                    </div>
+                                </div>
+                            </div>
+                        `;
+                        
+                        document.getElementById('positions-stats-content').innerHTML = statsHtml;
+                    }
+                })
+                .catch(error => {
+                    console.error('加载实时持仓失败:', error);
+                    document.getElementById('realtime-positions-content').innerHTML = '<div class="error-state">加载失败，请稍后重试</div>';
+                });
+        }
+        
+        function filterPositions(type) {
+            // 更新按钮状态
+            document.querySelectorAll('.filter-btn').forEach(btn => btn.classList.remove('active'));
+            event.target.classList.add('active');
+            
+            // 过滤显示
+            const allRows = document.querySelectorAll('#positions-table-body tr');
+            allRows.forEach(row => {
+                if (type === 'all') {
+                    row.style.display = '';
+                } else if (type === 'anchor') {
+                    row.style.display = row.classList.contains('anchor-row') ? '' : 'none';
+                } else if (type === 'normal') {
+                    row.style.display = row.classList.contains('normal-row') ? '' : 'none';
+                }
+            });
+        }
         
         // 页面加载时加载配置
         window.onload = () => {
