@@ -169,6 +169,34 @@ def get_position_opens():
                 'created_at': row[10]
             }
             
+            # 获取当前市场价格
+            try:
+                crypto_conn = sqlite3.connect('/home/user/webapp/crypto_data.db', timeout=5.0)
+                crypto_cursor = crypto_conn.cursor()
+                symbol = record['inst_id'].replace('-SWAP', '')
+                crypto_cursor.execute('''
+                    SELECT last_price FROM ticker 
+                    WHERE symbol = ? 
+                    ORDER BY timestamp DESC LIMIT 1
+                ''', (symbol,))
+                price_row = crypto_cursor.fetchone()
+                if price_row and price_row[0]:
+                    record['current_price'] = float(price_row[0])
+                    # 计算盈亏率（考虑10x杠杆）
+                    leverage = 10
+                    if record['pos_side'] == 'short':
+                        price_change = (record['open_price'] - record['current_price']) / record['open_price']
+                    else:
+                        price_change = (record['current_price'] - record['open_price']) / record['open_price']
+                    record['profit_rate'] = round(price_change * leverage * 100, 2)
+                else:
+                    record['current_price'] = None
+                    record['profit_rate'] = None
+                crypto_conn.close()
+            except Exception as e:
+                record['current_price'] = None
+                record['profit_rate'] = None
+            
             # 如果是锚点单，额外查询补仓次数和总金额
             if record['is_anchor']:
                 cursor.execute('''

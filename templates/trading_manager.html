@@ -1057,9 +1057,9 @@
                         }
                         
                         const rows = data.records.map(r => {
-                            // 计算当前盈亏（需要后端提供current_price）
-                            const profitRate = r.current_price ? 
-                                ((r.current_price - r.open_price) / r.open_price * 100).toFixed(2) : 'N/A';
+                            // 使用后端计算的盈亏率（已考虑10x杠杆）
+                            const profitRate = r.profit_rate !== null && r.profit_rate !== undefined ? 
+                                r.profit_rate.toFixed(2) : 'N/A';
                             const profitClass = parseFloat(profitRate) >= 0 ? 'profit-positive' : 'profit-negative';
                             
                             return `
