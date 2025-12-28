@@ -719,7 +719,19 @@
         
         <!-- 挂单记录 -->
         <div id="orders-tab" class="tab-content">
-            <div class="card" style="background: linear-gradient(135deg, #e0e7ff 0%, #c7d2fe 100%); border-left: 4px solid #6366f1;">
+            <div class="card" style="background: linear-gradient(135deg, #fef3c7 0%, #fcd34d 100%); border-left: 4px solid #f59e0b;">
+                <h2 style="color: #92400e;">🎯 条件单管理（不占资金）</h2>
+                <p style="color: #78350f; margin-bottom: 15px; font-size: 0.95em;">
+                    💡 为已开仓的锚点单自动创建条件单：价格上涨5%时挂5倍持仓，上涨10%时挂10倍持仓
+                </p>
+                <div style="margin-bottom: 15px;">
+                    <button class="btn btn-warning" onclick="createAutoConditionalOrders()">⚡ 创建条件单</button>
+                    <button class="btn btn-success" onclick="loadConditionalOrders()">🔄 刷新条件单</button>
+                </div>
+                <div id="conditional-orders-content" class="loading">暂未加载</div>
+            </div>
+            
+            <div class="card" style="background: linear-gradient(135deg, #e0e7ff 0%, #c7d2fe 100%); border-left: 4px solid #6366f1; margin-top: 20px;">
                 <h2 style="color: #4338ca;">📋 保护挂单记录</h2>
                 <p style="color: #312e81; margin-bottom: 15px; font-size: 0.95em;">
                     🛡️ 为锚点单服务的保护挂单，防止急速拉升（币价+4%/10倍 和 +10%/20倍）
@@ -2199,6 +2211,119 @@
             const now = new Date();
             const timeStr = now.toLocaleTimeString('zh-CN', { hour12: false });
             document.getElementById('last-update-time').textContent = `最后更新: ${timeStr}`;
+        }
+        
+        // ==================== 条件单函数 ====================
+        
+        // 创建自动条件单
+        function createAutoConditionalOrders() {
+            if (!confirm('确认为所有锚点单创建条件单？\n\n将为每个锚点单创建2个条件单：\n- 价格上涨5% → 开仓5倍持仓\n- 价格上涨10% → 开仓10倍持仓')) {
+                return;
+            }
+            
+            document.getElementById('conditional-orders-content').innerHTML = '<div class="loading">创建中...</div>';
+            
+            fetch('/api/trading/orders/pending/create-auto', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' }
+            })
+            .then(res => res.json())
+            .then(data => {
+                if (data.success) {
+                    alert(`✅ ${data.message}\n\n锚点单数量: ${data.total_anchors}\n条件单数量: ${data.total_orders}`);
+                    loadConditionalOrders();
+                } else {
+                    alert(`❌ 创建失败: ${data.error}`);
+                    document.getElementById('conditional-orders-content').innerHTML = `<div class="alert alert-danger">创建失败: ${data.error}</div>`;
+                }
+            })
+            .catch(err => {
+                alert(`❌ 创建失败: ${err.message}`);
+                document.getElementById('conditional-orders-content').innerHTML = `<div class="alert alert-danger">创建失败: ${err.message}</div>`;
+            });
+        }
+        
+        // 加载条件单列表
+        function loadConditionalOrders() {
+            document.getElementById('conditional-orders-content').innerHTML = '<div class="loading">加载中...</div>';
+            
+            fetch('/api/trading/orders/pending?status=pending')
+                .then(res => res.json())
+                .then(data => {
+                    if (data.success) {
+                        if (data.records.length === 0) {
+                            document.getElementById('conditional-orders-content').innerHTML = '<div class="empty-state">暂无条件单<br><small>点击"⚡ 创建条件单"按钮创建</small></div>';
+                            return;
+                        }
+                        
+                        // 按币种分组
+                        const groupedOrders = {};
+                        data.records.forEach(order => {
+                            if (!groupedOrders[order.inst_id]) {
+                                groupedOrders[order.inst_id] = [];
+                            }
+                            groupedOrders[order.inst_id].push(order);
+                        });
+                        
+                        let html = `
+                            <table>
+                                <thead>
+                                    <tr>
+                                        <th>币种</th>
+                                        <th>方向</th>
+                                        <th>锚点价格</th>
+                                        <th>5%触发价</th>
+                                        <th>5%挂单量</th>
+                                        <th>10%触发价</th>
+                                        <th>10%挂单量</th>
+                                        <th>创建时间</th>
+                                        <th>状态</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                        `;
+                        
+                        Object.keys(groupedOrders).forEach(instId => {
+                            const orders = groupedOrders[instId];
+                            const order5 = orders.find(o => o.price_diff_percent === 5.0);
+                            const order10 = orders.find(o => o.price_diff_percent === 10.0);
+                            
+                            if (order5 && order10) {
+                                html += `
+                                    <tr>
+                                        <td><strong>${instId}</strong></td>
+                                        <td>${order5.pos_side === 'short' ? '🔻 做空' : '🔺 做多'}</td>
+                                        <td>${order5.anchor_price.toFixed(4)}</td>
+                                        <td class="profit-positive">${order5.target_price.toFixed(4)}</td>
+                                        <td>${order5.order_size} (5x)</td>
+                                        <td class="profit-positive">${order10.target_price.toFixed(4)}</td>
+                                        <td>${order10.order_size} (10x)</td>
+                                        <td>${order5.created_at}</td>
+                                        <td><span class="status-badge status-pending">⏳ 待触发</span></td>
+                                    </tr>
+                                `;
+                            }
+                        });
+                        
+                        html += '</tbody></table>';
+                        html += `<div style="margin-top: 15px; padding: 10px; background: #fef3c7; border-radius: 6px; font-size: 0.9em; color: #78350f;">
+                            <strong>💡 说明：</strong>
+                            <ul style="margin: 5px 0; padding-left: 20px;">
+                                <li>条件单不占用资金，触发时才执行</li>
+                                <li>5%触发：当价格上涨5%时，开仓5倍当前持仓</li>
+                                <li>10%触发：当价格上涨10%时，开仓10倍当前持仓</li>
+                                <li>所有条件单都是做空方向，防止价格继续上涨</li>
+                            </ul>
+                        </div>`;
+                        
+                        document.getElementById('conditional-orders-content').innerHTML = html;
+                    } else {
+                        document.getElementById('conditional-orders-content').innerHTML = `<div class="alert alert-danger">加载失败: ${data.error}</div>`;
+                    }
+                })
+                .catch(err => {
+                    document.getElementById('conditional-orders-content').innerHTML = `<div class="alert alert-danger">加载失败: ${err.message}</div>`;
+                });
         }
         
         // 手动刷新

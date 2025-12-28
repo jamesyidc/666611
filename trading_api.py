@@ -7,7 +7,7 @@
 
 from flask import Blueprint, jsonify, request
 import sqlite3
-from datetime import datetime
+from datetime import datetime, timedelta
 import pytz
 
 trading_bp = Blueprint('trading', __name__, url_prefix='/api/trading')
@@ -342,6 +342,127 @@ def get_pending_orders():
             'success': True,
             'total': len(records),
             'records': records
+        })
+    
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)})
+
+
+@trading_bp.route('/orders/pending/create-auto', methods=['POST'])
+def create_auto_conditional_orders():
+    """为所有现有锚点单自动创建条件单（5%挂5倍，10%挂10倍）"""
+    try:
+        conn = sqlite3.connect(DB_PATH, timeout=10.0)
+        cursor = conn.cursor()
+        
+        # 获取所有锚点单
+        cursor.execute('''
+            SELECT id, inst_id, pos_side, open_price, open_size
+            FROM position_opens
+            WHERE is_anchor = 1
+        ''')
+        
+        anchors = cursor.fetchall()
+        
+        if not anchors:
+            conn.close()
+            return jsonify({
+                'success': False,
+                'error': '没有找到任何锚点单'
+            })
+        
+        created_orders = []
+        
+        for anchor in anchors:
+            position_id, inst_id, pos_side, open_price, open_size = anchor
+            
+            # 删除该币种的旧条件单
+            cursor.execute('''
+                DELETE FROM pending_orders 
+                WHERE inst_id = ? AND pos_side = ?
+            ''', (inst_id, pos_side))
+            
+            # 创建两个新条件单
+            # 1. 价格上涨5% -> 开仓5倍当前持仓
+            target_price_5 = open_price * 1.05
+            order_size_5 = open_size * 5
+            order_type_5 = f"conditional_{'short' if pos_side == 'short' else 'long'}_5%"
+            
+            cursor.execute('''
+                INSERT INTO pending_orders (
+                    inst_id, pos_side, order_type, anchor_price, target_price, 
+                    price_diff_percent, order_size, status, timestamp, created_at
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ''', (
+                inst_id, 
+                pos_side,
+                order_type_5,
+                open_price,
+                target_price_5,
+                5.0,
+                order_size_5,
+                'pending',
+                (datetime.now() + timedelta(hours=8)).strftime('%Y-%m-%d %H:%M:%S'),
+                (datetime.now() + timedelta(hours=8)).strftime('%Y-%m-%d %H:%M:%S')
+            ))
+            order_id_5 = cursor.lastrowid
+            
+            # 2. 价格上涨10% -> 开仓10倍当前持仓
+            target_price_10 = open_price * 1.10
+            order_size_10 = open_size * 10
+            order_type_10 = f"conditional_{'short' if pos_side == 'short' else 'long'}_10%"
+            
+            cursor.execute('''
+                INSERT INTO pending_orders (
+                    inst_id, pos_side, order_type, anchor_price, target_price, 
+                    price_diff_percent, order_size, status, timestamp, created_at
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ''', (
+                inst_id, 
+                pos_side,
+                order_type_10,
+                open_price,
+                target_price_10,
+                10.0,
+                order_size_10,
+                'pending',
+                (datetime.now() + timedelta(hours=8)).strftime('%Y-%m-%d %H:%M:%S'),
+                (datetime.now() + timedelta(hours=8)).strftime('%Y-%m-%d %H:%M:%S')
+            ))
+            order_id_10 = cursor.lastrowid
+            
+            created_orders.append({
+                'inst_id': inst_id,
+                'pos_side': pos_side,
+                'anchor_price': open_price,
+                'current_size': open_size,
+                'orders': [
+                    {
+                        'id': order_id_5,
+                        'target_price': round(target_price_5, 4),
+                        'price_diff': '5%',
+                        'order_size': order_size_5,
+                        'multiplier': '5x'
+                    },
+                    {
+                        'id': order_id_10,
+                        'target_price': round(target_price_10, 4),
+                        'price_diff': '10%',
+                        'order_size': order_size_10,
+                        'multiplier': '10x'
+                    }
+                ]
+            })
+        
+        conn.commit()
+        conn.close()
+        
+        return jsonify({
+            'success': True,
+            'message': f'成功为 {len(anchors)} 个锚点单创建条件单',
+            'total_anchors': len(anchors),
+            'total_orders': len(anchors) * 2,
+            'created_orders': created_orders
         })
     
     except Exception as e:
