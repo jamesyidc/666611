@@ -28,7 +28,8 @@ def get_config():
         SELECT market_mode, market_trend, total_capital, position_limit_mode,
                position_limit_percent, anchor_capital_limit, anchor_capital_percent,
                allow_long, allow_short, allow_anchor, max_long_position, max_short_position,
-               max_single_coin_percent, min_granularity, long_granularity, enabled, updated_at
+               max_single_coin_percent, min_granularity, long_granularity, enabled, updated_at,
+               simulation_mode
         FROM market_config
         ORDER BY updated_at DESC
         LIMIT 1
@@ -57,7 +58,8 @@ def get_config():
                     'min_granularity': row[13],
                     'long_granularity': row[14],
                     'enabled': bool(row[15]),
-                    'updated_at': row[16]
+                    'updated_at': row[16],
+                    'simulation_mode': bool(row[17]) if row[17] is not None else True
                 }
             })
         else:
@@ -83,8 +85,8 @@ def update_config():
             market_mode, market_trend, total_capital, position_limit_mode,
             position_limit_percent, anchor_capital_limit, anchor_capital_percent,
             allow_long, allow_short, allow_anchor, max_long_position, max_short_position,
-            max_single_coin_percent, min_granularity, long_granularity, enabled, updated_at
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            max_single_coin_percent, min_granularity, long_granularity, enabled, simulation_mode, updated_at
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         ''', (
             data.get('market_mode', 'manual'),
             data.get('market_trend', 'neutral'),
@@ -102,6 +104,7 @@ def update_config():
             data.get('min_granularity', 1),
             data.get('long_granularity', 10),
             1 if data.get('enabled', False) else 0,
+            1 if data.get('simulation_mode', True) else 0,
             timestamp
         ))
         

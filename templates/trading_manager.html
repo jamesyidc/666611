@@ -476,6 +476,20 @@
                             <small style="color: #666;">单个币种最大占可开仓额的百分比（默认10%）</small>
                         </div>
                         
+                        <div class="form-group" style="background: #fef3c7; padding: 15px; border-radius: 8px; border-left: 4px solid #f59e0b;">
+                            <label class="form-label" style="color: #d97706; font-weight: bold;">🧪 模拟交易模式</label>
+                            <div class="switch-container">
+                                <label class="switch">
+                                    <input type="checkbox" name="simulation_mode" id="simulation-mode-checkbox" checked>
+                                    <span class="slider"></span>
+                                </label>
+                                <span id="simulation-mode-text" style="color: #d97706; font-weight: bold;">✅ 模拟中</span>
+                            </div>
+                            <small style="color: #92400e; display: block; margin-top: 8px;">
+                                ⚠️ 开启后不会执行真实交易，用于测试策略。确认无误后再关闭进入实盘模式。
+                            </small>
+                        </div>
+                        
                         <div class="form-group">
                             <label class="form-label">⚡ 系统启用</label>
                             <div class="switch-container">
@@ -656,6 +670,13 @@
                                     <div class="config-value">${config.allow_anchor ? '✅ 是' : '❌ 否'}</div>
                                 </div>
                                 
+                                <div class="config-item" style="background: ${config.simulation_mode !== false ? '#fef3c7' : '#fee2e2'}; border-left: 4px solid ${config.simulation_mode !== false ? '#f59e0b' : '#dc2626'};">
+                                    <div class="config-label" style="color: ${config.simulation_mode !== false ? '#d97706' : '#dc2626'}; font-weight: bold;">🧪 交易模式</div>
+                                    <div class="config-value" style="color: ${config.simulation_mode !== false ? '#d97706' : '#dc2626'}; font-weight: bold;">
+                                        ${config.simulation_mode !== false ? '✅ 模拟交易' : '⚡ 实盘交易'}
+                                    </div>
+                                </div>
+                                
                                 <div class="config-item">
                                     <div class="config-label">单币种最大占比</div>
                                     <div class="config-value">${config.max_single_coin_percent || 10}%</div>
@@ -697,6 +718,7 @@
                         document.querySelector('[name="max_long_position"]').value = config.max_long_position || 500;
                         document.querySelector('[name="max_short_position"]').value = config.max_short_position || 600;
                         document.querySelector('[name="max_single_coin_percent"]').value = config.max_single_coin_percent || 10;
+                        document.getElementById('simulation-mode-checkbox').checked = config.simulation_mode !== false;
                         document.getElementById('enabled-checkbox').checked = config.enabled;
                         updateSwitchText();
                     }
@@ -711,11 +733,15 @@
             const allowLong = document.getElementById('allow-long-checkbox').checked;
             const allowShort = document.getElementById('allow-short-checkbox').checked;
             const allowAnchor = document.getElementById('allow-anchor-checkbox').checked;
+            const simulationMode = document.getElementById('simulation-mode-checkbox').checked;
             const enabled = document.getElementById('enabled-checkbox').checked;
             
             document.getElementById('allow-long-text').textContent = allowLong ? '允许' : '禁止';
             document.getElementById('allow-short-text').textContent = allowShort ? '允许' : '禁止';
             document.getElementById('allow-anchor-text').textContent = allowAnchor ? '允许' : '禁止';
+            document.getElementById('simulation-mode-text').textContent = simulationMode ? '✅ 模拟中' : '⚡ 实盘';
+            document.getElementById('simulation-mode-text').style.color = simulationMode ? '#d97706' : '#dc2626';
+            document.getElementById('simulation-mode-text').style.fontWeight = 'bold';
             document.getElementById('enabled-text').textContent = enabled ? '开启' : '关闭';
         }
         
@@ -723,6 +749,7 @@
         document.getElementById('allow-long-checkbox').addEventListener('change', updateSwitchText);
         document.getElementById('allow-short-checkbox').addEventListener('change', updateSwitchText);
         document.getElementById('allow-anchor-checkbox').addEventListener('change', updateSwitchText);
+        document.getElementById('simulation-mode-checkbox').addEventListener('change', updateSwitchText);
         document.getElementById('enabled-checkbox').addEventListener('change', updateSwitchText);
         
         // 更新配置
@@ -744,6 +771,7 @@
                 max_long_position: parseFloat(formData.get('max_long_position')),
                 max_short_position: parseFloat(formData.get('max_short_position')),
                 max_single_coin_percent: parseFloat(formData.get('max_single_coin_percent')),
+                simulation_mode: document.getElementById('simulation-mode-checkbox').checked,
                 min_granularity: 1,
                 long_granularity: 10,
                 enabled: document.getElementById('enabled-checkbox').checked
