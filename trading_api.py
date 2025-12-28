@@ -1392,3 +1392,47 @@ def get_anchor_maintenance_logs():
         import traceback
         traceback.print_exc()
         return jsonify({'success': False, 'error': str(e)})
+
+
+# ============ 锚点单保证金调整 API ============
+
+@trading_bp.route('/anchor-margin/check', methods=['GET'])
+def check_anchor_margin():
+    """检查锚点单保证金是否超限"""
+    try:
+        from anchor_margin_adjuster import AnchorMarginAdjuster
+        
+        adjuster = AnchorMarginAdjuster()
+        over_limit = adjuster.scan_over_limit_anchors()
+        
+        return jsonify({
+            'success': True,
+            'count': len(over_limit),
+            'over_limit': over_limit
+        })
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        return jsonify({'success': False, 'error': str(e)})
+
+
+@trading_bp.route('/anchor-margin/adjust', methods=['POST'])
+def adjust_anchor_margin():
+    """调整超限的锚点单保证金"""
+    try:
+        from anchor_margin_adjuster import AnchorMarginAdjuster
+        
+        data = request.get_json() or {}
+        dry_run = data.get('dry_run', True)
+        
+        adjuster = AnchorMarginAdjuster()
+        result = adjuster.adjust_all_over_limit(dry_run=dry_run)
+        
+        return jsonify(result)
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        return jsonify({'success': False, 'error': str(e)})
+        import traceback
+        traceback.print_exc()
+        return jsonify({'success': False, 'error': str(e)})
