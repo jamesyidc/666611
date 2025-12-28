@@ -374,10 +374,11 @@
         <div class="tabs">
             <button class="tab active" onclick="switchTab('config')">⚙️ 系统配置</button>
             <button class="tab" onclick="switchTab('statistics')">📊 统计数据</button>
+            <button class="tab" onclick="switchTab('stop-profit-loss')">💰 止盈止损</button>
             <button class="tab" onclick="switchTab('anchors')">⚓ 锚点单</button>
+            <button class="tab" onclick="switchTab('orders')">📋 挂单记录</button>
             <button class="tab" onclick="switchTab('positions')">📈 开仓记录</button>
             <button class="tab" onclick="switchTab('adds')">➕ 补仓记录</button>
-            <button class="tab" onclick="switchTab('orders')">📋 挂单记录</button>
             <button class="tab" onclick="switchTab('decisions')">🎯 决策记录</button>
         </div>
         
@@ -518,19 +519,67 @@
             </div>
         </div>
         
+        <!-- 止盈止损 -->
+        <div id="stop-profit-loss-tab" class="tab-content">
+            <div class="card" style="background: linear-gradient(135deg, #d1fae5 0%, #a7f3d0 100%); border-left: 4px solid #10b981;">
+                <h2 style="color: #047857;">💰 止盈止损管理</h2>
+                <p style="color: #065f46; margin-bottom: 15px; font-size: 0.95em;">
+                    📊 自动监控仓位盈亏，按规则分批止盈止损
+                </p>
+                <div style="margin-bottom: 15px;">
+                    <button class="btn btn-primary" onclick="scanStopProfitLoss()">🔍 手动扫描</button>
+                    <button class="btn btn-success" onclick="loadStopProfitLossLogs()">🔄 刷新日志</button>
+                </div>
+                <div id="stop-profit-loss-content" class="loading">加载中...</div>
+            </div>
+            
+            <!-- 止盈止损决策日志 -->
+            <div class="card" style="margin-top: 20px; background: #f8f9fa;">
+                <h2 style="color: #333;">📋 止盈止损决策日志</h2>
+                <p style="color: #666; margin-bottom: 15px; font-size: 0.95em;">
+                    📊 记录所有止盈止损触发的完整决策过程
+                </p>
+                <div id="stop-profit-loss-logs" class="loading">加载中...</div>
+            </div>
+        </div>
+        
         <!-- 开仓记录 -->
         <div id="positions-tab" class="tab-content">
             <div class="card">
-                <h2>开仓记录</h2>
+                <h2>开仓记录（不包含锚点单维护）</h2>
                 <div id="positions-content" class="loading">加载中...</div>
+            </div>
+            
+            <!-- 开仓决策日志 -->
+            <div class="card" style="margin-top: 20px; background: #f8f9fa;">
+                <h2 style="color: #333;">📋 开仓决策日志</h2>
+                <p style="color: #666; margin-bottom: 15px; font-size: 0.95em;">
+                    📊 记录开仓的完整决策过程（压力线检查、单币种限制等）
+                </p>
+                <div style="margin-bottom: 15px;">
+                    <button class="btn btn-success" onclick="loadOpenDecisionLogs()">🔄 刷新日志</button>
+                </div>
+                <div id="open-decision-logs" class="loading">加载中...</div>
             </div>
         </div>
         
         <!-- 补仓记录 -->
         <div id="adds-tab" class="tab-content">
             <div class="card">
-                <h2>补仓记录</h2>
+                <h2>补仓记录（不包含锚点单维护）</h2>
                 <div id="adds-content" class="loading">加载中...</div>
+            </div>
+            
+            <!-- 补仓决策日志 -->
+            <div class="card" style="margin-top: 20px; background: #f8f9fa;">
+                <h2 style="color: #333;">📋 补仓决策日志</h2>
+                <p style="color: #666; margin-bottom: 15px; font-size: 0.95em;">
+                    📊 记录补仓的完整决策过程（颗粒度计算、补仓阶段判断等）
+                </p>
+                <div style="margin-bottom: 15px;">
+                    <button class="btn btn-success" onclick="loadAddDecisionLogs()">🔄 刷新日志</button>
+                </div>
+                <div id="add-decision-logs" class="loading">加载中...</div>
             </div>
         </div>
         
@@ -561,9 +610,25 @@
         
         <!-- 挂单记录 -->
         <div id="orders-tab" class="tab-content">
-            <div class="card">
-                <h2>挂单记录</h2>
+            <div class="card" style="background: linear-gradient(135deg, #e0e7ff 0%, #c7d2fe 100%); border-left: 4px solid #6366f1;">
+                <h2 style="color: #4338ca;">📋 保护挂单记录</h2>
+                <p style="color: #312e81; margin-bottom: 15px; font-size: 0.95em;">
+                    🛡️ 为锚点单服务的保护挂单，防止急速拉升（币价+4%/10倍 和 +10%/20倍）
+                </p>
+                <div style="margin-bottom: 15px;">
+                    <button class="btn btn-success" onclick="loadProtectOrders()">🔄 刷新挂单</button>
+                    <button class="btn btn-primary" onclick="scanProtectOrderTrigger()">🔍 检查触发</button>
+                </div>
                 <div id="orders-content" class="loading">加载中...</div>
+            </div>
+            
+            <!-- 挂单决策日志 -->
+            <div class="card" style="margin-top: 20px; background: #f8f9fa;">
+                <h2 style="color: #333;">📋 挂单决策日志</h2>
+                <p style="color: #666; margin-bottom: 15px; font-size: 0.95em;">
+                    📊 记录保护挂单创建和触发的决策过程
+                </p>
+                <div id="protect-order-logs" class="loading">加载中...</div>
             </div>
         </div>
         
@@ -606,18 +671,23 @@
                 case 'statistics':
                     loadStatistics();
                     break;
+                case 'stop-profit-loss':
+                    loadStopProfitLossLogs();
+                    break;
                 case 'anchors':
                     loadAnchors();
                     loadAnchorDecisionLogs();
                     break;
                 case 'positions':
                     loadPositions();
+                    loadOpenDecisionLogs();
                     break;
                 case 'adds':
                     loadAdds();
+                    loadAddDecisionLogs();
                     break;
                 case 'orders':
-                    loadOrders();
+                    loadProtectOrders();
                     break;
                 case 'decisions':
                     loadDecisions();
@@ -1266,6 +1336,420 @@
         window.onload = () => {
             loadConfig();
         };
+        
+        
+        // ==================== 止盈止损相关函数 ====================
+        
+        function loadStopProfitLossLogs() {
+            fetch('/api/trading/stop-profit-loss/decision-logs?limit=20')
+                .then(res => res.json())
+                .then(data => {
+                    if (data.success) {
+                        if (data.logs.length === 0) {
+                            document.getElementById('stop-profit-loss-logs').innerHTML = '<div class="empty-state">暂无止盈止损日志</div>';
+                            return;
+                        }
+                        
+                        let html = '<div style="max-height: 600px; overflow-y: auto;">';
+                        
+                        for (const log of data.logs) {
+                            const typeBadge = log.decision_type === 'profit' ? 
+                                '<span style="background:#10b981;color:white;padding:3px 8px;border-radius:3px;font-size:12px;">💰 止盈</span>' :
+                                '<span style="background:#ef4444;color:white;padding:3px 8px;border-radius:3px;font-size:12px;">🛑 止损</span>';
+                            
+                            const posSideBadge = log.pos_side === 'long' ?
+                                '<span style="background:#3b82f6;color:white;padding:3px 8px;border-radius:3px;font-size:12px;">做多</span>' :
+                                '<span style="background:#f59e0b;color:white;padding:3px 8px;border-radius:3px;font-size:12px;">做空</span>';
+                            
+                            html += `
+                                <div style="background:white;border:1px solid #e5e7eb;border-radius:8px;padding:15px;margin-bottom:15px;border-left:4px solid ${log.decision_type === 'profit' ? '#10b981' : '#ef4444'};">
+                                    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">
+                                        <div>
+                                            <strong style="font-size:16px;">${log.inst_id}</strong>
+                                            ${posSideBadge}
+                                            ${typeBadge}
+                                        </div>
+                                        <div style="color:#666;font-size:13px;">${log.trigger_time}</div>
+                                    </div>
+                                    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;margin-bottom:10px;font-size:14px;">
+                                        <div>
+                                            <span style="color:#666;">当前价:</span>
+                                            <span style="font-weight:bold;">${log.current_price?.toFixed(4) || 'N/A'}</span>
+                                        </div>
+                                        <div>
+                                            <span style="color:#666;">盈亏率:</span>
+                                            <span style="font-weight:bold;color:${log.profit_rate >= 0 ? '#10b981' : '#ef4444'};">${log.profit_rate?.toFixed(2) || 'N/A'}%</span>
+                                        </div>
+                                        <div>
+                                            <span style="color:#666;">剩余仓位:</span>
+                                            <span style="font-weight:bold;">${log.remaining_position?.toFixed(2) || 'N/A'} USDT</span>
+                                        </div>
+                                        <div>
+                                            <span style="color:#666;">平仓金额:</span>
+                                            <span style="font-weight:bold;color:#ef4444;">${log.close_amount?.toFixed(2) || 'N/A'} USDT</span>
+                                        </div>
+                                    </div>
+                                    ${log.trigger_reason ? `
+                                        <div style="background:#f3f4f6;padding:10px;border-radius:5px;margin-top:10px;font-size:13px;">
+                                            <strong>触发原因:</strong> ${log.trigger_reason}
+                                        </div>
+                                    ` : ''}
+                                    ${log.decision_steps ? `
+                                        <div style="margin-top:10px;">
+                                            <strong style="font-size:13px;color:#666;">决策步骤:</strong>
+                                            <div style="margin-top:5px;">
+                                                ${log.decision_steps.map(step => `
+                                                    <div style="padding:5px 0;font-size:13px;border-left:2px solid #e5e7eb;padding-left:10px;margin-left:5px;">
+                                                        ${step}
+                                                    </div>
+                                                `).join('')}
+                                            </div>
+                                        </div>
+                                    ` : ''}
+                                </div>
+                            `;
+                        }
+                        
+                        html += '</div>';
+                        document.getElementById('stop-profit-loss-logs').innerHTML = html;
+                    }
+                })
+                .catch(err => {
+                    document.getElementById('stop-profit-loss-logs').innerHTML = `<div class="alert alert-danger">加载失败: ${err.message}</div>`;
+                });
+        }
+        
+        function scanStopProfitLoss() {
+            if (!confirm('确认执行止盈止损扫描？\n\n系统将：\n1. 检查所有持仓的盈亏情况\n2. 根据规则判断是否触发止盈/止损\n3. 记录详细决策日志')) {
+                return;
+            }
+            
+            document.getElementById('stop-profit-loss-logs').innerHTML = '<div class="loading">扫描中...</div>';
+            
+            fetch('/api/trading/stop-profit-loss/scan', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'}
+            })
+            .then(res => res.json())
+            .then(data => {
+                if (data.success) {
+                    alert(`扫描完成！\n发现 ${data.count} 个触发机会`);
+                    loadStopProfitLossLogs();
+                } else {
+                    alert('扫描失败: ' + data.error);
+                }
+            })
+            .catch(err => {
+                alert('扫描失败: ' + err.message);
+            });
+        }
+        
+        // ==================== 开仓决策日志函数 ====================
+        
+        function loadOpenDecisionLogs() {
+            fetch('/api/trading/open/decision-logs?limit=20')
+                .then(res => res.json())
+                .then(data => {
+                    if (data.success) {
+                        if (data.logs.length === 0) {
+                            document.getElementById('open-decision-logs').innerHTML = '<div class="empty-state">暂无开仓决策日志</div>';
+                            return;
+                        }
+                        
+                        let html = '<div style="max-height: 600px; overflow-y: auto;">';
+                        
+                        for (const log of data.logs) {
+                            const resultBadge = log.result === 'can_open' ? 
+                                '<span style="background:#10b981;color:white;padding:3px 8px;border-radius:3px;font-size:12px;">✅ 可开仓</span>' :
+                                '<span style="background:#9ca3af;color:white;padding:3px 8px;border-radius:3px;font-size:12px;">⏭️ 跳过</span>';
+                            
+                            html += `
+                                <div style="background:white;border:1px solid #e5e7eb;border-radius:8px;padding:15px;margin-bottom:15px;border-left:4px solid ${log.result === 'can_open' ? '#10b981' : '#9ca3af'};">
+                                    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">
+                                        <div>
+                                            <strong style="font-size:16px;">${log.inst_id}</strong>
+                                            ${resultBadge}
+                                        </div>
+                                        <div style="color:#666;font-size:13px;">${log.decision_time}</div>
+                                    </div>
+                                    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;margin-bottom:10px;font-size:14px;">
+                                        ${log.pressure1 ? `<div>
+                                            <span style="color:#666;">压力线1:</span>
+                                            <span style="font-weight:bold;">${log.pressure1.toFixed(4)}</span>
+                                        </div>` : ''}
+                                        ${log.pressure2 ? `<div>
+                                            <span style="color:#666;">压力线2:</span>
+                                            <span style="font-weight:bold;">${log.pressure2.toFixed(4)}</span>
+                                        </div>` : ''}
+                                        ${log.position_48h ? `<div>
+                                            <span style="color:#666;">48h位置:</span>
+                                            <span style="font-weight:bold;">${log.position_48h.toFixed(2)}</span>
+                                        </div>` : ''}
+                                        ${log.position_7d ? `<div>
+                                            <span style="color:#666;">7d位置:</span>
+                                            <span style="font-weight:bold;">${log.position_7d.toFixed(2)}</span>
+                                        </div>` : ''}
+                                        ${log.open_amount ? `<div>
+                                            <span style="color:#666;">开仓金额:</span>
+                                            <span style="font-weight:bold;color:#10b981;">${log.open_amount.toFixed(2)} USDT</span>
+                                        </div>` : ''}
+                                    </div>
+                                    ${log.trigger_reason ? `
+                                        <div style="background:#f3f4f6;padding:10px;border-radius:5px;margin-bottom:10px;font-size:13px;">
+                                            <strong>原因:</strong> ${log.trigger_reason}
+                                        </div>
+                                    ` : ''}
+                                    ${log.decision_steps ? `
+                                        <div style="margin-top:10px;">
+                                            <strong style="font-size:13px;color:#666;">决策步骤:</strong>
+                                            <div style="margin-top:5px;">
+                                                ${log.decision_steps.map(step => `
+                                                    <div style="padding:5px 0;font-size:13px;border-left:2px solid #e5e7eb;padding-left:10px;margin-left:5px;">
+                                                        ${step}
+                                                    </div>
+                                                `).join('')}
+                                            </div>
+                                        </div>
+                                    ` : ''}
+                                </div>
+                            `;
+                        }
+                        
+                        html += '</div>';
+                        document.getElementById('open-decision-logs').innerHTML = html;
+                    }
+                })
+                .catch(err => {
+                    document.getElementById('open-decision-logs').innerHTML = `<div class="alert alert-danger">加载失败: ${err.message}</div>`;
+                });
+        }
+        
+        // ==================== 补仓决策日志函数 ====================
+        
+        function loadAddDecisionLogs() {
+            fetch('/api/trading/add/decision-logs?limit=20')
+                .then(res => res.json())
+                .then(data => {
+                    if (data.success) {
+                        if (data.logs.length === 0) {
+                            document.getElementById('add-decision-logs').innerHTML = '<div class="empty-state">暂无补仓决策日志</div>';
+                            return;
+                        }
+                        
+                        let html = '<div style="max-height: 600px; overflow-y: auto;">';
+                        
+                        for (const log of data.logs) {
+                            const resultBadge = log.result === 'can_add' ? 
+                                '<span style="background:#10b981;color:white;padding:3px 8px;border-radius:3px;font-size:12px;">✅ 可补仓</span>' :
+                                '<span style="background:#9ca3af;color:white;padding:3px 8px;border-radius:3px;font-size:12px;">⏭️ 跳过</span>';
+                            
+                            const posSideBadge = log.pos_side === 'long' ?
+                                '<span style="background:#3b82f6;color:white;padding:3px 8px;border-radius:3px;font-size:12px;">做多</span>' :
+                                '<span style="background:#f59e0b;color:white;padding:3px 8px;border-radius:3px;font-size:12px;">做空</span>';
+                            
+                            html += `
+                                <div style="background:white;border:1px solid #e5e7eb;border-radius:8px;padding:15px;margin-bottom:15px;border-left:4px solid ${log.result === 'can_add' ? '#10b981' : '#9ca3af'};">
+                                    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">
+                                        <div>
+                                            <strong style="font-size:16px;">${log.inst_id}</strong>
+                                            ${posSideBadge}
+                                            ${resultBadge}
+                                        </div>
+                                        <div style="color:#666;font-size:13px;">${log.decision_time}</div>
+                                    </div>
+                                    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;margin-bottom:10px;font-size:14px;">
+                                        ${log.current_loss_rate ? `<div>
+                                            <span style="color:#666;">当前亏损率:</span>
+                                            <span style="font-weight:bold;color:#ef4444;">${log.current_loss_rate.toFixed(2)}%</span>
+                                        </div>` : ''}
+                                        ${log.add_level ? `<div>
+                                            <span style="color:#666;">补仓Level:</span>
+                                            <span style="font-weight:bold;">${log.add_level}</span>
+                                        </div>` : ''}
+                                        ${log.add_amount ? `<div>
+                                            <span style="color:#666;">补仓金额:</span>
+                                            <span style="font-weight:bold;color:#10b981;">${log.add_amount.toFixed(2)} USDT</span>
+                                        </div>` : ''}
+                                        ${log.current_position_value ? `<div>
+                                            <span style="color:#666;">当前仓位:</span>
+                                            <span style="font-weight:bold;">${log.current_position_value.toFixed(2)} USDT</span>
+                                        </div>` : ''}
+                                    </div>
+                                    ${log.stage_info ? `
+                                        <div style="background:#fef3c7;padding:10px;border-radius:5px;margin-bottom:10px;font-size:13px;">
+                                            <strong>阶段信息:</strong> Stage ${log.stage_info.stage} | 
+                                            触发阈值: ${log.stage_info.trigger_loss}% | 
+                                            补仓比例: ${log.stage_info.add_percent}%
+                                        </div>
+                                    ` : ''}
+                                    ${log.trigger_reason ? `
+                                        <div style="background:#f3f4f6;padding:10px;border-radius:5px;margin-bottom:10px;font-size:13px;">
+                                            <strong>原因:</strong> ${log.trigger_reason}
+                                        </div>
+                                    ` : ''}
+                                    ${log.decision_steps ? `
+                                        <div style="margin-top:10px;">
+                                            <strong style="font-size:13px;color:#666;">决策步骤:</strong>
+                                            <div style="margin-top:5px;">
+                                                ${log.decision_steps.map(step => `
+                                                    <div style="padding:5px 0;font-size:13px;border-left:2px solid #e5e7eb;padding-left:10px;margin-left:5px;">
+                                                        ${step}
+                                                    </div>
+                                                `).join('')}
+                                            </div>
+                                        </div>
+                                    ` : ''}
+                                </div>
+                            `;
+                        }
+                        
+                        html += '</div>';
+                        document.getElementById('add-decision-logs').innerHTML = html;
+                    }
+                })
+                .catch(err => {
+                    document.getElementById('add-decision-logs').innerHTML = `<div class="alert alert-danger">加载失败: ${err.message}</div>`;
+                });
+        }
+        
+        // ==================== 保护挂单函数 ====================
+        
+        function loadProtectOrders() {
+            fetch('/api/trading/protect-orders/list?limit=50')
+                .then(res => res.json())
+                .then(data => {
+                    if (data.success) {
+                        if (data.orders.length === 0) {
+                            document.getElementById('orders-content').innerHTML = '<div class="empty-state">暂无保护挂单</div>';
+                            return;
+                        }
+                        
+                        const rows = data.orders.map(o => `
+                            <tr>
+                                <td>${o.created_time}</td>
+                                <td><strong>${o.inst_id}</strong></td>
+                                <td>${o.order_type === 'protect_1' ? '保护挂单1' : '保护挂单2'}</td>
+                                <td>${o.anchor_open_price.toFixed(4)}</td>
+                                <td>${o.trigger_price.toFixed(4)} (+${o.price_offset_percent}%)</td>
+                                <td>${o.leverage}x</td>
+                                <td>${o.close_percent}%</td>
+                                <td><span class="status-badge status-${o.status}">${o.status === 'pending' ? '⏳ 待触发' : o.status === 'triggered' ? '🔔 已触发' : '✅ 已执行'}</span></td>
+                            </tr>
+                        `).join('');
+                        
+                        const html = `
+                            <table>
+                                <thead>
+                                    <tr>
+                                        <th>创建时间</th>
+                                        <th>币种</th>
+                                        <th>挂单类型</th>
+                                        <th>锚点价格</th>
+                                        <th>触发价格</th>
+                                        <th>杠杆</th>
+                                        <th>平仓比例</th>
+                                        <th>状态</th>
+                                    </tr>
+                                </thead>
+                                <tbody>${rows}</tbody>
+                            </table>
+                        `;
+                        
+                        document.getElementById('orders-content').innerHTML = html;
+                    }
+                })
+                .catch(err => {
+                    document.getElementById('orders-content').innerHTML = `<div class="alert alert-danger">加载失败: ${err.message}</div>`;
+                });
+            
+            // 同时加载决策日志
+            loadProtectOrderLogs();
+        }
+        
+        function loadProtectOrderLogs() {
+            fetch('/api/trading/protect-orders/decision-logs?limit=10')
+                .then(res => res.json())
+                .then(data => {
+                    if (data.success) {
+                        if (data.logs.length === 0) {
+                            document.getElementById('protect-order-logs').innerHTML = '<div class="empty-state">暂无决策日志</div>';
+                            return;
+                        }
+                        
+                        let html = '<div style="max-height: 600px; overflow-y: auto;">';
+                        
+                        for (const log of data.logs) {
+                            const resultBadge = log.result === 'success' ? 
+                                '<span style="background:#10b981;color:white;padding:3px 8px;border-radius:3px;font-size:12px;">✅ 成功</span>' :
+                                '<span style="background:#ef4444;color:white;padding:3px 8px;border-radius:3px;font-size:12px;">❌ 失败</span>';
+                            
+                            html += `
+                                <div style="background:white;border:1px solid #e5e7eb;border-radius:8px;padding:15px;margin-bottom:15px;border-left:4px solid ${log.result === 'success' ? '#10b981' : '#ef4444'};">
+                                    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">
+                                        <div>
+                                            <strong style="font-size:16px;">${log.inst_id}</strong>
+                                            ${resultBadge}
+                                        </div>
+                                        <div style="color:#666;font-size:13px;">${log.decision_time}</div>
+                                    </div>
+                                    ${log.anchor_open_price ? `
+                                        <div style="margin-bottom:10px;font-size:14px;">
+                                            <span style="color:#666;">锚点开仓价:</span>
+                                            <span style="font-weight:bold;">${log.anchor_open_price.toFixed(4)}</span>
+                                        </div>
+                                    ` : ''}
+                                    ${log.trigger_reason ? `
+                                        <div style="background:#f3f4f6;padding:10px;border-radius:5px;margin-bottom:10px;font-size:13px;">
+                                            <strong>触发原因:</strong> ${log.trigger_reason}
+                                        </div>
+                                    ` : ''}
+                                    ${log.decision_steps ? `
+                                        <div style="margin-top:10px;">
+                                            <strong style="font-size:13px;color:#666;">决策步骤:</strong>
+                                            <div style="margin-top:5px;">
+                                                ${log.decision_steps.map(step => `
+                                                    <div style="padding:5px 0;font-size:13px;border-left:2px solid #e5e7eb;padding-left:10px;margin-left:5px;">
+                                                        ${step}
+                                                    </div>
+                                                `).join('')}
+                                            </div>
+                                        </div>
+                                    ` : ''}
+                                </div>
+                            `;
+                        }
+                        
+                        html += '</div>';
+                        document.getElementById('protect-order-logs').innerHTML = html;
+                    }
+                })
+                .catch(err => {
+                    document.getElementById('protect-order-logs').innerHTML = `<div class="alert alert-danger">加载失败: ${err.message}</div>`;
+                });
+        }
+        
+        function scanProtectOrderTrigger() {
+            if (!confirm('确认检查保护挂单触发条件？')) {
+                return;
+            }
+            
+            fetch('/api/trading/protect-orders/scan-trigger', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'}
+            })
+            .then(res => res.json())
+            .then(data => {
+                if (data.success) {
+                    alert(`检查完成！\n发现 ${data.count} 个触发条件`);
+                    loadProtectOrders();
+                } else {
+                    alert('检查失败: ' + data.error);
+                }
+            })
+            .catch(err => {
+                alert('检查失败: ' + err.message);
+            });
+        }
         
         // 自动刷新（每60秒）
         setInterval(() => {
