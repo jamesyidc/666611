@@ -4,11 +4,13 @@
 使用路径后缀区分不同页面，而非端口号
 """
 from flask import Flask, render_template_string, request, jsonify, redirect, url_for
+from flask_compress import Compress
 import sqlite3
 from datetime import datetime, timedelta
 import json
 
 app = Flask(__name__)
+Compress(app)  # 启用gzip压缩
 
 # 首页HTML
 HOME_HTML = """
