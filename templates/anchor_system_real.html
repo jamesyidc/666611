@@ -635,68 +635,86 @@
             }
         }
 
+        // 全局变量：存储当前记录数据
+        let currentRecordsData = [];
+
+        // 计算持续时间的函数（独立抽取，方便定时更新）
+        function calculateDuration(timestamp) {
+            if (!timestamp) return '--';
+            
+            try {
+                const now = new Date();
+                const recordTime = new Date(timestamp.replace(' ', 'T') + '+08:00');
+                const diffMs = now - recordTime;
+                const totalHours = diffMs / (1000 * 60 * 60);
+                
+                if (totalHours < 0) {
+                    return '<span style="color: #718096;">刚刚</span>';
+                }
+                
+                const hours = Math.floor(totalHours);
+                const minutes = Math.floor((diffMs % (1000 * 60 * 60)) / (1000 * 60));
+                const days = Math.floor(hours / 24);
+                const remainHours = hours % 24;
+                
+                let color, text;
+                
+                if (hours < 1) {
+                    color = '#10b981';
+                    text = `${minutes}分钟`;
+                } else if (hours < 24) {
+                    color = '#3b82f6';
+                    text = `${hours}小时${minutes}分`;
+                } else if (days === 1) {
+                    color = '#f59e0b';
+                    text = `${days}天${remainHours}小时`;
+                } else if (days === 2) {
+                    color = '#f97316';
+                    text = `${days}天${remainHours}小时`;
+                } else {
+                    color = '#ef4444';
+                    text = `${days}天${remainHours}小时`;
+                }
+                
+                return `<span style="color: ${color}; font-weight: 600;">${text}</span>`;
+            } catch (e) {
+                console.error('时间解析错误:', e, timestamp);
+                return '--';
+            }
+        }
+
+        // 仅更新持续时间列（不重新渲染整个表格）
+        function updateDurations() {
+            const tbody = document.getElementById('recordsBody');
+            if (!tbody || currentRecordsData.length === 0) return;
+            
+            const rows = tbody.querySelectorAll('tr');
+            rows.forEach((row, index) => {
+                if (index < currentRecordsData.length) {
+                    const item = currentRecordsData[index];
+                    const durationCell = row.querySelector('td:nth-child(9)'); // 第9列是持续时间
+                    if (durationCell && item.timestamp) {
+                        durationCell.innerHTML = calculateDuration(item.timestamp);
+                    }
+                }
+            });
+            
+            console.log('⏰ 持续时间已更新');
+        }
+
         // 渲染历史极值记录表
         function renderRecordsTable(data) {
+            currentRecordsData = data; // 保存数据供持续时间更新使用
             const tbody = document.getElementById('recordsBody');
             
             if (data.length === 0) {
                 tbody.innerHTML = '<tr><td colspan="9" class="empty">暂无历史记录</td></tr>';
                 return;
             }
-
-            // 获取当前时间（用户浏览器本地时间）
-            const now = new Date();
             
             tbody.innerHTML = data.map(item => {
-                // 计算持续时间（小时）
-                let durationHtml = '--';
-                if (item.timestamp) {
-                    try {
-                        // 数据库中的时间是北京时间，需要标注时区
-                        // 格式：2025-12-29 20:16:10 -> 2025-12-29T20:16:10+08:00
-                        const recordTime = new Date(item.timestamp.replace(' ', 'T') + '+08:00');
-                        const diffMs = now - recordTime;
-                        const totalHours = diffMs / (1000 * 60 * 60);
-                        
-                        if (totalHours < 0) {
-                            // 如果是未来时间，显示为刚刚
-                            durationHtml = '<span style="color: #718096;">刚刚</span>';
-                        } else {
-                            const hours = Math.floor(totalHours);
-                            const minutes = Math.floor((diffMs % (1000 * 60 * 60)) / (1000 * 60));
-                            const days = Math.floor(hours / 24);
-                            const remainHours = hours % 24;
-                            
-                            let color, text;
-                            
-                            if (hours < 1) {
-                                // 小于1小时：显示分钟 - 绿色
-                                color = '#10b981'; // 亮绿色
-                                text = `${minutes}分钟`;
-                            } else if (hours < 24) {
-                                // 小于24小时：显示小时 - 蓝色
-                                color = '#3b82f6'; // 蓝色
-                                text = `${hours}小时${minutes}分`;
-                            } else if (days === 1) {
-                                // 1天：显示天数+小时 - 黄色
-                                color = '#f59e0b'; // 黄色
-                                text = `${days}天${remainHours}小时`;
-                            } else if (days === 2) {
-                                // 2天：显示天数+小时 - 橙色
-                                color = '#f97316'; // 橙色
-                                text = `${days}天${remainHours}小时`;
-                            } else {
-                                // 3天及以上：显示天数+小时 - 红色
-                                color = '#ef4444'; // 红色
-                                text = `${days}天${remainHours}小时`;
-                            }
-                            
-                            durationHtml = `<span style="color: ${color}; font-weight: 600;">${text}</span>`;
-                        }
-                    } catch (e) {
-                        console.error('时间解析错误:', e, item.timestamp);
-                    }
-                }
+                // 计算持续时间
+                const durationHtml = calculateDuration(item.timestamp)
                 
                 return `
                 <tr>
@@ -1039,13 +1057,19 @@
             // 初始加载数据
             loadData();
             
-            // 自动刷新（每30秒）
+            // 自动刷新数据（每30秒）
             setInterval(() => {
-                console.log('⏰ 自动刷新触发...', new Date().toLocaleString('zh-CN'));
+                console.log('⏰ 自动刷新数据...', new Date().toLocaleString('zh-CN'));
                 refreshData();
             }, 30000);
             
-            console.log('✅ 页面初始化完成，30秒自动刷新已启动');
+            // 持续时间独立更新（每30秒）
+            setInterval(() => {
+                console.log('⏰ 更新持续时间...', new Date().toLocaleString('zh-CN'));
+                updateDurations();
+            }, 30000);
+            
+            console.log('✅ 页面初始化完成，30秒自动刷新已启动（数据+持续时间）');
         });
     </script>
 </body>
