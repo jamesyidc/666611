@@ -498,6 +498,9 @@
                 <div class="card-title">
                     <span>💼</span>
                     当前持仓情况
+                    <span id="positionStats" style="margin-left: 15px; font-size: 14px; font-weight: normal; color: #718096;">
+                        <!-- 统计信息将在这里动态显示 -->
+                    </span>
                 </div>
                 <div class="update-time" id="currentPositionTime" style="font-size: 14px; color: #718096;">
                     最后更新: --
@@ -724,14 +727,46 @@
         // 渲染当前持仓情况
         function renderCurrentPositions(data) {
             const tbody = document.getElementById('currentPositionBody');
+            const statsDiv = document.getElementById('positionStats');
             
             if (data.length === 0) {
                 tbody.innerHTML = '<tr><td colspan="10" class="empty">当前无持仓</td></tr>';
+                statsDiv.innerHTML = '';
                 return;
             }
 
+            // 统计做空持仓
+            const shortPositions = data.filter(item => item.pos_side === 'short');
+            const profitAbove40 = shortPositions.filter(item => item.profit_rate >= 40).length;
+            const lossBelow10 = shortPositions.filter(item => item.profit_rate <= -10).length;
+            
+            // 更新统计信息
+            statsDiv.innerHTML = `
+                <span style="display: inline-flex; align-items: center; gap: 15px;">
+                    <span style="background: linear-gradient(135deg, #48bb78 0%, #38a169 100%); 
+                                 color: white; 
+                                 padding: 4px 12px; 
+                                 border-radius: 12px; 
+                                 font-size: 13px;
+                                 font-weight: 600;
+                                 box-shadow: 0 2px 4px rgba(72, 187, 120, 0.3);">
+                        🎯 盈利≥40%: ${profitAbove40}
+                    </span>
+                    <span style="background: linear-gradient(135deg, ${lossBelow10 > 0 ? '#f56565' : '#a0aec0'} 0%, ${lossBelow10 > 0 ? '#e53e3e' : '#718096'} 100%); 
+                                 color: white; 
+                                 padding: 4px 12px; 
+                                 border-radius: 12px; 
+                                 font-size: 13px;
+                                 font-weight: 600;
+                                 box-shadow: 0 2px 4px ${lossBelow10 > 0 ? 'rgba(245, 101, 101, 0.3)' : 'rgba(160, 174, 192, 0.3)'};">
+                        ⚠️ 亏损≤-10%: ${lossBelow10}
+                    </span>
+                </span>
+            `;
+
             // 调试日志
             console.log('🔍 渲染当前持仓数据:', data);
+            console.log('📊 做空统计: 盈利≥40%:', profitAbove40, '亏损≤-10%:', lossBelow10);
             if (data.length > 0) {
                 console.log('📊 第一条数据 pos_size:', data[0].pos_size, 'type:', typeof data[0].pos_size);
             }
