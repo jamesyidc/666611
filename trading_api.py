@@ -153,8 +153,59 @@ def get_position_opens():
         params.append(limit)
         cursor.execute(query, tuple(params))
         
+        rows = cursor.fetchall()
+        
+        # 🚀 优化：一次性获取所有价格数据，避免多次数据库连接
+        symbols = []
+        symbol_map = {}  # inst_id -> symbol
+        for row in rows:
+            inst_id = row[1]
+            symbol = inst_id.replace('-USDT-SWAP', 'USDT')
+            symbols.append(symbol)
+            symbol_map[inst_id] = symbol
+        
+        # 🚀 一次性批量查询所有价格数据（大幅提升性能）
+        price_data = {}
+        latest_price_update = None
+        if symbols:
+            try:
+                crypto_conn = sqlite3.connect('/home/user/webapp/crypto_data.db', timeout=5.0)
+                crypto_cursor = crypto_conn.cursor()
+                
+                # 批量查询：对每个symbol，只获取最新的一条记录
+                # 方法：使用子查询获取每个symbol的最大record_time，然后JOIN获取完整记录
+                unique_symbols = list(set(symbols))  # 去重
+                placeholders = ','.join(['?'] * len(unique_symbols))
+                
+                query = f'''
+                    SELECT srl.symbol, srl.current_price, srl.record_time
+                    FROM support_resistance_levels srl
+                    INNER JOIN (
+                        SELECT symbol, MAX(record_time) as max_time
+                        FROM support_resistance_levels
+                        WHERE symbol IN ({placeholders})
+                        GROUP BY symbol
+                    ) latest ON srl.symbol = latest.symbol AND srl.record_time = latest.max_time
+                '''
+                
+                crypto_cursor.execute(query, unique_symbols)
+                
+                for symbol, current_price, record_time in crypto_cursor.fetchall():
+                    price_data[symbol] = {
+                        'current_price': float(current_price) if current_price else None,
+                        'record_time': record_time
+                    }
+                    # 找出最新的价格更新时间
+                    if record_time and (not latest_price_update or record_time > latest_price_update):
+                        latest_price_update = record_time
+                
+                crypto_conn.close()
+            except Exception as e:
+                print(f"获取价格数据失败: {e}")
+        
+        # 构建记录列表
         records = []
-        for row in cursor.fetchall():
+        for row in rows:
             record = {
                 'id': row[0],
                 'inst_id': row[1],
@@ -169,34 +220,24 @@ def get_position_opens():
                 'created_at': row[10]
             }
             
-            # 获取当前市场价格和更新时间
-            try:
-                crypto_conn = sqlite3.connect('/home/user/webapp/crypto_data.db', timeout=5.0)
-                crypto_cursor = crypto_conn.cursor()
-                # 转换symbol格式: LDO-USDT-SWAP -> LDOUSDT
-                symbol = record['inst_id'].replace('-USDT-SWAP', 'USDT')
-                crypto_cursor.execute('''
-                    SELECT current_price, record_time FROM support_resistance_levels 
-                    WHERE symbol = ? 
-                    ORDER BY record_time DESC LIMIT 1
-                ''', (symbol,))
-                price_row = crypto_cursor.fetchone()
-                if price_row and price_row[0]:
-                    record['current_price'] = float(price_row[0])
-                    record['price_update_time'] = price_row[1]  # 记录价格更新时间
-                    # 计算盈亏率（考虑10x杠杆）
+            # 从预加载的价格数据中获取价格
+            symbol = symbol_map[record['inst_id']]
+            if symbol in price_data:
+                pd = price_data[symbol]
+                record['current_price'] = pd['current_price']
+                record['price_update_time'] = pd['record_time']
+                
+                # 计算盈亏率（考虑10x杠杆）
+                if pd['current_price']:
                     leverage = 10
                     if record['pos_side'] == 'short':
-                        price_change = (record['open_price'] - record['current_price']) / record['open_price']
+                        price_change = (record['open_price'] - pd['current_price']) / record['open_price']
                     else:
-                        price_change = (record['current_price'] - record['open_price']) / record['open_price']
+                        price_change = (pd['current_price'] - record['open_price']) / record['open_price']
                     record['profit_rate'] = round(price_change * leverage * 100, 2)
                 else:
-                    record['current_price'] = None
                     record['profit_rate'] = None
-                    record['price_update_time'] = None
-                crypto_conn.close()
-            except Exception as e:
+            else:
                 record['current_price'] = None
                 record['profit_rate'] = None
                 record['price_update_time'] = None
@@ -216,13 +257,6 @@ def get_position_opens():
             records.append(record)
         
         conn.close()
-        
-        # 获取最新的价格更新时间（从所有记录中取最新的）
-        latest_price_update = None
-        for r in records:
-            if r.get('price_update_time'):
-                if not latest_price_update or r['price_update_time'] > latest_price_update:
-                    latest_price_update = r['price_update_time']
         
         return jsonify({
             'success': True,

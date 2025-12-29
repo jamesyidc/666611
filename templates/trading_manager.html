@@ -997,7 +997,8 @@
             // 显示加载指示器
             document.getElementById('anchors-content').innerHTML = '<div class="loading-indicator"><div class="loading-spinner"></div>加载中...</div>';
             
-            fetch('/api/trading/positions/opens?is_anchor=1&limit=50')
+            // 🚀 减少一次加载量，提升响应速度
+            fetch('/api/trading/positions/opens?is_anchor=1&limit=20')
                 .then(res => res.json())
                 .then(data => {
                     if (data.success) {
