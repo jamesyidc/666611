@@ -411,7 +411,30 @@ class AnchorMaintenanceDaemon:
             log_id_2 = cursor.lastrowid
             print(f"  4️⃣  维护日志 #{log_id_1}, #{log_id_2}: 已记录")
             
-            # 4. 更新决策状态为已执行
+            # 4. **关键步骤：更新 position_opens 表，将持仓量改为剩余的5%**
+            cursor.execute('''
+            UPDATE position_opens
+            SET open_size = ?,
+                updated_time = ?
+            WHERE inst_id = ? AND pos_side = ? AND is_anchor = 1
+            ''', (remain_size, now, inst_id, pos_side))
+            
+            rows_updated = cursor.rowcount
+            print(f"  5️⃣  更新持仓记录: {inst_id} {pos_side} → {remain_size:.4f} (更新了{rows_updated}行)")
+            
+            # 5. **关闭相关预警（维护完成后预警应该关闭）**
+            cursor.execute('''
+            UPDATE anchor_warning_monitor
+            SET status = 'closed',
+                updated_at = ?
+            WHERE inst_id = ? AND pos_side = ? AND status = 'active'
+            ''', (now, inst_id, pos_side))
+            
+            warnings_closed = cursor.rowcount
+            if warnings_closed > 0:
+                print(f"  6️⃣  关闭预警: {inst_id} {pos_side} (关闭了{warnings_closed}个预警)")
+            
+            # 6. 更新决策状态为已执行
             cursor.execute('''
             UPDATE trading_decisions
             SET executed = 1
