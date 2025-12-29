@@ -371,7 +371,14 @@ class AnchorMaintenanceDaemon:
             
             log_id_1 = cursor.lastrowid
             
-            # 步骤2：平仓
+            # 步骤2：平仓（需要先计算平均价格）
+            # 计算平均价格：(原持仓成本 + 补仓成本) / (原持仓 + 补仓)
+            original_cost = open_size * open_price
+            add_cost = add_size * current_price
+            total_cost = original_cost + add_cost
+            total_size_after_add = open_size + add_size
+            average_price = total_cost / total_size_after_add
+            
             cursor.execute('''
             INSERT INTO anchor_maintenance_logs (
                 inst_id,
@@ -408,7 +415,7 @@ class AnchorMaintenanceDaemon:
                 remain_size,
                 remain_size * current_price / 10,
                 f"亏损{maintenance['profit_rate']:.2f}%触发维护",
-                f"平仓{close_percent:.1f}%：{total_after_add:.4f} 张中平掉 {close_size:.4f} 张，保留1U ≈ {remain_size:.4f} 张",
+                f"平仓{close_percent:.1f}%：{total_after_add:.4f} 张中平掉 {close_size:.4f} 张，保留1U ≈ {remain_size:.4f} 张；维护后平均价格：{average_price:.4f}（原价{open_price:.4f}）",
                 'executed',
                 now,
                 now
@@ -417,16 +424,20 @@ class AnchorMaintenanceDaemon:
             log_id_2 = cursor.lastrowid
             print(f"  4️⃣  维护日志 #{log_id_1}, #{log_id_2}: 已记录")
             
-            # 4. **关键步骤：更新 position_opens 表，将持仓量改为剩余的1U对应量**
+            # 5. **关键步骤：更新 position_opens 表，使用已计算的平均价格**
             cursor.execute('''
             UPDATE position_opens
             SET open_size = ?,
+                open_price = ?,
                 updated_time = ?
             WHERE inst_id = ? AND pos_side = ? AND is_anchor = 1
-            ''', (remain_size, now, inst_id, pos_side))
+            ''', (remain_size, average_price, now, inst_id, pos_side))
             
             rows_updated = cursor.rowcount
-            print(f"  5️⃣  更新持仓记录: {inst_id} {pos_side} → {remain_size:.4f} (更新了{rows_updated}行)")
+            print(f"  5️⃣  更新持仓记录: {inst_id} {pos_side}")
+            print(f"     原价格: {open_price:.4f} → 平均价格: {average_price:.4f}")
+            print(f"     原持仓: {open_size:.4f} → 剩余持仓: {remain_size:.4f}")
+            print(f"     更新了 {rows_updated} 行")
             
             # 5. **关闭相关预警（维护完成后预警应该关闭）**
             cursor.execute('''
