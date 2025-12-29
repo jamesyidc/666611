@@ -848,38 +848,18 @@
         
         // 检查预警模块是否存在
         window.addEventListener('DOMContentLoaded', function() {
-            console.log('🔍 页面版本检测开始...');
+            console.log('📊 开始加载锚点系统数据...');
             
-            const warningEntry = document.getElementById('warning-quick-entry');
-            const pageVersion = document.getElementById('page-version');
+            // 初始加载数据
+            refreshData();
             
-            if (!warningEntry) {
-                console.error('❌ 预警模块未找到！浏览器缓存了旧版本');
-                // 显示强制刷新提示
-                const alertDiv = document.createElement('div');
-                alertDiv.innerHTML = `
-                    <div style="position: fixed; top: 0; left: 0; right: 0; background: #ef4444; color: white; padding: 15px; text-align: center; z-index: 99999; font-size: 16px; font-weight: bold;">
-                        ⚠️ 检测到浏览器缓存，正在自动刷新页面...
-                    </div>
-                `;
-                document.body.insertBefore(alertDiv, document.body.firstChild);
-                
-                // 3秒后强制刷新
-                setTimeout(() => {
-                    location.reload(true);
-                }, 3000);
-            } else {
-                console.log('✅ 预警模块已加载');
-                console.log('✅ 页面版本:', pageVersion ? pageVersion.dataset.version : 'unknown');
-            }
+            // 自动刷新（每30秒）
+            setInterval(() => {
+                refreshData();
+            }, 30000);
+            
+            console.log('✅ 页面初始化完成');
         });
-
-        // ============================================================
-        // 预警监控相关函数
-        // ============================================================
-
-        // 扫描锚点预警
-        function scanAnchorWarnings() {
     </script>
 </body>
 </html>
