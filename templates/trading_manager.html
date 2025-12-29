@@ -2090,8 +2090,8 @@
                                 '<span style="background:#10b981;color:white;padding:3px 8px;border-radius:3px;font-size:12px;">✅ 已执行</span>' :
                                 '<span style="background:#fbbf24;color:white;padding:3px 8px;border-radius:3px;font-size:12px;">⏳ 待执行</span>';
                             
-                            const decision_log = typeof log.decision_log === 'string' ? 
-                                JSON.parse(log.decision_log) : log.decision_log;
+                            // decision_log 是普通字符串，不需要 JSON.parse
+                            const decision_log = log.decision_log || '';
                             
                             html += `
                                 <div style="background:white;border:1px solid #e5e7eb;border-radius:8px;padding:15px;margin-bottom:15px;border-left:4px solid #ef4444;">
@@ -2124,12 +2124,7 @@
                                     
                                     ${decision_log ? `
                                         <div style="background:#f9fafb;padding:10px;border-radius:5px;font-size:13px;line-height:1.6;">
-                                            ${decision_log.step1 || ''}<br>
-                                            ${decision_log.step2 || ''}<br>
-                                            ${decision_log.step3 || ''}<br>
-                                            ${decision_log.step4 || ''}<br>
-                                            ${decision_log.step5 || ''}<br>
-                                            ${decision_log.step6 || ''}
+                                            ${decision_log}
                                         </div>
                                     ` : ''}
                                     
