@@ -12388,3 +12388,9 @@ def simulated_trades():
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=5000, debug=False)
 
+
+# 测试页面路由
+@app.route('/test-positions')
+def test_positions_page():
+    """持仓数据测试页面"""
+    return render_template('test_positions.html')

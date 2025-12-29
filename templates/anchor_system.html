@@ -596,6 +596,12 @@
                 return;
             }
 
+            // 调试日志
+            console.log('🔍 渲染当前持仓数据:', data);
+            if (data.length > 0) {
+                console.log('📊 第一条数据 pos_size:', data[0].pos_size, 'type:', typeof data[0].pos_size);
+            }
+
             tbody.innerHTML = data.map(item => `
                 <tr>
                     <td style="font-weight: 600;">${item.inst_id || '--'}</td>
@@ -604,7 +610,7 @@
                             ${item.pos_side === 'short' ? '做空' : '做多'}
                         </span>
                     </td>
-                    <td>${item.pos_size.toFixed(4)}</td>
+                    <td>${(item.pos_size || 0).toFixed(4)}</td>
                     <td>$${item.avg_price.toFixed(4)}</td>
                     <td>$${item.mark_price.toFixed(4)}</td>
                     <td>${item.lever}x</td>
