@@ -12045,10 +12045,14 @@ def get_anchor_status():
 
 @app.route('/api/anchor-system/profit-records')
 def get_anchor_profit_records():
-    """获取历史极值记录"""
+    """获取历史极值记录 - 实盘和模拟盘使用不同的表"""
     try:
         inst_id = request.args.get('inst_id')
         pos_side = request.args.get('pos_side')
+        trade_mode = request.args.get('trade_mode', 'real')  # 默认实盘
+        
+        # 根据 trade_mode 选择不同的表
+        table_name = 'anchor_real_profit_records' if trade_mode == 'real' else 'anchor_paper_profit_records'
         
         db_path = '/home/user/webapp/anchor_system.db'
         conn = sqlite3.connect(db_path, timeout=10.0)
@@ -12056,17 +12060,17 @@ def get_anchor_profit_records():
         
         if inst_id and pos_side:
             # 查询特定币种的记录
-            cursor.execute('''
+            cursor.execute(f'''
             SELECT record_type, profit_rate, timestamp, pos_size, avg_price, mark_price, upl, margin, leverage
-            FROM anchor_profit_records
+            FROM {table_name}
             WHERE inst_id = ? AND pos_side = ?
             ORDER BY record_type
             ''', (inst_id, pos_side))
         else:
             # 查询所有记录
-            cursor.execute('''
+            cursor.execute(f'''
             SELECT inst_id, pos_side, record_type, profit_rate, timestamp, pos_size, avg_price, mark_price
-            FROM anchor_profit_records
+            FROM {table_name}
             ORDER BY inst_id, pos_side, record_type
             ''')
         
@@ -12103,7 +12107,8 @@ def get_anchor_profit_records():
         return jsonify({
             'success': True,
             'records': records,
-            'total': len(records)
+            'total': len(records),
+            'trade_mode': trade_mode
         })
     except Exception as e:
         return jsonify({

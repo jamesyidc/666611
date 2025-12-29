@@ -593,8 +593,8 @@
                     renderAlerts(alertsData.data);
                 }
 
-                // 加载历史极值记录
-                const recordsRes = await fetch('/api/anchor-system/profit-records');
+                // 加载历史极值记录（实盘）
+                const recordsRes = await fetch('/api/anchor-system/profit-records?trade_mode=real');
                 const recordsData = await recordsRes.json();
                 
                 if (recordsData.success) {
