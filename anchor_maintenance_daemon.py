@@ -80,25 +80,24 @@ class AnchorMaintenanceDaemon:
             return []
     
     def get_current_price(self, inst_id: str) -> Optional[float]:
-        """从anchor_system.db获取最新价格"""
+        """从 OKEx API 获取实时价格"""
         try:
-            conn = sqlite3.connect(self.anchor_db, timeout=10.0)
-            conn.row_factory = sqlite3.Row
-            cursor = conn.cursor()
+            import sys
+            sys.path.append('/home/user/webapp')
+            from anchor_system import get_positions
             
-            cursor.execute('''
-            SELECT mark_price
-            FROM anchor_monitors
-            WHERE inst_id = ?
-            ORDER BY created_at DESC
-            LIMIT 1
-            ''', (inst_id,))
+            # 从 OKEx API 获取所有持仓
+            positions = get_positions()
             
-            row = cursor.fetchone()
-            conn.close()
+            if not positions:
+                return None
             
-            if row:
-                return row['mark_price']
+            # 查找对应的持仓
+            for pos in positions:
+                if pos.get('instId') == inst_id:
+                    mark_price = float(pos.get('markPx', 0))
+                    return mark_price if mark_price > 0 else None
+            
             return None
             
         except Exception as e:
