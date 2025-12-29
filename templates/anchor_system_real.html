@@ -482,10 +482,11 @@
                             <th>开仓价</th>
                             <th>标记价</th>
                             <th>时间</th>
+                            <th>持续时间</th>
                         </tr>
                     </thead>
                     <tbody id="recordsBody">
-                        <tr><td colspan="8" class="loading">加载中...</td></tr>
+                        <tr><td colspan="9" class="loading">加载中...</td></tr>
                     </tbody>
                 </table>
             </div>
@@ -636,11 +637,47 @@
             const tbody = document.getElementById('recordsBody');
             
             if (data.length === 0) {
-                tbody.innerHTML = '<tr><td colspan="8" class="empty">暂无历史记录</td></tr>';
+                tbody.innerHTML = '<tr><td colspan="9" class="empty">暂无历史记录</td></tr>';
                 return;
             }
 
-            tbody.innerHTML = data.map(item => `
+            // 获取北京时间（UTC+8）
+            const now = new Date();
+            const beijingNow = new Date(now.getTime() + (8 * 60 * 60 * 1000));
+            
+            tbody.innerHTML = data.map(item => {
+                // 计算持续时间（小时）
+                let durationHtml = '--';
+                if (item.timestamp) {
+                    try {
+                        // 数据库中的时间已经是北京时间
+                        const recordTime = new Date(item.timestamp.replace(' ', 'T') + '+08:00');
+                        const diffMs = beijingNow - recordTime;
+                        const totalHours = diffMs / (1000 * 60 * 60);
+                        
+                        if (totalHours < 0) {
+                            // 如果是未来时间，显示为即将到来
+                            durationHtml = '<span style="color: #718096;">刚刚</span>';
+                        } else {
+                            const hours = Math.floor(totalHours);
+                            const minutes = Math.floor((diffMs % (1000 * 60 * 60)) / (1000 * 60));
+                            
+                            if (hours < 1) {
+                                durationHtml = `<span style="color: #48bb78; font-weight: 600;">${minutes}分钟</span>`;
+                            } else if (hours < 24) {
+                                durationHtml = `<span style="color: #48bb78; font-weight: 600;">${hours}小时${minutes}分</span>`;
+                            } else {
+                                const days = Math.floor(hours / 24);
+                                const remainHours = hours % 24;
+                                durationHtml = `<span style="color: #ed8936; font-weight: 600;">${days}天${remainHours}小时</span>`;
+                            }
+                        }
+                    } catch (e) {
+                        console.error('时间解析错误:', e);
+                    }
+                }
+                
+                return `
                 <tr>
                     <td>${item.inst_id || '--'}</td>
                     <td>
@@ -660,8 +697,10 @@
                     <td>$${(item.avg_price || 0).toFixed(4)}</td>
                     <td>$${(item.mark_price || 0).toFixed(4)}</td>
                     <td>${item.timestamp}</td>
+                    <td>${durationHtml}</td>
                 </tr>
-            `).join('');
+            `;
+            }).join('');
         }
 
         // 渲染当前持仓情况
