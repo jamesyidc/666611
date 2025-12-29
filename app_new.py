@@ -12111,7 +12111,7 @@ def get_current_positions():
             SELECT inst_id, pos_side, open_size, open_price,
                    mark_price, profit_rate, upl, lever, margin
             FROM position_opens
-            WHERE is_anchor = 1
+            WHERE is_anchor = 1 AND open_size != 1.0
             ORDER BY created_at DESC
         ''')
         
