@@ -12098,7 +12098,7 @@ def get_anchor_profit_records():
 
 @app.route('/api/anchor-system/current-positions')
 def get_current_positions():
-    """获取当前持仓情况 - 从 OKEx API 实时获取持仓数据，开仓价格优先使用数据库维护后的价格"""
+    """获取当前持仓情况 - 模拟盘直接读取数据库，实盘从 OKEx API 实时获取"""
     try:
         import sys
         import sqlite3
@@ -12106,15 +12106,8 @@ def get_current_positions():
         sys.path.append('/home/user/webapp')
         from anchor_system import get_positions, calculate_profit_rate
         
-        # 从 OKEx API 获取实时持仓
-        okex_positions = get_positions()
-        
-        if not okex_positions or len(okex_positions) == 0:
-            return jsonify({
-                'success': True,
-                'positions': [],
-                'total': 0
-            })
+        # 获取交易模式（默认为 paper 模拟盘）
+        trade_mode = request.args.get('trade_mode', 'paper')
         
         # 连接数据库，获取维护后的开仓价格
         DB_PATH = '/home/user/webapp/trading_decision.db'
@@ -12122,14 +12115,67 @@ def get_current_positions():
         conn.row_factory = sqlite3.Row
         cursor = conn.cursor()
         
-        # 获取所有锚点单的开仓价格
+        # 从数据库读取模拟盘数据
         cursor.execute('''
-            SELECT inst_id, pos_side, open_price, open_size, updated_time
+            SELECT inst_id, pos_side, open_price, open_size, updated_time, 
+                   mark_price, profit_rate, upl, lever, margin
             FROM position_opens
-            WHERE is_anchor = 1
-        ''')
-        db_positions = {(row['inst_id'], row['pos_side']): row for row in cursor.fetchall()}
+            WHERE is_anchor = 1 AND (trade_mode = ? OR trade_mode IS NULL)
+        ''', (trade_mode,))
+        
+        db_positions = cursor.fetchall()
         conn.close()
+        
+        # 如果是模拟盘，直接使用数据库数据
+        if trade_mode == 'paper':
+            position_list = []
+            for row in db_positions:
+                profit_rate = row['profit_rate'] if row['profit_rate'] is not None else 0.0
+                
+                # 判断状态
+                status = '监控中'
+                status_class = 'normal'
+                if profit_rate >= 40:
+                    status = '接近盈利目标'
+                    status_class = 'profit'
+                elif profit_rate <= -10:
+                    status = '接近止损'
+                    status_class = 'loss'
+                
+                position_list.append({
+                    'inst_id': row['inst_id'],
+                    'pos_side': row['pos_side'],
+                    'pos_size': abs(float(row['open_size'])),
+                    'avg_price': float(row['open_price']),
+                    'mark_price': float(row['mark_price']) if row['mark_price'] else 0.0,
+                    'lever': int(row['lever']) if row['lever'] else 10,
+                    'upl': float(row['upl']) if row['upl'] else 0.0,
+                    'margin': float(row['margin']) if row['margin'] else 0.0,
+                    'profit_rate': profit_rate,
+                    'status': status,
+                    'status_class': status_class
+                })
+            
+            return jsonify({
+                'success': True,
+                'positions': position_list,
+                'total': len(position_list),
+                'trade_mode': trade_mode
+            })
+        
+        # 如果是实盘，从 OKEx API 获取实时持仓
+        okex_positions = get_positions()
+        
+        if not okex_positions or len(okex_positions) == 0:
+            return jsonify({
+                'success': True,
+                'positions': [],
+                'total': 0,
+                'trade_mode': trade_mode
+            })
+        
+        # 将数据库记录转换为字典
+        db_positions_dict = {(row['inst_id'], row['pos_side']): row for row in db_positions}
         
         position_list = []
         for pos in okex_positions:
@@ -12149,7 +12195,7 @@ def get_current_positions():
             margin = float(pos.get('margin', 0))
             
             # 优先使用数据库中的开仓价格（维护后的平均价格）
-            db_record = db_positions.get((inst_id, pos_side))
+            db_record = db_positions_dict.get((inst_id, pos_side))
             if db_record:
                 avg_price = float(db_record['open_price'])
                 # 重新计算收益率（使用维护后的开仓价格）
@@ -12189,7 +12235,8 @@ def get_current_positions():
         return jsonify({
             'success': True,
             'positions': position_list,
-            'total': len(position_list)
+            'total': len(position_list),
+            'trade_mode': trade_mode
         })
     except Exception as e:
         return jsonify({

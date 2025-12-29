@@ -803,14 +803,9 @@
 
         // 刷新数据
         function refreshData() {
+            console.log('🔄 刷新数据...', new Date().toLocaleString('zh-CN'));
             loadData();
         }
-
-        // 初始加载
-        loadData();
-
-        // 自动刷新（每60秒）
-        setInterval(loadData, 60000);
 
         // 窗口大小变化时调整图表
         window.addEventListener('resize', () => {
@@ -822,17 +817,18 @@
         // ============================================================
         
         window.addEventListener('DOMContentLoaded', function() {
-            console.log('📊 开始加载锚点系统数据...');
+            console.log('📊 开始加载锚点系统数据...', new Date().toLocaleString('zh-CN'));
             
             // 初始加载数据
-            refreshData();
+            loadData();
             
             // 自动刷新（每30秒）
             setInterval(() => {
+                console.log('⏰ 自动刷新触发...', new Date().toLocaleString('zh-CN'));
                 refreshData();
             }, 30000);
             
-            console.log('✅ 页面初始化完成');
+            console.log('✅ 页面初始化完成，30秒自动刷新已启动');
         });
     </script>
 </body>
