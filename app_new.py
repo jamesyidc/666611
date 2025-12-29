@@ -10,6 +10,7 @@ import pytz
 import os
 from functools import wraps
 import time
+import traceback
 
 app = Flask(__name__)
 app.config['TEMPLATES_AUTO_RELOAD'] = True
@@ -12004,6 +12005,7 @@ def get_anchor_status():
         
         conn.close()
         
+        # 使用默认配置值（因为 anchor_config.json 没有 monitor 键）
         return jsonify({
             'success': True,
             'status': {
@@ -12011,10 +12013,10 @@ def get_anchor_status():
                 'total_alerts': total_alerts,
                 'latest_check': latest[1] if latest else None,
                 'config': {
-                    'profit_target': config['monitor']['profit_target'],
-                    'loss_limit': config['monitor']['loss_limit'],
-                    'check_interval': config['monitor']['check_interval'],
-                    'only_short': config['monitor']['only_short_positions']
+                    'profit_target': 40.0,  # 默认盈利目标 40%
+                    'loss_limit': -10.0,     # 默认止损限制 -10%
+                    'check_interval': 30,    # 默认检查间隔 30秒
+                    'only_short': False      # 默认支持多空
                 }
             }
         })
