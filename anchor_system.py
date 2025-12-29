@@ -424,18 +424,21 @@ def update_profit_extremes(position, profit_rate):
         conn = sqlite3.connect(DB_PATH, timeout=10.0)
         cursor = conn.cursor()
         
+        # 根据交易模式选择表名
+        profit_table = 'anchor_real_profit_records' if TRADE_MODE == 'real' else 'anchor_paper_profit_records'
+        
         # 检查是否需要更新最高收益
         if profit_rate > 0:
-            cursor.execute('''
-            SELECT profit_rate FROM anchor_profit_records
+            cursor.execute(f'''
+            SELECT profit_rate FROM {profit_table}
             WHERE inst_id = ? AND pos_side = ? AND record_type = 'max_profit'
             ''', (inst_id, pos_side))
             row = cursor.fetchone()
             
             if row is None or profit_rate > row[0]:
                 # 插入或更新最高收益记录
-                cursor.execute('''
-                INSERT OR REPLACE INTO anchor_profit_records (
+                cursor.execute(f'''
+                INSERT OR REPLACE INTO {profit_table} (
                     inst_id, pos_side, record_type, profit_rate, timestamp,
                     pos_size, avg_price, mark_price, upl, margin, leverage,
                     snapshot_data, updated_at
@@ -450,20 +453,20 @@ def update_profit_extremes(position, profit_rate):
                     float(position.get('lever', 0)),
                     snapshot_data
                 ))
-                print(f"  📈 更新最高收益记录: {inst_id} {profit_rate:+.2f}%")
+                print(f"  📈 更新最高收益记录 [{TRADE_MODE}]: {inst_id} {profit_rate:+.2f}%")
         
         # 检查是否需要更新最大亏损
         if profit_rate < 0:
-            cursor.execute('''
-            SELECT profit_rate FROM anchor_profit_records
+            cursor.execute(f'''
+            SELECT profit_rate FROM {profit_table}
             WHERE inst_id = ? AND pos_side = ? AND record_type = 'max_loss'
             ''', (inst_id, pos_side))
             row = cursor.fetchone()
             
             if row is None or profit_rate < row[0]:
                 # 插入或更新最大亏损记录
-                cursor.execute('''
-                INSERT OR REPLACE INTO anchor_profit_records (
+                cursor.execute(f'''
+                INSERT OR REPLACE INTO {profit_table} (
                     inst_id, pos_side, record_type, profit_rate, timestamp,
                     pos_size, avg_price, mark_price, upl, margin, leverage,
                     snapshot_data, updated_at
@@ -478,7 +481,7 @@ def update_profit_extremes(position, profit_rate):
                     float(position.get('lever', 0)),
                     snapshot_data
                 ))
-                print(f"  📉 更新最大亏损记录: {inst_id} {profit_rate:+.2f}%")
+                print(f"  📉 更新最大亏损记录 [{TRADE_MODE}]: {inst_id} {profit_rate:+.2f}%")
         
         conn.commit()
         conn.close()
@@ -517,6 +520,9 @@ def update_profit_record(position, profit_rate):
         pos_side = position.get('posSide')
         timestamp = datetime.now(BEIJING_TZ).strftime('%Y-%m-%d %H:%M:%S')
         
+        # 根据交易模式选择表名
+        profit_table = 'anchor_real_profit_records' if TRADE_MODE == 'real' else 'anchor_paper_profit_records'
+        
         conn = sqlite3.connect(DB_PATH, timeout=10.0)
         cursor = conn.cursor()
         
@@ -527,8 +533,8 @@ def update_profit_record(position, profit_rate):
             record_type = 'max_loss'    # 最大亏损
         
         # 查询当前记录
-        cursor.execute('''
-        SELECT profit_rate FROM anchor_profit_records
+        cursor.execute(f'''
+        SELECT profit_rate FROM {profit_table}
         WHERE inst_id = ? AND pos_side = ? AND record_type = ?
         ''', (inst_id, pos_side, record_type))
         
@@ -547,18 +553,18 @@ def update_profit_record(position, profit_rate):
                 # 新的收益更高
                 should_update = True
                 should_alert = True
-                print(f"  🎉 {inst_id} 刷新最高收益: {current_record:.2f}% → {profit_rate:.2f}%")
+                print(f"  🎉 {inst_id} 刷新最高收益 [{TRADE_MODE}]: {current_record:.2f}% → {profit_rate:.2f}%")
                 alert_message = format_extreme_alert(position, profit_rate, current_record, 'max_profit')
             elif record_type == 'max_loss' and profit_rate < current_record:
                 # 新的亏损更大（更负）
                 should_update = True
                 should_alert = True
-                print(f"  ⚠️  {inst_id} 刷新最大亏损: {current_record:.2f}% → {profit_rate:.2f}%")
+                print(f"  ⚠️  {inst_id} 刷新最大亏损 [{TRADE_MODE}]: {current_record:.2f}% → {profit_rate:.2f}%")
                 alert_message = format_extreme_alert(position, profit_rate, current_record, 'max_loss')
         
         if should_update:
-            cursor.execute('''
-            INSERT OR REPLACE INTO anchor_profit_records (
+            cursor.execute(f'''
+            INSERT OR REPLACE INTO {profit_table} (
                 inst_id, pos_side, record_type, profit_rate, timestamp,
                 pos_size, avg_price, mark_price, upl, margin, leverage, updated_at
             ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
