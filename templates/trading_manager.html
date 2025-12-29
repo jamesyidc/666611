@@ -508,6 +508,59 @@
                 </p>
                 <div id="anchor-maintenance-logs" class="loading">加载中...</div>
             </div>
+            
+            <!-- ⚠️ 锚点单预警监控 -->
+            <div class="card" style="margin-top: 20px; border-left: 4px solid #f59e0b;">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
+                    <div>
+                        <h2 style="color: #d97706;">⚠️ 锚点单预警监控</h2>
+                        <p style="color: #92400e; margin-bottom: 0; font-size: 0.95em;">
+                            🔍 -8%预警 | ⚡ -10%触发维护 | 📋 完整操作留痕
+                        </p>
+                    </div>
+                    <button class="btn btn-primary" onclick="refreshTradingManagerWarnings()" style="font-size: 14px;">
+                        🔄 刷新预警
+                    </button>
+                </div>
+                
+                <!-- 预警统计卡片 -->
+                <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 15px; margin-bottom: 20px;">
+                    <div style="background: linear-gradient(135deg, #ede9fe 0%, #ddd6fe 100%); padding: 15px; border-radius: 8px; text-align: center;">
+                        <div style="font-size: 24px; font-weight: bold; color: #7c3aed;" id="tm-warning-total">-</div>
+                        <div style="font-size: 12px; color: #5b21b6; margin-top: 5px;">监控锚点</div>
+                    </div>
+                    <div style="background: linear-gradient(135deg, #fee2e2 0%, #fecaca 100%); padding: 15px; border-radius: 8px; text-align: center;">
+                        <div style="font-size: 24px; font-weight: bold; color: #dc2626;" id="tm-warning-critical">-</div>
+                        <div style="font-size: 12px; color: #991b1b; margin-top: 5px;">临界预警 (≤-10%)</div>
+                    </div>
+                    <div style="background: linear-gradient(135deg, #fef3c7 0%, #fde68a 100%); padding: 15px; border-radius: 8px; text-align: center;">
+                        <div style="font-size: 24px; font-weight: bold; color: #d97706;" id="tm-warning-normal">-</div>
+                        <div style="font-size: 12px; color: #92400e; margin-top: 5px;">普通预警 (-8%~-10%)</div>
+                    </div>
+                    <div style="background: linear-gradient(135deg, #d1fae5 0%, #a7f3d0 100%); padding: 15px; border-radius: 8px; text-align: center;">
+                        <div style="font-size: 24px; font-weight: bold; color: #059669;" id="tm-warning-safe">-</div>
+                        <div style="font-size: 12px; color: #065f46; margin-top: 5px;">正常状态</div>
+                    </div>
+                </div>
+                
+                <!-- 预警列表 -->
+                <div id="tm-anchor-warnings-list">
+                    <div style="text-align: center; padding: 30px; color: #718096;">
+                        <div style="font-size: 40px; margin-bottom: 10px;">⏳</div>
+                        <div>加载中...</div>
+                    </div>
+                </div>
+                
+                <!-- 操作日志 -->
+                <div style="margin-top: 25px; padding-top: 20px; border-top: 2px solid #e5e7eb;">
+                    <h3 style="color: #4b5563; margin-bottom: 15px; font-size: 16px;">📋 预警操作日志</h3>
+                    <div id="tm-warning-logs-list" style="max-height: 400px; overflow-y: auto;">
+                        <div style="text-align: center; padding: 20px; color: #9ca3af;">
+                            加载中...
+                        </div>
+                    </div>
+                </div>
+            </div>
         </div>
         
         <!-- 纠错系统 -->
@@ -2518,6 +2571,235 @@
                 alert(`请求失败: ${err.message}`);
             });
         }
+        
+        // ========== Trading Manager 预警监控函数 ==========
+        
+        // 刷新Trading Manager预警数据
+        function refreshTradingManagerWarnings() {
+            const listContainer = document.getElementById('tm-anchor-warnings-list');
+            
+            listContainer.innerHTML = `
+                <div style="text-align: center; padding: 40px; color: #718096;">
+                    <div style="font-size: 48px; margin-bottom: 10px;">⏳</div>
+                    <div>加载中...</div>
+                </div>
+            `;
+            
+            fetch('/api/trading/anchor-warning/active')
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    updateTradingManagerWarningStats(data);
+                    renderTradingManagerWarningsList(data.warnings);
+                    loadTradingManagerWarningLogs();
+                } else {
+                    listContainer.innerHTML = `
+                        <div style="text-align: center; padding: 40px; color: #ef4444;">
+                            <div style="font-size: 48px; margin-bottom: 10px;">❌</div>
+                            <div>加载失败: ${data.error || '未知错误'}</div>
+                        </div>
+                    `;
+                }
+            })
+            .catch(err => {
+                listContainer.innerHTML = `
+                    <div style="text-align: center; padding: 40px; color: #ef4444;">
+                        <div style="font-size: 48px; margin-bottom: 10px;">❌</div>
+                        <div>网络错误: ${err.message}</div>
+                    </div>
+                `;
+            });
+        }
+        
+        // 更新Trading Manager预警统计
+        function updateTradingManagerWarningStats(data) {
+            const warnings = data.warnings || [];
+            const criticalCount = warnings.filter(w => w.warning_level === 'critical').length;
+            const warningCount = warnings.filter(w => w.warning_level === 'warning').length;
+            const totalAnchors = data.total || 0;
+            
+            document.getElementById('tm-warning-total').textContent = totalAnchors;
+            document.getElementById('tm-warning-critical').textContent = criticalCount;
+            document.getElementById('tm-warning-normal').textContent = warningCount;
+            document.getElementById('tm-warning-safe').textContent = totalAnchors - warnings.length;
+        }
+        
+        // 渲染Trading Manager预警列表
+        function renderTradingManagerWarningsList(warnings) {
+            const container = document.getElementById('tm-anchor-warnings-list');
+            
+            if (!warnings || warnings.length === 0) {
+                container.innerHTML = `
+                    <div style="text-align: center; padding: 40px; color: #10b981;">
+                        <div style="font-size: 48px; margin-bottom: 10px;">✅</div>
+                        <div style="font-size: 16px; font-weight: bold; margin-bottom: 5px;">暂无预警</div>
+                        <div style="font-size: 14px; color: #718096;">所有锚点单状态正常</div>
+                    </div>
+                `;
+                return;
+            }
+            
+            container.innerHTML = warnings.map(warning => {
+                const isCritical = warning.warning_level === 'critical';
+                const borderColor = isCritical ? '#ef4444' : '#f59e0b';
+                const bgGradient = isCritical 
+                    ? 'linear-gradient(135deg, #fef2f2 0%, #fee2e2 100%)' 
+                    : 'linear-gradient(135deg, #fffbeb 0%, #fef3c7 100%)';
+                const badgeColor = isCritical ? '#ef4444' : '#f59e0b';
+                const badgeText = isCritical ? '临界预警' : '普通预警';
+                const icon = isCritical ? '❗' : '⚠️';
+                
+                return `
+                    <div style="border: 2px solid ${borderColor}; border-radius: 12px; padding: 20px; margin-bottom: 15px; background: ${bgGradient}; transition: all 0.3s;">
+                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
+                            <div style="font-size: 18px; font-weight: bold; display: flex; align-items: center; gap: 10px;">
+                                <span style="font-size: 32px;">${icon}</span>
+                                <span>${warning.inst_id}</span>
+                            </div>
+                            <span style="padding: 6px 12px; border-radius: 20px; font-size: 12px; font-weight: bold; background: ${badgeColor}; color: white;">
+                                ${badgeText}
+                            </span>
+                        </div>
+
+                        <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 15px; margin-bottom: 15px;">
+                            <div>
+                                <div style="font-size: 12px; color: #718096; margin-bottom: 3px;">方向</div>
+                                <div style="font-size: 15px; font-weight: bold;">${warning.pos_side === 'long' ? '做多' : '做空'}</div>
+                            </div>
+                            <div>
+                                <div style="font-size: 12px; color: #718096; margin-bottom: 3px;">开仓价</div>
+                                <div style="font-size: 15px; font-weight: bold;">${parseFloat(warning.open_price).toFixed(4)} USDT</div>
+                            </div>
+                            <div>
+                                <div style="font-size: 12px; color: #718096; margin-bottom: 3px;">当前价</div>
+                                <div style="font-size: 15px; font-weight: bold;">${parseFloat(warning.current_price).toFixed(4)} USDT</div>
+                            </div>
+                            <div>
+                                <div style="font-size: 12px; color: #718096; margin-bottom: 3px;">收益率 (10x)</div>
+                                <div style="font-size: 15px; font-weight: bold; color: ${warning.profit_rate < 0 ? '#ef4444' : '#10b981'};">
+                                    ${parseFloat(warning.profit_rate).toFixed(2)}%
+                                </div>
+                            </div>
+                            <div>
+                                <div style="font-size: 12px; color: #718096; margin-bottom: 3px;">持仓量</div>
+                                <div style="font-size: 15px; font-weight: bold;">${parseFloat(warning.open_size).toFixed(4)}</div>
+                            </div>
+                            <div>
+                                <div style="font-size: 12px; color: #718096; margin-bottom: 3px;">创建时间</div>
+                                <div style="font-size: 13px; font-weight: bold;">${warning.created_at}</div>
+                            </div>
+                        </div>
+
+                        <div style="background: rgba(255,255,255,0.6); padding: 12px; border-radius: 8px; border-left: 4px solid ${borderColor}; margin-bottom: 12px; font-size: 14px;">
+                            ${warning.alert_message}
+                        </div>
+
+                        <div style="display: flex; gap: 10px; justify-content: flex-end;">
+                            <button onclick="closeTradingManagerWarning(${warning.id}, '${warning.inst_id}')" 
+                                    style="padding: 8px 16px; background: #ef4444; color: white; border: none; border-radius: 8px; font-size: 13px; font-weight: 600; cursor: pointer; transition: all 0.3s;">
+                                ✓ 手动关闭
+                            </button>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+        }
+        
+        // 关闭Trading Manager预警
+        function closeTradingManagerWarning(warningId, instId) {
+            if (!confirm(`确定要关闭 ${instId} 的预警吗？`)) {
+                return;
+            }
+
+            const reason = prompt('请输入关闭原因（可选）:', '手动关闭') || '手动关闭';
+
+            fetch(`/api/trading/anchor-warning/close/${warningId}`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ reason })
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    alert('✅ 预警已关闭');
+                    refreshTradingManagerWarnings();
+                } else {
+                    alert(`❌ 关闭失败: ${data.error || '未知错误'}`);
+                }
+            })
+            .catch(err => {
+                alert(`❌ 网络错误: ${err.message}`);
+            });
+        }
+        
+        // 加载Trading Manager预警日志
+        function loadTradingManagerWarningLogs() {
+            const container = document.getElementById('tm-warning-logs-list');
+            
+            fetch('/api/trading/anchor-warning/logs?limit=20')
+            .then(response => response.json())
+            .then(data => {
+                if (data.success && data.logs && data.logs.length > 0) {
+                    container.innerHTML = data.logs.map(log => {
+                        const actionColors = {
+                            'created': '#10b981',
+                            'updated': '#3b82f6',
+                            'closed': '#6b7280',
+                            'triggered': '#ef4444'
+                        };
+                        const actionColor = actionColors[log.action_type] || '#718096';
+                        
+                        return `
+                            <div style="border-bottom: 1px solid #e5e7eb; padding: 12px 0;">
+                                <div style="display: flex; justify-content: space-between; align-items: start;">
+                                    <div style="flex: 1;">
+                                        <div style="font-size: 14px; font-weight: bold; color: #1f2937; margin-bottom: 5px;">
+                                            <span style="color: ${actionColor};">●</span>
+                                            ${log.inst_id} - ${log.action_type}
+                                        </div>
+                                        <div style="font-size: 12px; color: #6b7280;">
+                                            收益率: <span style="color: ${log.profit_rate < 0 ? '#ef4444' : '#10b981'};">${log.profit_rate ? parseFloat(log.profit_rate).toFixed(2) + '%' : '-'}</span>
+                                            ${log.price ? ' | 价格: ' + parseFloat(log.price).toFixed(4) + ' USDT' : ''}
+                                            ${log.note ? ' | 备注: ' + log.note : ''}
+                                        </div>
+                                    </div>
+                                    <div style="font-size: 11px; color: #9ca3af; white-space: nowrap; margin-left: 15px;">
+                                        ${log.created_at}
+                                    </div>
+                                </div>
+                            </div>
+                        `;
+                    }).join('');
+                } else {
+                    container.innerHTML = `
+                        <div style="text-align: center; padding: 20px; color: #9ca3af;">
+                            暂无操作日志
+                        </div>
+                    `;
+                }
+            })
+            .catch(err => {
+                container.innerHTML = `
+                    <div style="text-align: center; padding: 20px; color: #ef4444;">
+                        加载失败: ${err.message}
+                    </div>
+                `;
+            });
+        }
+        
+        // 在锚点单tab激活时自动加载预警数据
+        const originalSwitchTab = window.switchTabOptimized;
+        window.switchTabOptimized = function(tabName) {
+            originalSwitchTab(tabName);
+            if (tabName === 'anchors') {
+                // 延迟500ms加载预警数据，确保tab切换完成
+                setTimeout(() => {
+                    refreshTradingManagerWarnings();
+                }, 500);
+            }
+        };
     </script>
 </body>
 </html>
