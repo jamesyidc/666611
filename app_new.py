@@ -12115,12 +12115,27 @@ def get_current_positions():
         conn.row_factory = sqlite3.Row
         cursor = conn.cursor()
         
-        # 从数据库读取模拟盘数据
+        # 从数据库读取模拟盘数据 - 联合查询维护价格表
         cursor.execute('''
-            SELECT inst_id, pos_side, open_price, open_size, updated_time, 
-                   mark_price, profit_rate, upl, lever, margin
-            FROM position_opens
-            WHERE is_anchor = 1 AND (trade_mode = ? OR trade_mode IS NULL)
+            SELECT 
+                p.inst_id, 
+                p.pos_side, 
+                COALESCE(amp.maintenance_price, p.open_price) as open_price,
+                p.open_size, 
+                p.updated_time, 
+                p.mark_price, 
+                p.profit_rate, 
+                p.upl, 
+                p.lever, 
+                p.margin,
+                amp.original_open_price,
+                amp.maintenance_count
+            FROM position_opens p
+            LEFT JOIN anchor_maintenance_prices amp 
+                ON p.inst_id = amp.inst_id 
+                AND p.pos_side = amp.pos_side 
+                AND p.trade_mode = amp.trade_mode
+            WHERE p.is_anchor = 1 AND p.trade_mode = ?
         ''', (trade_mode,))
         
         db_positions = cursor.fetchall()
@@ -12146,7 +12161,7 @@ def get_current_positions():
                     'inst_id': row['inst_id'],
                     'pos_side': row['pos_side'],
                     'pos_size': abs(float(row['open_size'])),
-                    'avg_price': float(row['open_price']),
+                    'avg_price': float(row['open_price']),  # 现在使用维护价格
                     'mark_price': float(row['mark_price']) if row['mark_price'] else 0.0,
                     'lever': int(row['lever']) if row['lever'] else 10,
                     'upl': float(row['upl']) if row['upl'] else 0.0,
