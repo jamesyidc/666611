@@ -310,37 +310,7 @@
             }
         }
 
-        /* 预警快速入口超强动画 */
-        @keyframes glow {
-            0%, 100% {
-                box-shadow: 0 10px 40px rgba(255, 0, 0, 0.6), 0 0 50px rgba(255, 0, 0, 0.4);
-            }
-            50% {
-                box-shadow: 0 15px 60px rgba(255, 0, 0, 0.9), 0 0 80px rgba(255, 0, 0, 0.7);
-            }
-        }
 
-        @keyframes shake {
-            0%, 100% { transform: rotate(0deg); }
-            25% { transform: rotate(-15deg); }
-            75% { transform: rotate(15deg); }
-        }
-
-        @keyframes pulse {
-            0%, 100% {
-                transform: scale(1);
-                box-shadow: 0 4px 15px rgba(0,0,0,0.3);
-            }
-            50% {
-                transform: scale(1.05);
-                box-shadow: 0 8px 30px rgba(239, 68, 68, 0.6);
-            }
-        }
-
-        #warning-quick-entry:hover {
-            transform: translateY(-5px) scale(1.02);
-            box-shadow: 0 20px 60px rgba(255, 0, 0, 0.8), 0 0 100px rgba(255, 0, 0, 0.6) !important;
-        }
     </style>
 </head>
 <body>
@@ -352,7 +322,6 @@
             <h1>
                 <span>🎯</span>
                 锚点系统
-                <span style="background: #10b981; color: white; font-size: 12px; padding: 4px 8px; border-radius: 4px; margin-left: 10px;">v2 预警已启用</span>
             </h1>
             <div class="subtitle">
                 <span>OKEx实盘持仓监控</span>
@@ -843,10 +812,9 @@
         });
 
         // ============================================================
-        // 版本检测和预警模块检查
+        // 页面初始化
         // ============================================================
         
-        // 检查预警模块是否存在
         window.addEventListener('DOMContentLoaded', function() {
             console.log('📊 开始加载锚点系统数据...');
             
