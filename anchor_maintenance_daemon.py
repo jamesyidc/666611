@@ -319,7 +319,99 @@ class AnchorMaintenanceDaemon:
             print(f"  2️⃣  平仓记录 #{close_id}: {close_size:.4f} @ {current_price:.4f} (95%)")
             print(f"  3️⃣  保留持仓: {remain_size:.4f} (5%)")
             
-            # 3. 更新决策状态为已执行
+            # 3. 记录维护日志（用于前端显示）
+            # 步骤1：补仓
+            cursor.execute('''
+            INSERT INTO anchor_maintenance_logs (
+                inst_id,
+                pos_side,
+                original_size,
+                original_price,
+                original_margin,
+                current_price,
+                profit_rate,
+                step,
+                action,
+                trade_size,
+                trade_price,
+                remaining_size,
+                remaining_margin,
+                trigger_reason,
+                decision_log,
+                status,
+                executed_at,
+                created_at
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ''', (
+                inst_id,
+                pos_side,
+                open_size,
+                open_price,
+                open_size * open_price / 10,  # 10x杠杆保证金
+                current_price,
+                maintenance['profit_rate'],
+                'step1',
+                'add_position',
+                add_size,
+                current_price,
+                total_after_add,
+                total_after_add * current_price / 10,
+                f"亏损{maintenance['profit_rate']:.2f}%触发维护",
+                f"补仓10倍：{open_size:.4f} × 10 = {add_size:.4f}",
+                'executed',
+                now,
+                now
+            ))
+            
+            log_id_1 = cursor.lastrowid
+            
+            # 步骤2：平仓
+            cursor.execute('''
+            INSERT INTO anchor_maintenance_logs (
+                inst_id,
+                pos_side,
+                original_size,
+                original_price,
+                original_margin,
+                current_price,
+                profit_rate,
+                step,
+                action,
+                trade_size,
+                trade_price,
+                remaining_size,
+                remaining_margin,
+                trigger_reason,
+                decision_log,
+                status,
+                executed_at,
+                created_at
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ''', (
+                inst_id,
+                pos_side,
+                open_size,
+                open_price,
+                open_size * open_price / 10,
+                current_price,
+                maintenance['profit_rate'],
+                'step2',
+                'close_position',
+                close_size,
+                current_price,
+                remain_size,
+                remain_size * current_price / 10,
+                f"亏损{maintenance['profit_rate']:.2f}%触发维护",
+                f"平仓95%：{total_after_add:.4f} × 0.95 = {close_size:.4f}，保留5% = {remain_size:.4f}",
+                'executed',
+                now,
+                now
+            ))
+            
+            log_id_2 = cursor.lastrowid
+            print(f"  4️⃣  维护日志 #{log_id_1}, #{log_id_2}: 已记录")
+            
+            # 4. 更新决策状态为已执行
             cursor.execute('''
             UPDATE trading_decisions
             SET executed = 1
