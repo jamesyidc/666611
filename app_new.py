@@ -12098,27 +12098,16 @@ def get_anchor_profit_records():
 
 @app.route('/api/anchor-system/current-positions')
 def get_current_positions():
-    """获取当前持仓情况 - 从数据库读取锚点单（is_anchor=1），排除普通持仓"""
+    """获取当前持仓情况 - 从 OKEx API 实时获取持仓数据"""
     try:
-        import sqlite3
+        import sys
+        sys.path.append('/home/user/webapp')
+        from anchor_system import get_positions, calculate_profit_rate
         
-        # 从 position_opens 表读取锚点单持仓（排除 is_anchor=0 的普通持仓）
-        db_path = '/home/user/webapp/trading_decision.db'
-        conn = sqlite3.connect(db_path, timeout=10.0)
-        cursor = conn.cursor()
+        # 从 OKEx API 获取实时持仓
+        okex_positions = get_positions()
         
-        cursor.execute('''
-            SELECT inst_id, pos_side, open_size, open_price,
-                   mark_price, profit_rate, upl, lever, margin
-            FROM position_opens
-            WHERE is_anchor = 1 AND open_size != 1.0
-            ORDER BY created_at DESC
-        ''')
-        
-        positions = cursor.fetchall()
-        conn.close()
-        
-        if not positions:
+        if not okex_positions or len(okex_positions) == 0:
             return jsonify({
                 'success': True,
                 'positions': [],
@@ -12126,16 +12115,24 @@ def get_current_positions():
             })
         
         position_list = []
-        for pos in positions:
-            inst_id, pos_side, open_size, open_price, mark_price, profit_rate, upl, lever, margin = pos
+        for pos in okex_positions:
+            inst_id = pos.get('instId')
+            pos_side = pos.get('posSide')
+            pos_value = float(pos.get('pos', 0))
             
-            # 如果没有标记价格，使用开仓价格
-            if not mark_price or mark_price == 0:
-                mark_price = open_price
+            # 跳过持仓量为0的
+            if pos_value == 0:
+                continue
             
-            # 如果没有收益率，计算一个默认值
-            if not profit_rate or profit_rate == 0:
-                profit_rate = 0.0
+            # 计算数据
+            avg_price = float(pos.get('avgPx', 0))
+            mark_price = float(pos.get('markPx', 0))
+            lever = int(pos.get('lever', 10))
+            upl = float(pos.get('upl', 0))
+            margin = float(pos.get('margin', 0))
+            
+            # 计算收益率
+            profit_rate = calculate_profit_rate(pos)
             
             # 判断状态
             status = '监控中'
@@ -12150,12 +12147,12 @@ def get_current_positions():
             position_list.append({
                 'inst_id': inst_id,
                 'pos_side': pos_side,
-                'pos_size': abs(open_size) if open_size else 0,
-                'avg_price': open_price if open_price else 0,
+                'pos_size': abs(pos_value),
+                'avg_price': avg_price,
                 'mark_price': mark_price,
-                'lever': lever if lever else 10,
-                'upl': upl if upl else 0,
-                'margin': margin if margin else 0,
+                'lever': lever,
+                'upl': upl,
+                'margin': margin,
                 'profit_rate': profit_rate,
                 'status': status,
                 'status_class': status_class

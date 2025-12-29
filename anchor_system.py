@@ -14,7 +14,12 @@ import os
 from datetime import datetime, timezone, timedelta
 import sqlite3
 
-# 加载配置
+# 加载 OKEx API 配置
+import sys
+sys.path.append(os.path.dirname(__file__))
+from okex_api_config import OKEX_API_KEY, OKEX_SECRET_KEY, OKEX_PASSPHRASE, OKEX_REST_URL
+
+# 加载其他配置
 CONFIG_FILE = os.path.join(os.path.dirname(__file__), 'anchor_config.json')
 
 try:
@@ -24,11 +29,8 @@ except Exception as e:
     print(f"❌ 加载配置文件失败: {e}")
     CONFIG = {}
 
-# OKEx API配置
-OKEX_API_KEY = CONFIG.get('okex', {}).get('api_key', '')
-OKEX_SECRET_KEY = CONFIG.get('okex', {}).get('secret_key', '')
-OKEX_PASSPHRASE = CONFIG.get('okex', {}).get('passphrase', '')
-OKEX_BASE_URL = CONFIG.get('okex', {}).get('base_url', 'https://www.okx.com')
+# OKEx API配置（从 okex_api_config.py 导入）
+OKEX_BASE_URL = OKEX_REST_URL
 
 # Telegram配置
 TELEGRAM_BOT_TOKEN = CONFIG.get('telegram', {}).get('bot_token', '')
