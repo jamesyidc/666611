@@ -11861,13 +11861,29 @@ def warning_test():
 
 @app.route('/anchor-system')
 def anchor_system():
-    """锚点系统主页"""
-    response = make_response(render_template('anchor_system.html'))
+    """锚点系统主页 - 重定向到实盘"""
+    return redirect('/anchor-system-real')
+
+@app.route('/anchor-system-real')
+def anchor_system_real():
+    """实盘锚点系统"""
+    response = make_response(render_template('anchor_system_real.html'))
     # 禁用所有缓存
     response.headers['Cache-Control'] = 'no-store, no-cache, must-revalidate, post-check=0, pre-check=0, max-age=0'
     response.headers['Pragma'] = 'no-cache'
     response.headers['Expires'] = '-1'
     return response
+
+@app.route('/anchor-system-paper')
+def anchor_system_paper():
+    """模拟盘锚点系统"""
+    response = make_response(render_template('anchor_system_paper.html'))
+    # 禁用所有缓存
+    response.headers['Cache-Control'] = 'no-store, no-cache, must-revalidate, post-check=0, pre-check=0, max-age=0'
+    response.headers['Pragma'] = 'no-cache'
+    response.headers['Expires'] = '-1'
+    return response
+
 
 @app.route('/anchor-system-v2')
 def anchor_system_v2():
@@ -12345,11 +12361,16 @@ def get_current_positions():
             # 使用数据库中的开仓价格（维护后的平均价格）
             if db_record:
                 avg_price = float(db_record['open_price'])
-                # 重新计算收益率（使用维护后的开仓价格）
-                if pos_side == 'short':
-                    profit_rate = (avg_price - mark_price) / avg_price * 100
-                else:  # long
-                    profit_rate = (mark_price - avg_price) / avg_price * 100
+                # 计算相对保证金的收益率（考虑杠杆）
+                # 方法：未实现盈亏 / 保证金 * 100
+                if margin > 0:
+                    profit_rate = (upl / margin) * 100
+                else:
+                    # 备用计算：价格变动率 * 杠杆
+                    if pos_side == 'short':
+                        profit_rate = ((avg_price - mark_price) / avg_price) * lever * 100
+                    else:  # long
+                        profit_rate = ((mark_price - avg_price) / avg_price) * lever * 100
             else:
                 # 如果数据库中没有，使用 OKEx 的价格
                 avg_price = okex_avg_price
