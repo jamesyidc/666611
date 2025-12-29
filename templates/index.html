@@ -311,6 +311,27 @@
                 <a href="/anchor-system" class="module-btn" style="background: linear-gradient(135deg, #a24b76 0%, #ea6666 100%);">进入监控 🆕</a>
             </div>
             
+            <div class="module-card" onclick="location.href='/trading-manager'" style="background: linear-gradient(135deg, rgba(245, 158, 11, 0.95) 0%, rgba(251, 191, 36, 0.95) 100%); border: 2px solid #f59e0b;">
+                <div class="module-icon">💼</div>
+                <h2>交易管理系统</h2>
+                <p>统一管理锚点单、持仓、止盈止损、多单开仓、纠错系统等</p>
+                <div class="module-stats">
+                    <div class="module-stats-row">
+                        <span class="stats-label">锚点单:</span>
+                        <span class="stats-value" id="trading-anchors">-</span>
+                    </div>
+                    <div class="module-stats-row">
+                        <span class="stats-label">持仓数:</span>
+                        <span class="stats-value" id="trading-positions">-</span>
+                    </div>
+                    <div class="module-stats-row">
+                        <span class="stats-label">功能模块:</span>
+                        <span class="stats-value">8个</span>
+                    </div>
+                </div>
+                <a href="/trading-manager" class="module-btn" style="background: linear-gradient(135deg, #d97706 0%, #f59e0b 100%);">进入管理 🔥</a>
+            </div>
+            
             <div class="module-card" onclick="location.href='/query'">
                 <div class="module-icon">🔍</div>
                 <h2>历史数据查询</h2>
@@ -1928,6 +1949,33 @@
             })
             .catch(err => {
                 console.error('获取K线指标系统状态失败:', err);
+            });
+        
+        // 加载交易管理统计
+        fetch('/api/trading/positions/opens')
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    const positions = data.data || [];
+                    const anchorPositions = positions.filter(p => p.is_anchor === 1);
+                    const normalPositions = positions.filter(p => p.is_anchor !== 1);
+                    
+                    // 更新统计数据
+                    document.getElementById('trading-anchors-count').textContent = anchorPositions.length;
+                    document.getElementById('trading-positions-count').textContent = normalPositions.length;
+                    
+                    // 计算总价值
+                    let totalValue = 0;
+                    positions.forEach(p => {
+                        const currentPrice = p.current_price || 0;
+                        const openSize = p.open_size || 0;
+                        totalValue += currentPrice * openSize;
+                    });
+                    document.getElementById('trading-total-value').textContent = totalValue.toFixed(2);
+                }
+            })
+            .catch(err => {
+                console.error('获取交易管理统计失败:', err);
             });
     </script>
 </body>

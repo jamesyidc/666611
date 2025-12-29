@@ -136,7 +136,7 @@ class AnchorMaintenanceDaemon:
             return (open_price - current_price) / open_price * 10 * 100
     
     def check_single_position(self, position: Dict) -> Optional[Dict]:
-        """检查单个锚点单是否需要维护"""
+        """检查单个锚点单是否需要维护或监控"""
         inst_id = position['inst_id']
         pos_side = position['pos_side']
         open_price = position['open_price']
@@ -153,8 +153,9 @@ class AnchorMaintenanceDaemon:
         # 3. 计算收益率
         profit_rate = self.calculate_profit_rate(open_price, current_price, pos_side)
         
-        # 4. 检查是否触发维护（亏损≥10%）
+        # 4. 检查是否需要提前监控（亏损≥8%）或触发维护（亏损≥10%）
         if profit_rate <= -10.0:
+            # 触发维护
             return {
                 'inst_id': inst_id,
                 'pos_side': pos_side,
@@ -163,7 +164,21 @@ class AnchorMaintenanceDaemon:
                 'profit_rate': profit_rate,
                 'open_size': position['open_size'],
                 'open_percent': position['open_percent'],
-                'need_maintenance': True
+                'need_maintenance': True,
+                'alert_level': 'critical'  # 严重告警
+            }
+        elif profit_rate <= -8.0:
+            # 提前监控
+            return {
+                'inst_id': inst_id,
+                'pos_side': pos_side,
+                'open_price': open_price,
+                'current_price': current_price,
+                'profit_rate': profit_rate,
+                'open_size': position['open_size'],
+                'open_percent': position['open_percent'],
+                'need_maintenance': False,
+                'alert_level': 'warning'  # 预警
             }
         
         return None
@@ -240,6 +255,21 @@ class AnchorMaintenanceDaemon:
         print(f"  3️⃣  保留 5% 继续持有")
         print("=" * 60)
     
+    def log_warning_alert(self, warning: Dict):
+        """输出预警监控告警"""
+        print("\n" + "=" * 60)
+        print("⚠️  锚点单预警监控")
+        print("=" * 60)
+        print(f"📊 币种: {warning['inst_id']}")
+        print(f"📍 方向: {'做多' if warning['pos_side'] == 'long' else '做空'}")
+        print(f"💰 开仓价格: {warning['open_price']:.4f}")
+        print(f"📈 当前价格: {warning['current_price']:.4f}")
+        print(f"📉 亏损率: {warning['profit_rate']:.2f}%")
+        print(f"🎯 监控阈值: 亏损 ≥ 8%（提前监控）")
+        print(f"🚨 维护触发: 亏损 ≥ 10%")
+        print(f"📏 距离触发: {abs(-10.0 - warning['profit_rate']):.2f}%")
+        print("=" * 60)
+    
     def scan_and_check(self):
         """扫描并检查所有锚点单"""
         try:
@@ -252,22 +282,30 @@ class AnchorMaintenanceDaemon:
             print(f"\n🔍 扫描锚点单: {len(positions)}个")
             
             maintenance_count = 0
+            warning_count = 0
             
             for position in positions:
-                # 检查是否需要维护
-                maintenance = self.check_single_position(position)
+                # 检查是否需要维护或监控
+                check_result = self.check_single_position(position)
                 
-                if maintenance:
-                    # 输出告警
-                    self.log_maintenance_alert(maintenance)
+                if check_result:
+                    alert_level = check_result.get('alert_level', 'critical')
                     
-                    # 记录维护触发决策
-                    if self.record_maintenance_trigger(maintenance):
-                        maintenance_count += 1
+                    if alert_level == 'critical':
+                        # 触发维护
+                        self.log_maintenance_alert(check_result)
+                        if self.record_maintenance_trigger(check_result):
+                            maintenance_count += 1
+                    elif alert_level == 'warning':
+                        # 提前监控预警
+                        self.log_warning_alert(check_result)
+                        warning_count += 1
             
             if maintenance_count > 0:
-                print(f"\n✅ 本次扫描触发维护: {maintenance_count}个")
-            else:
+                print(f"\n🚨 本次扫描触发维护: {maintenance_count}个")
+            if warning_count > 0:
+                print(f"\n⚠️  本次扫描预警监控: {warning_count}个")
+            if maintenance_count == 0 and warning_count == 0:
                 print(f"✅ 扫描完成，无需维护")
                 
         except Exception as e:
