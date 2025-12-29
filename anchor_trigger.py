@@ -63,14 +63,14 @@ class AnchorTrigger:
         1. 当前价格非常接近压力线（距离<=2%）
         2. 同时存在压力线1和压力线2
         3. 位置百分比>90%（接近顶部）
-        4. 排除BTC和ETH（不作为锚点单标的）
+        4. 排除BTC、ETH、LTC和ETC（不作为锚点单标的）
         """
         try:
             conn = sqlite3.connect(self.crypto_db_path, timeout=10.0)
             cursor = conn.cursor()
             
             # 从 support_resistance_levels 表获取最新数据
-            # 排除 BTC 和 ETH
+            # 排除 BTC、ETH、LTC和ETC
             cursor.execute('''
             SELECT symbol, current_price, 
                    resistance_line_1, resistance_line_2,
@@ -85,6 +85,8 @@ class AnchorTrigger:
               AND position_7d >= 90
               AND symbol NOT LIKE 'BTC%'
               AND symbol NOT LIKE 'ETH%'
+              AND symbol NOT LIKE 'LTC%'
+              AND symbol NOT LIKE 'ETC%'
             ORDER BY record_time DESC
             ''')
             
@@ -94,8 +96,8 @@ class AnchorTrigger:
                 symbol = row[0]
                 inst_id = f"{symbol[:-4]}-{symbol[-4:]}-SWAP"
                 
-                # 双重检查：确保不是BTC或ETH
-                if inst_id.startswith('BTC-') or inst_id.startswith('ETH-'):
+                # 双重检查：确保不是BTC、ETH、LTC或ETC
+                if inst_id.startswith(('BTC-', 'ETH-', 'LTC-', 'ETC-')):
                     continue
                 
                 signals.append({

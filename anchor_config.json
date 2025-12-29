@@ -2,10 +2,12 @@
   "anchor_config": {
     "excluded_coins": [
       "BTC",
-      "ETH"
+      "ETH",
+      "LTC",
+      "ETC"
     ],
     "description": "锚点单配置",
-    "excluded_reason": "BTC和ETH不作为锚点单的标的币种",
+    "excluded_reason": "BTC、ETH、LTC和ETC不作为锚点单的标的币种",
     "rules": {
       "check_add_position": true,
       "add_position_trigger": -10.0,

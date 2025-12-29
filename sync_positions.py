@@ -115,9 +115,11 @@ class PositionSyncer:
                     # 新增持仓（使用原表结构）
                     now = datetime.now(BEIJING_TZ).strftime('%Y-%m-%d %H:%M:%S')
                     
-                    # 判断是否为锚点单：空单且保证金≤2 USDT
+                    # 判断是否为锚点单：空单且保证金≤2 USDT，但排除 BTC、ETH、LTC、ETC
                     # 注意：锚点单保证金不能大于2U，超过2U需要调整到1U
-                    is_anchor = 1 if (pos_side == 'short' and margin <= 2.0) else 0
+                    excluded_coins = ['BTC', 'ETH', 'LTC', 'ETC']
+                    is_excluded = any(inst_id.startswith(f"{coin}-") for coin in excluded_coins)
+                    is_anchor = 1 if (pos_side == 'short' and margin <= 2.0 and not is_excluded) else 0
                     
                     cursor.execute('''
                         INSERT INTO position_opens (
