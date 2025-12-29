@@ -641,22 +641,22 @@
                 return;
             }
 
-            // 获取北京时间（UTC+8）
+            // 获取当前时间（用户浏览器本地时间）
             const now = new Date();
-            const beijingNow = new Date(now.getTime() + (8 * 60 * 60 * 1000));
             
             tbody.innerHTML = data.map(item => {
                 // 计算持续时间（小时）
                 let durationHtml = '--';
                 if (item.timestamp) {
                     try {
-                        // 数据库中的时间已经是北京时间
+                        // 数据库中的时间是北京时间，需要标注时区
+                        // 格式：2025-12-29 20:16:10 -> 2025-12-29T20:16:10+08:00
                         const recordTime = new Date(item.timestamp.replace(' ', 'T') + '+08:00');
-                        const diffMs = beijingNow - recordTime;
+                        const diffMs = now - recordTime;
                         const totalHours = diffMs / (1000 * 60 * 60);
                         
                         if (totalHours < 0) {
-                            // 如果是未来时间，显示为即将到来
+                            // 如果是未来时间，显示为刚刚
                             durationHtml = '<span style="color: #718096;">刚刚</span>';
                         } else {
                             const hours = Math.floor(totalHours);
@@ -673,7 +673,7 @@
                             }
                         }
                     } catch (e) {
-                        console.error('时间解析错误:', e);
+                        console.error('时间解析错误:', e, item.timestamp);
                     }
                 }
                 
