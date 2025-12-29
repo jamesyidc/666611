@@ -21,8 +21,9 @@ logging.basicConfig(
 )
 
 class PositionSyncer:
-    def __init__(self, db_path='trading_decision.db'):
+    def __init__(self, db_path='trading_decision.db', trade_mode='live'):
         self.db_path = db_path
+        self.trade_mode = trade_mode  # 交易模式：paper 或 live
         self.init_database()
     
     def init_database(self):
@@ -147,12 +148,12 @@ class PositionSyncer:
                             inst_id, pos_side, open_price, open_size,
                             open_percent, granularity, total_positions,
                             is_anchor, timestamp, created_at,
-                            lever, margin, mark_price, profit_rate, upl, updated_time
-                        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                            lever, margin, mark_price, profit_rate, upl, updated_time, trade_mode
+                        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                     ''', (inst_id, pos_side, avg_price, pos_size,
                           0.0, 0.0, 0,  # 默认值
                           is_anchor, now, now,  # 根据规则判断是否为锚点单
-                          lever, margin, mark_price, profit_rate, upl, now))
+                          lever, margin, mark_price, profit_rate, upl, now, self.trade_mode))
                     synced_count += 1
             
             # 4. 删除已平仓的持仓（从数据库中移除）

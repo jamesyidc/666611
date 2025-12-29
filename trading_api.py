@@ -125,7 +125,8 @@ def get_position_opens():
         
         limit = request.args.get('limit', 50, type=int)
         inst_id = request.args.get('inst_id')
-        is_anchor = request.args.get('is_anchor')  # 新增：锚点单过滤
+        is_anchor = request.args.get('is_anchor')  # 锚点单过滤
+        trade_mode = request.args.get('trade_mode', 'paper')  # 交易模式过滤，默认 paper
         
         # 构建查询条件
         conditions = []
@@ -138,6 +139,10 @@ def get_position_opens():
         if is_anchor is not None:
             conditions.append('is_anchor = ?')
             params.append(1 if is_anchor == '1' else 0)
+        
+        # 添加 trade_mode 过滤
+        conditions.append('(trade_mode = ? OR trade_mode IS NULL)')
+        params.append(trade_mode)
         
         where_clause = 'WHERE ' + ' AND '.join(conditions) if conditions else ''
         

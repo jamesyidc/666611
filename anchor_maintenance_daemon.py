@@ -21,15 +21,21 @@ BEIJING_TZ = pytz.timezone('Asia/Shanghai')
 TRADING_DB = '/home/user/webapp/trading_decision.db'
 ANCHOR_DB = '/home/user/webapp/anchor_system.db'
 
+# 交易模式配置
+# 可选值: 'paper' (模拟交易) 或 'live' (实盘交易)
+TRADE_MODE = 'paper'  # 默认使用模拟交易
+
 class AnchorMaintenanceDaemon:
     """锚点单自动维护守护进程"""
     
-    def __init__(self):
+    def __init__(self, trade_mode='paper'):
         """初始化"""
         self.trading_db = TRADING_DB
         self.anchor_db = ANCHOR_DB
+        self.trade_mode = trade_mode  # 交易模式：paper 或 live
         self.check_interval = 30  # 30秒检查一次
         print("🚀 锚点单自动维护守护进程启动")
+        print(f"📊 交易模式: {'🧪 模拟交易 (Paper Trading)' if trade_mode == 'paper' else '💰 实盘交易 (Live Trading)'}")
         print(f"📊 检查间隔: {self.check_interval}秒")
         print(f"🎯 触发条件: 亏损 ≥ 10%")
         print(f"💰 补仓倍数: 10倍")
@@ -43,7 +49,7 @@ class AnchorMaintenanceDaemon:
             conn.row_factory = sqlite3.Row
             cursor = conn.cursor()
             
-            # 获取所有开仓的锚点单
+            # 获取所有开仓的锚点单（仅查询当前交易模式的数据）
             cursor.execute('''
             SELECT 
                 inst_id,
@@ -55,9 +61,10 @@ class AnchorMaintenanceDaemon:
                 timestamp,
                 created_at
             FROM position_opens
-            WHERE is_anchor = 1
+            WHERE is_anchor = 1 
+              AND (trade_mode = ? OR trade_mode IS NULL)
             ORDER BY created_at DESC
-            ''')
+            ''', (self.trade_mode,))
             
             positions = []
             for row in cursor.fetchall():
@@ -209,8 +216,9 @@ class AnchorMaintenanceDaemon:
                 reason,
                 executed,
                 timestamp,
-                created_at
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                created_at,
+                trade_mode
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             ''', (
                 maintenance['inst_id'],
                 maintenance['pos_side'],
@@ -225,7 +233,8 @@ class AnchorMaintenanceDaemon:
                 f"锚点单亏损{maintenance['profit_rate']:.2f}%，触发维护：补仓10倍+平掉95%",
                 0,  # 待执行
                 now,
-                now
+                now,
+                self.trade_mode  # 交易模式
             ))
             
             decision_id = cursor.lastrowid
