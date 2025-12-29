@@ -12098,11 +12098,11 @@ def get_anchor_profit_records():
 
 @app.route('/api/anchor-system/current-positions')
 def get_current_positions():
-    """获取当前持仓情况 - 从 position_opens 表读取锚点单"""
+    """获取当前持仓情况 - 从数据库读取锚点单（is_anchor=1），排除普通持仓"""
     try:
         import sqlite3
         
-        # 从 position_opens 表读取锚点单持仓
+        # 从 position_opens 表读取锚点单持仓（排除 is_anchor=0 的普通持仓）
         db_path = '/home/user/webapp/trading_decision.db'
         conn = sqlite3.connect(db_path, timeout=10.0)
         cursor = conn.cursor()
