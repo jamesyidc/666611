@@ -1,22 +1,27 @@
 {
-  "okex": {
-    "api_key": "77465009-2c87-443c-83c8-08b35c7f14b2",
-    "secret_key": "11647B2578630D28501D41C748B3D809",
-    "passphrase": "Tencent@123",
-    "base_url": "https://www.okx.com"
-  },
-  "telegram": {
-    "bot_token": "8437045462:AAFePnwdC21cqeWhZISMQHGGgjmroVqE2H0",
-    "chat_id": "-1003227444260"
-  },
-  "monitor": {
-    "profit_target": 40.0,
-    "loss_limit": -10.0,
-    "check_interval": 60,
-    "alert_cooldown": 30,
-    "only_short_positions": true
-  },
-  "database": {
-    "path": "/home/user/webapp/anchor_system.db"
+  "anchor_config": {
+    "excluded_coins": [
+      "BTC",
+      "ETH"
+    ],
+    "description": "锚点单配置",
+    "excluded_reason": "BTC和ETH不作为锚点单的标的币种",
+    "rules": {
+      "check_add_position": true,
+      "add_position_trigger": -10.0,
+      "min_amount_handling": "dynamic",
+      "prevent_duplicate_minutes": 5
+    },
+    "target_coins": [
+      "CFX",
+      "FIL",
+      "CELO",
+      "UNI",
+      "CRV",
+      "LDO"
+    ],
+    "target_coins_description": "优先开仓的目标币种（按市值和成交量排序）",
+    "last_updated": "2025-12-29",
+    "updated_by": "GenSpark AI Developer"
   }
 }
