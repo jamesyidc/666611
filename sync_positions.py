@@ -21,7 +21,7 @@ logging.basicConfig(
 )
 
 class PositionSyncer:
-    def __init__(self, db_path='trading_decision.db', trade_mode='live'):
+    def __init__(self, db_path='trading_decision.db', trade_mode='paper'):
         self.db_path = db_path
         self.trade_mode = trade_mode  # 交易模式：paper 或 live
         self.init_database()

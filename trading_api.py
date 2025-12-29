@@ -126,7 +126,7 @@ def get_position_opens():
         limit = request.args.get('limit', 50, type=int)
         inst_id = request.args.get('inst_id')
         is_anchor = request.args.get('is_anchor')  # 锚点单过滤
-        trade_mode = request.args.get('trade_mode', 'live')  # 交易模式过滤，默认 live（实盘）
+        trade_mode = request.args.get('trade_mode', 'paper')  # 交易模式过滤，默认 paper（模拟盘）
         
         # 构建查询条件
         conditions = []
