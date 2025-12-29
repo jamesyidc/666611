@@ -12098,9 +12098,11 @@ def get_anchor_profit_records():
 
 @app.route('/api/anchor-system/current-positions')
 def get_current_positions():
-    """获取当前持仓情况 - 从 OKEx API 实时获取持仓数据"""
+    """获取当前持仓情况 - 从 OKEx API 实时获取持仓数据，开仓价格优先使用数据库维护后的价格"""
     try:
         import sys
+        import sqlite3
+        from datetime import datetime
         sys.path.append('/home/user/webapp')
         from anchor_system import get_positions, calculate_profit_rate
         
@@ -12114,6 +12116,21 @@ def get_current_positions():
                 'total': 0
             })
         
+        # 连接数据库，获取维护后的开仓价格
+        DB_PATH = '/home/user/webapp/trading_decision.db'
+        conn = sqlite3.connect(DB_PATH, timeout=10.0)
+        conn.row_factory = sqlite3.Row
+        cursor = conn.cursor()
+        
+        # 获取所有锚点单的开仓价格
+        cursor.execute('''
+            SELECT inst_id, pos_side, open_price, open_size, updated_time
+            FROM position_opens
+            WHERE is_anchor = 1
+        ''')
+        db_positions = {(row['inst_id'], row['pos_side']): row for row in cursor.fetchall()}
+        conn.close()
+        
         position_list = []
         for pos in okex_positions:
             inst_id = pos.get('instId')
@@ -12125,14 +12142,25 @@ def get_current_positions():
                 continue
             
             # 计算数据
-            avg_price = float(pos.get('avgPx', 0))
+            okex_avg_price = float(pos.get('avgPx', 0))
             mark_price = float(pos.get('markPx', 0))
             lever = int(pos.get('lever', 10))
             upl = float(pos.get('upl', 0))
             margin = float(pos.get('margin', 0))
             
-            # 计算收益率
-            profit_rate = calculate_profit_rate(pos)
+            # 优先使用数据库中的开仓价格（维护后的平均价格）
+            db_record = db_positions.get((inst_id, pos_side))
+            if db_record:
+                avg_price = float(db_record['open_price'])
+                # 重新计算收益率（使用维护后的开仓价格）
+                if pos_side == 'short':
+                    profit_rate = (avg_price - mark_price) / avg_price * 100
+                else:  # long
+                    profit_rate = (mark_price - avg_price) / avg_price * 100
+            else:
+                # 如果数据库中没有，使用 OKEx 的价格
+                avg_price = okex_avg_price
+                profit_rate = calculate_profit_rate(pos)
             
             # 判断状态
             status = '监控中'
