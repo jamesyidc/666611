@@ -2111,3 +2111,72 @@ def get_long_position_monitoring_summary():
         import traceback
         traceback.print_exc()
         return jsonify({'success': False, 'error': str(e)})
+
+@trading_bp.route('/long-position/execute-open', methods=['POST'])
+def execute_long_position_open():
+    """执行多单自动开仓"""
+    try:
+        from long_position_executor import LongPositionExecutor
+        
+        executor = LongPositionExecutor()
+        result = executor.scan_and_execute()
+        
+        return jsonify({
+            'success': True,
+            'result': result
+        })
+        
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        return jsonify({'success': False, 'error': str(e)})
+
+@trading_bp.route('/long-position/check-open-conditions', methods=['GET'])
+def check_long_position_open_conditions():
+    """检查特定币种的开仓条件"""
+    try:
+        from long_position_executor import LongPositionExecutor
+        
+        inst_id = request.args.get('inst_id')
+        if not inst_id:
+            return jsonify({'success': False, 'error': '缺少inst_id参数'})
+        
+        executor = LongPositionExecutor()
+        
+        # 获取当前价格
+        current_price = executor.get_current_price(inst_id)
+        if not current_price:
+            return jsonify({'success': False, 'error': '无法获取当前价格'})
+        
+        # 计算开仓金额
+        open_amount, available_capital = executor.calculate_open_amount()
+        
+        # 检查是否可以开仓
+        can_open, reason = executor.check_can_open_long(inst_id, current_price, open_amount, available_capital)
+        
+        # 获取详细信息
+        open_count = executor.get_long_position_count(inst_id)
+        last_price = executor.get_last_long_open_price(inst_id)
+        total_value = executor.get_coin_total_value(inst_id)
+        max_single_coin = available_capital * executor.max_single_coin_percent / 100
+        
+        return jsonify({
+            'success': True,
+            'inst_id': inst_id,
+            'can_open': can_open,
+            'reason': reason,
+            'current_price': current_price,
+            'open_amount': open_amount,
+            'available_capital': available_capital,
+            'open_count': open_count,
+            'max_opens': executor.max_opens_per_coin,
+            'last_open_price': last_price,
+            'total_value': total_value,
+            'max_single_coin': max_single_coin,
+            'max_single_coin_percent': executor.max_single_coin_percent
+        })
+        
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        return jsonify({'success': False, 'error': str(e)})
