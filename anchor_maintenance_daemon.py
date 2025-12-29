@@ -443,8 +443,8 @@ class AnchorMaintenanceDaemon:
             SET open_size = ?,
                 open_price = ?,
                 updated_time = ?
-            WHERE inst_id = ? AND pos_side = ? AND is_anchor = 1
-            ''', (remain_size, average_price, now, inst_id, pos_side))
+            WHERE inst_id = ? AND pos_side = ? AND is_anchor = 1 AND (trade_mode = ? OR trade_mode IS NULL)
+            ''', (remain_size, average_price, now, inst_id, pos_side, self.trade_mode))
             
             rows_updated = cursor.rowcount
             print(f"  5️⃣  更新持仓记录: {inst_id} {pos_side}")
