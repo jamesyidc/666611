@@ -12572,6 +12572,161 @@ def get_anchor_warnings():
             'traceback': traceback.format_exc()
         })
 
+@app.route('/api/trading/positions/opens')
+def get_trading_positions_opens():
+    """获取开仓持仓 - Trading Manager专用，支持维护价格表"""
+    try:
+        import sqlite3
+        
+        # 获取参数
+        is_anchor = request.args.get('is_anchor', type=int)
+        limit = request.args.get('limit', 50, type=int)
+        trade_mode = request.args.get('trade_mode', 'paper')
+        
+        DB_PATH = '/home/user/webapp/trading_decision.db'
+        conn = sqlite3.connect(DB_PATH, timeout=10.0)
+        conn.row_factory = sqlite3.Row
+        cursor = conn.cursor()
+        
+        # 如果是锚点单，使用维护价格表
+        if is_anchor == 1:
+            # 联合查询：position_opens 和 anchor_maintenance_prices
+            cursor.execute('''
+                SELECT 
+                    p.id,
+                    p.inst_id,
+                    p.pos_side,
+                    p.open_size,
+                    p.mark_price,
+                    p.profit_rate,
+                    p.lever,
+                    p.upl,
+                    p.margin,
+                    p.created_at,
+                    p.updated_time,
+                    p.trade_mode,
+                    p.is_anchor,
+                    p.granularity,
+                    p.open_percent,
+                    p.total_adds,
+                    p.total_positions,
+                    COALESCE(amp.maintenance_price, p.open_price) as open_price,
+                    amp.original_open_price,
+                    amp.maintenance_count,
+                    amp.last_maintenance_time,
+                    p.mark_price as current_price
+                FROM position_opens p
+                LEFT JOIN anchor_maintenance_prices amp 
+                    ON p.inst_id = amp.inst_id 
+                    AND p.pos_side = amp.pos_side 
+                    AND p.trade_mode = amp.trade_mode
+                WHERE p.is_anchor = 1 AND p.trade_mode = ?
+                ORDER BY p.id DESC
+                LIMIT ?
+            ''', (trade_mode, limit))
+            
+            rows = cursor.fetchall()
+            
+            # 获取最新价格更新时间
+            cursor.execute('''
+                SELECT MAX(updated_time) FROM position_opens WHERE is_anchor = 1 AND trade_mode = ?
+            ''', (trade_mode,))
+            
+            price_update_time = cursor.fetchone()[0] or ''
+            
+            records = []
+            for row in rows:
+                records.append({
+                    'id': row['id'],
+                    'inst_id': row['inst_id'],
+                    'pos_side': row['pos_side'],
+                    'open_price': float(row['open_price']),  # 使用维护价格
+                    'original_open_price': float(row['original_open_price']) if row['original_open_price'] else None,
+                    'open_size': float(row['open_size']),
+                    'current_price': float(row['current_price']) if row['current_price'] else 0.0,
+                    'mark_price': float(row['mark_price']) if row['mark_price'] else 0.0,
+                    'profit_rate': float(row['profit_rate']) if row['profit_rate'] else 0.0,
+                    'lever': int(row['lever']) if row['lever'] else 10,
+                    'upl': float(row['upl']) if row['upl'] else 0.0,
+                    'margin': float(row['margin']) if row['margin'] else 0.0,
+                    'is_anchor': bool(row['is_anchor']),
+                    'granularity': float(row['granularity']) if row['granularity'] else 0.0,
+                    'open_percent': float(row['open_percent']) if row['open_percent'] else 0.0,
+                    'total_adds': int(row['total_adds']) if row['total_adds'] else 0,
+                    'total_positions': int(row['total_positions']) if row['total_positions'] else 0,
+                    'maintenance_count': int(row['maintenance_count']) if row['maintenance_count'] else 0,
+                    'last_maintenance_time': row['last_maintenance_time'] or '',
+                    'created_at': row['created_at'],
+                    'price_update_time': row['updated_time'] or '',
+                    'trade_mode': row['trade_mode']
+                })
+            
+            conn.close()
+            
+            return jsonify({
+                'success': True,
+                'records': records,
+                'total': len(records),
+                'price_update_time': price_update_time,
+                'trade_mode': trade_mode
+            })
+        
+        # 非锚点单，直接查询
+        else:
+            cursor.execute('''
+                SELECT 
+                    id, inst_id, pos_side, open_price, open_size, mark_price, 
+                    profit_rate, lever, upl, margin, created_at, updated_time,
+                    trade_mode, is_anchor, granularity, open_percent, 
+                    total_adds, total_positions
+                FROM position_opens
+                WHERE (? IS NULL OR is_anchor = ?) AND trade_mode = ?
+                ORDER BY id DESC
+                LIMIT ?
+            ''', (is_anchor, is_anchor, trade_mode, limit))
+            
+            rows = cursor.fetchall()
+            conn.close()
+            
+            records = []
+            for row in rows:
+                records.append({
+                    'id': row['id'],
+                    'inst_id': row['inst_id'],
+                    'pos_side': row['pos_side'],
+                    'open_price': float(row['open_price']),
+                    'open_size': float(row['open_size']),
+                    'current_price': float(row['mark_price']) if row['mark_price'] else 0.0,
+                    'mark_price': float(row['mark_price']) if row['mark_price'] else 0.0,
+                    'profit_rate': float(row['profit_rate']) if row['profit_rate'] else 0.0,
+                    'lever': int(row['lever']) if row['lever'] else 10,
+                    'upl': float(row['upl']) if row['upl'] else 0.0,
+                    'margin': float(row['margin']) if row['margin'] else 0.0,
+                    'is_anchor': bool(row['is_anchor']),
+                    'granularity': float(row['granularity']) if row['granularity'] else 0.0,
+                    'open_percent': float(row['open_percent']) if row['open_percent'] else 0.0,
+                    'total_adds': int(row['total_adds']) if row['total_adds'] else 0,
+                    'total_positions': int(row['total_positions']) if row['total_positions'] else 0,
+                    'created_at': row['created_at'],
+                    'price_update_time': row['updated_time'] or '',
+                    'trade_mode': row['trade_mode']
+                })
+            
+            return jsonify({
+                'success': True,
+                'records': records,
+                'total': len(records),
+                'trade_mode': trade_mode
+            })
+    
+    except Exception as e:
+        import traceback
+        return jsonify({
+            'success': False,
+            'error': str(e),
+            'traceback': traceback.format_exc()
+        })
+
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=5000, debug=False)
 
