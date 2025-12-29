@@ -2307,17 +2307,26 @@ def scan_anchor_warnings():
 
 @trading_bp.route('/anchor-warning/active', methods=['GET'])
 def get_active_warnings():
-    """获取所有活跃预警"""
+    """获取所有活跃预警（先扫描再返回）"""
     try:
         from anchor_warning_monitor import AnchorWarningMonitor
         
         monitor = AnchorWarningMonitor()
+        
+        # 先执行扫描，更新预警状态
+        scan_result = monitor.scan_warnings()
+        
+        # 然后获取活跃预警
         warnings = monitor.get_active_warnings()
         
         return jsonify({
             'success': True,
             'total': len(warnings),
-            'warnings': warnings
+            'warnings': warnings,
+            'scan_info': {
+                'scanned': scan_result.get('total_scanned', 0),
+                'warnings_found': scan_result.get('warnings_count', 0)
+            }
         })
         
     except Exception as e:
