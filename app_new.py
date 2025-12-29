@@ -11861,7 +11861,21 @@ def warning_test():
 @app.route('/anchor-system')
 def anchor_system():
     """锚点系统主页"""
-    return render_template('anchor_system.html')
+    response = make_response(render_template('anchor_system.html'))
+    # 禁用所有缓存
+    response.headers['Cache-Control'] = 'no-store, no-cache, must-revalidate, post-check=0, pre-check=0, max-age=0'
+    response.headers['Pragma'] = 'no-cache'
+    response.headers['Expires'] = '-1'
+    return response
+
+@app.route('/anchor-system-v2')
+def anchor_system_v2():
+    """锚点系统主页 v2 (新URL避免缓存)"""
+    response = make_response(render_template('anchor_system.html'))
+    response.headers['Cache-Control'] = 'no-store, no-cache, must-revalidate, post-check=0, pre-check=0, max-age=0'
+    response.headers['Pragma'] = 'no-cache'
+    response.headers['Expires'] = '-1'
+    return response
 
 @app.route('/api/anchor-system/monitors')
 def get_anchor_monitors():
