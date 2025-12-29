@@ -12177,6 +12177,65 @@ def trading_decision_page():
     """交易决策系统管理页面 - 重定向到统一管理页面"""
     return redirect('/trading-manager')
 
+@app.route('/api/trading/anchor-maintenance/logs')
+def anchor_maintenance_logs_api():
+    """获取锚点单维护日志"""
+    try:
+        limit = request.args.get('limit', 10, type=int)
+        
+        conn = sqlite3.connect('/home/user/webapp/trading_decision.db', timeout=10.0)
+        cursor = conn.cursor()
+        
+        cursor.execute('''
+        SELECT id, inst_id, pos_side, original_size, original_price, 
+               original_margin, current_price, profit_rate, step, action,
+               trade_size, trade_price, remaining_size, remaining_margin,
+               trigger_reason, decision_log, status, executed_at, created_at
+        FROM anchor_maintenance_logs
+        ORDER BY created_at DESC
+        LIMIT ?
+        ''', (limit,))
+        
+        logs = []
+        for row in cursor.fetchall():
+            logs.append({
+                'id': row[0],
+                'inst_id': row[1],
+                'pos_side': row[2],
+                'original_size': float(row[3]),
+                'original_price': float(row[4]),
+                'original_margin': float(row[5]),
+                'current_price': float(row[6]),
+                'profit_rate': float(row[7]),
+                'step': row[8],
+                'action': row[9],
+                'trade_size': float(row[10]),
+                'trade_price': float(row[11]),
+                'remaining_size': float(row[12]),
+                'remaining_margin': float(row[13]),
+                'trigger_reason': row[14],
+                'decision_log': row[15],
+                'status': row[16],
+                'executed_at': row[17],
+                'created_at': row[18]
+            })
+        
+        conn.close()
+        
+        return jsonify({
+            'success': True,
+            'count': len(logs),
+            'logs': logs
+        })
+        
+    except Exception as e:
+        return jsonify({
+            'success': False,
+            'error': str(e),
+            'traceback': traceback.format_exc()
+        }), 500
+
+
 @app.route('/api/trading/config', methods=['GET', 'POST'])
 def trading_config_api():
     """交易配置API"""
