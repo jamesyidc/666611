@@ -2018,3 +2018,96 @@ def close_anchor_position():
         import traceback
         traceback.print_exc()
         return jsonify({'success': False, 'error': str(e)})
+
+# =====================================================
+# 多单开仓监控API
+# =====================================================
+
+@trading_bp.route('/long-position/scan-monitoring', methods=['POST'])
+def scan_long_position_monitoring():
+    """扫描锚点单盈利率，记录监控日志"""
+    try:
+        from long_position_monitor import LongPositionMonitor
+        
+        monitor = LongPositionMonitor()
+        result = monitor.scan_positions()
+        
+        return jsonify({
+            'success': True,
+            'result': result
+        })
+        
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        return jsonify({'success': False, 'error': str(e)})
+
+@trading_bp.route('/long-position/monitoring-logs', methods=['GET'])
+def get_long_position_monitoring_logs():
+    """获取监控日志"""
+    try:
+        from long_position_monitor import LongPositionMonitor
+        
+        limit = request.args.get('limit', 50, type=int)
+        
+        monitor = LongPositionMonitor()
+        logs = monitor.get_monitoring_logs(limit)
+        
+        return jsonify({
+            'success': True,
+            'total': len(logs),
+            'logs': logs
+        })
+        
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        return jsonify({'success': False, 'error': str(e)})
+
+@trading_bp.route('/long-position/monitoring-summary', methods=['GET'])
+def get_long_position_monitoring_summary():
+    """获取监控摘要"""
+    try:
+        from long_position_monitor import LongPositionMonitor
+        
+        monitor = LongPositionMonitor()
+        
+        # 获取最新的监控结果
+        logs = monitor.get_monitoring_logs(limit=100)
+        
+        # 统计各状态数量
+        summary = {
+            'ready_to_open': 0,
+            'monitoring': 0,
+            'below_threshold': 0,
+            'recent_logs': []
+        }
+        
+        # 按币种分组，只取最新的记录
+        inst_latest = {}
+        for log in logs:
+            inst_id = log['inst_id']
+            if inst_id not in inst_latest:
+                inst_latest[inst_id] = log
+                
+                # 统计状态
+                if log['status'] == 'ready_to_open':
+                    summary['ready_to_open'] += 1
+                elif log['status'] == 'monitoring':
+                    summary['monitoring'] += 1
+                elif log['status'] == 'below_threshold':
+                    summary['below_threshold'] += 1
+        
+        # 最近10条日志
+        summary['recent_logs'] = logs[:10]
+        summary['total_coins'] = len(inst_latest)
+        
+        return jsonify({
+            'success': True,
+            'summary': summary
+        })
+        
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        return jsonify({'success': False, 'error': str(e)})

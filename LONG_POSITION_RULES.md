@@ -8,13 +8,24 @@
 
 ## 🎯 一、多单开仓触发条件
 
-### 1.1 触发条件
+### 1.1 监控与触发两阶段
 
-**空单盈利超过40%时，开多单**
+#### **阶段1：监控阶段（盈利≥30%）**
+
+**锚点单盈利超过30%时，进入开仓系统日志进行监控**
 
 - 检测所有持仓的空单
 - 计算空单收益率
+- 当收益率 ≥ 30% 时，记录到开仓系统日志
+- **仅监控，不开仓**
+
+#### **阶段2：触发开仓（盈利≥40%）**
+
+**空单盈利超过40%时，开多单**
+
+- 持续监控日志中的空单
 - 当收益率 ≥ 40% 时，触发多单开仓信号
+- 执行开仓操作
 
 ### 1.2 判断逻辑
 
@@ -23,7 +34,24 @@
 for position in all_positions:
     if position['pos_side'] == 'short':
         profit_rate = calculate_profit_rate(position)
-        if profit_rate >= 40.0:
+        
+        # 阶段1：监控（30%-40%）
+        if 30.0 <= profit_rate < 40.0:
+            log_to_monitoring_system(
+                inst_id=position['inst_id'],
+                profit_rate=profit_rate,
+                status='monitoring',
+                message=f'空单盈利{profit_rate:.2f}%，进入监控'
+            )
+        
+        # 阶段2：触发开仓（≥40%）
+        elif profit_rate >= 40.0:
+            log_to_monitoring_system(
+                inst_id=position['inst_id'],
+                profit_rate=profit_rate,
+                status='ready_to_open',
+                message=f'空单盈利{profit_rate:.2f}%，达到开仓条件'
+            )
             # 触发多单开仓
             trigger_long_position(position['inst_id'])
 ```
