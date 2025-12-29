@@ -169,20 +169,21 @@ def get_position_opens():
                 'created_at': row[10]
             }
             
-            # 获取当前市场价格
+            # 获取当前市场价格和更新时间
             try:
                 crypto_conn = sqlite3.connect('/home/user/webapp/crypto_data.db', timeout=5.0)
                 crypto_cursor = crypto_conn.cursor()
                 # 转换symbol格式: LDO-USDT-SWAP -> LDOUSDT
                 symbol = record['inst_id'].replace('-USDT-SWAP', 'USDT')
                 crypto_cursor.execute('''
-                    SELECT current_price FROM support_resistance_levels 
+                    SELECT current_price, record_time FROM support_resistance_levels 
                     WHERE symbol = ? 
                     ORDER BY record_time DESC LIMIT 1
                 ''', (symbol,))
                 price_row = crypto_cursor.fetchone()
                 if price_row and price_row[0]:
                     record['current_price'] = float(price_row[0])
+                    record['price_update_time'] = price_row[1]  # 记录价格更新时间
                     # 计算盈亏率（考虑10x杠杆）
                     leverage = 10
                     if record['pos_side'] == 'short':
@@ -193,10 +194,12 @@ def get_position_opens():
                 else:
                     record['current_price'] = None
                     record['profit_rate'] = None
+                    record['price_update_time'] = None
                 crypto_conn.close()
             except Exception as e:
                 record['current_price'] = None
                 record['profit_rate'] = None
+                record['price_update_time'] = None
             
             # 如果是锚点单，额外查询补仓次数和总金额
             if record['is_anchor']:
@@ -214,10 +217,18 @@ def get_position_opens():
         
         conn.close()
         
+        # 获取最新的价格更新时间（从所有记录中取最新的）
+        latest_price_update = None
+        for r in records:
+            if r.get('price_update_time'):
+                if not latest_price_update or r['price_update_time'] > latest_price_update:
+                    latest_price_update = r['price_update_time']
+        
         return jsonify({
             'success': True,
             'total': len(records),
-            'records': records
+            'records': records,
+            'price_update_time': latest_price_update  # 添加最新价格更新时间
         })
     
     except Exception as e:

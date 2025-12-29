@@ -466,7 +466,12 @@
         <!-- 锚点单记录 -->
         <div id="anchors-tab" class="tab-content">
             <div class="card" style="background: linear-gradient(135deg, #fef3c7 0%, #fde68a 100%); border-left: 4px solid #f59e0b;">
-                <h2 style="color: #d97706;">⚓ 锚点单记录</h2>
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+                    <h2 style="color: #d97706; margin: 0;">⚓ 锚点单记录</h2>
+                    <span id="anchor-price-update-time" style="color: #92400e; font-size: 0.85em; font-style: italic;">
+                        ⏰ 价格更新时间: 加载中...
+                    </span>
+                </div>
                 <p style="color: #92400e; margin-bottom: 15px; font-size: 0.95em;">
                     🔒 锚点单是防护性空单，只在出现逃顶信号时触发 | 只有锚点单才能补仓
                 </p>
@@ -996,6 +1001,16 @@
                 .then(res => res.json())
                 .then(data => {
                     if (data.success) {
+                        // 更新价格更新时间
+                        const updateTimeEl = document.getElementById('anchor-price-update-time');
+                        if (data.price_update_time) {
+                            updateTimeEl.innerHTML = `⏰ 价格更新时间: ${data.price_update_time}`;
+                            updateTimeEl.style.color = '#059669'; // 绿色表示有数据
+                        } else {
+                            updateTimeEl.innerHTML = '⏰ 价格更新时间: 暂无数据';
+                            updateTimeEl.style.color = '#dc2626'; // 红色表示无数据
+                        }
+                        
                         if (data.records.length === 0) {
                             document.getElementById('anchors-content').innerHTML = `
                                 <div class="empty-state">
