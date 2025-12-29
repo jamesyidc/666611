@@ -137,15 +137,15 @@ class AnchorMaintenanceManager:
         total_size_after_buy = original_size + buy_size
         total_margin_after_buy = original_margin + buy_margin
         
-        # 步骤2：计算要保留1U，需要平掉多少
-        target_remaining_margin = 1.0  # 目标保留1U
+        # 步骤2：计算要保留≤2U，需要平掉多少
+        target_remaining_margin = min(2.0, total_margin_after_buy)  # 目标保留2U，但不超过总额
         close_margin = total_margin_after_buy - target_remaining_margin
         close_percent = (close_margin / total_margin_after_buy) * 100
         
         # 按比例计算平仓数量
         close_size = (close_margin / total_margin_after_buy) * total_size_after_buy
         
-        # 步骤3：剩余持仓（接近1U）
+        # 步骤3：剩余持仓（≤2U）
         remaining_size = total_size_after_buy - close_size
         remaining_margin = total_margin_after_buy - close_margin
         
