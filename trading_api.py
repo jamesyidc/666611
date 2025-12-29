@@ -2282,3 +2282,95 @@ def correct_single_anchor():
         return jsonify({'success': False, 'error': str(e)})
 
 print('✅ 锚点单纠错系统API已添加')
+
+
+# ============================================================
+# 锚点单预警监控API
+# ============================================================
+
+@trading_bp.route('/anchor-warning/scan', methods=['POST'])
+def scan_anchor_warnings():
+    """扫描锚点单预警"""
+    try:
+        from anchor_warning_monitor import AnchorWarningMonitor
+        
+        monitor = AnchorWarningMonitor()
+        result = monitor.scan_warnings()
+        
+        return jsonify(result)
+        
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        return jsonify({'success': False, 'error': str(e)})
+
+
+@trading_bp.route('/anchor-warning/active', methods=['GET'])
+def get_active_warnings():
+    """获取所有活跃预警"""
+    try:
+        from anchor_warning_monitor import AnchorWarningMonitor
+        
+        monitor = AnchorWarningMonitor()
+        warnings = monitor.get_active_warnings()
+        
+        return jsonify({
+            'success': True,
+            'total': len(warnings),
+            'warnings': warnings
+        })
+        
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        return jsonify({'success': False, 'error': str(e)})
+
+
+@trading_bp.route('/anchor-warning/logs', methods=['GET'])
+def get_warning_logs():
+    """获取预警操作日志"""
+    try:
+        from anchor_warning_monitor import AnchorWarningMonitor
+        
+        inst_id = request.args.get('inst_id')
+        limit = int(request.args.get('limit', 100))
+        
+        monitor = AnchorWarningMonitor()
+        logs = monitor.get_warning_logs(inst_id, limit)
+        
+        return jsonify({
+            'success': True,
+            'total': len(logs),
+            'logs': logs
+        })
+        
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        return jsonify({'success': False, 'error': str(e)})
+
+
+@trading_bp.route('/anchor-warning/close/<int:warning_id>', methods=['POST'])
+def close_warning(warning_id):
+    """手动关闭预警"""
+    try:
+        from anchor_warning_monitor import AnchorWarningMonitor
+        
+        data = request.json or {}
+        reason = data.get('reason', '手动关闭')
+        
+        monitor = AnchorWarningMonitor()
+        success = monitor.close_warning(warning_id, reason)
+        
+        return jsonify({
+            'success': success,
+            'message': '预警已关闭' if success else '关闭失败'
+        })
+        
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        return jsonify({'success': False, 'error': str(e)})
+
+
+print('✅ 锚点单预警监控API已添加')
