@@ -11853,6 +11853,11 @@ def cache_clear():
 
 # ========== 锚点系统（OKEx持仓监控） ==========
 
+@app.route('/warning-test')
+def warning_test():
+    """预警模块测试页面"""
+    return render_template('warning_test.html')
+
 @app.route('/anchor-system')
 def anchor_system():
     """锚点系统主页"""
