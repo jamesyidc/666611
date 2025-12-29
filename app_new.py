@@ -12096,6 +12096,133 @@ def get_anchor_profit_records():
             'traceback': traceback.format_exc()
         })
 
+@app.route('/api/anchor-system/cleanup-extremes', methods=['POST'])
+def cleanup_extreme_records():
+    """清理错误的极值记录（删除所有亏损记录）"""
+    try:
+        import sys
+        sys.path.insert(0, '/home/user/webapp')
+        from extreme_correction_system import (
+            init_correction_system, backup_current_data,
+            detect_error_records, delete_error_records, get_statistics
+        )
+        
+        # 初始化
+        from anchor_system import init_database
+        init_database()
+        init_correction_system()
+        
+        # 备份
+        backup_count = backup_current_data()
+        
+        # 检测错误记录
+        error_records = detect_error_records()
+        
+        if not error_records:
+            return jsonify({
+                'success': True,
+                'message': '没有发现错误记录',
+                'backup_count': backup_count,
+                'deleted_count': 0
+            })
+        
+        # 删除错误记录
+        deleted_count = delete_error_records(error_records, "Web端手动清理")
+        
+        # 获取统计
+        stats = get_statistics()
+        
+        return jsonify({
+            'success': True,
+            'message': f'已清理 {deleted_count} 条错误记录',
+            'backup_count': backup_count,
+            'deleted_count': deleted_count,
+            'statistics': stats
+        })
+    except Exception as e:
+        return jsonify({
+            'success': False,
+            'error': str(e),
+            'traceback': traceback.format_exc()
+        })
+
+
+@app.route('/api/anchor-system/extreme-stats')
+def get_extreme_stats():
+    """获取极值记录统计信息"""
+    try:
+        import sys
+        sys.path.insert(0, '/home/user/webapp')
+        from extreme_correction_system import get_statistics, detect_error_records
+        
+        # 获取统计
+        stats = get_statistics()
+        
+        # 检测错误记录
+        error_records = detect_error_records()
+        
+        return jsonify({
+            'success': True,
+            'statistics': stats,
+            'error_count': len(error_records),
+            'has_errors': len(error_records) > 0
+        })
+    except Exception as e:
+        return jsonify({
+            'success': False,
+            'error': str(e),
+            'traceback': traceback.format_exc()
+        })
+
+
+@app.route('/api/anchor-system/correction-log')
+def get_correction_log():
+    """获取纠错日志"""
+    try:
+        limit = int(request.args.get('limit', 20))
+        
+        db_path = '/home/user/webapp/anchor_system.db'
+        conn = sqlite3.connect(db_path, timeout=10.0)
+        cursor = conn.cursor()
+        
+        cursor.execute('''
+        SELECT id, correction_type, inst_id, pos_side, record_type,
+               old_profit_rate, new_profit_rate, reason, created_at
+        FROM extreme_corrections_log
+        ORDER BY created_at DESC
+        LIMIT ?
+        ''', (limit,))
+        
+        rows = cursor.fetchall()
+        conn.close()
+        
+        logs = []
+        for row in rows:
+            logs.append({
+                'id': row[0],
+                'correction_type': row[1],
+                'inst_id': row[2],
+                'pos_side': row[3],
+                'record_type': row[4],
+                'old_profit_rate': row[5],
+                'new_profit_rate': row[6],
+                'reason': row[7],
+                'created_at': row[8]
+            })
+        
+        return jsonify({
+            'success': True,
+            'logs': logs,
+            'total': len(logs)
+        })
+    except Exception as e:
+        return jsonify({
+            'success': False,
+            'error': str(e),
+            'traceback': traceback.format_exc()
+        })
+
+
 @app.route('/api/anchor-system/current-positions')
 def get_current_positions():
     """获取当前持仓情况 - 模拟盘直接读取数据库，实盘从 OKEx API 实时获取"""
