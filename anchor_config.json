@@ -25,5 +25,20 @@
     "target_coins_description": "优先开仓的目标币种（按市值和成交量排序）",
     "last_updated": "2025-12-29",
     "updated_by": "GenSpark AI Developer"
+  },
+  "monitor": {
+    "profit_target": 40.0,
+    "loss_limit": -10.0,
+    "check_interval": 60,
+    "alert_cooldown": 30,
+    "only_short_positions": true,
+    "trade_mode": "paper"
+  },
+  "telegram": {
+    "bot_token": "",
+    "chat_id": ""
+  },
+  "database": {
+    "path": "/home/user/webapp/anchor_system.db"
   }
 }

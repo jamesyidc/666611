@@ -43,9 +43,13 @@ CHECK_INTERVAL = CONFIG.get('monitor', {}).get('check_interval', 60)
 ALERT_COOLDOWN = CONFIG.get('monitor', {}).get('alert_cooldown', 30)
 ONLY_SHORT = CONFIG.get('monitor', {}).get('only_short_positions', True)
 
+# 交易模式配置
+TRADE_MODE = CONFIG.get('monitor', {}).get('trade_mode', 'paper')  # 'paper' 或 'real'
+
 # 数据库
 DB_PATH = CONFIG.get('database', {}).get('path', '/home/user/webapp/anchor_system.db')
 CRYPTO_DB_PATH = '/home/user/webapp/crypto_data.db'
+TRADING_DB_PATH = '/home/user/webapp/trading_decision.db'
 
 # 北京时区
 BEIJING_TZ = timezone(timedelta(hours=8))
@@ -77,8 +81,87 @@ def get_headers(method, request_path, body=''):
     }
 
 
+def get_positions_from_db():
+    """从数据库获取模拟盘持仓"""
+    try:
+        conn = sqlite3.connect(TRADING_DB_PATH)
+        cursor = conn.cursor()
+        
+        # 获取锚点单持仓
+        cursor.execute("""
+            SELECT 
+                p.inst_id,
+                p.pos_side,
+                p.open_size,
+                COALESCE(amp.maintenance_price, p.open_price) as avg_price,
+                p.mark_price,
+                p.lever,
+                p.created_at,
+                p.updated_time
+            FROM position_opens p
+            LEFT JOIN anchor_maintenance_prices amp 
+                ON p.inst_id = amp.inst_id 
+                AND p.pos_side = amp.pos_side 
+                AND (p.trade_mode = amp.trade_mode OR (p.trade_mode IS NULL AND amp.trade_mode = 'paper'))
+            WHERE p.is_anchor = 1 
+            AND (p.trade_mode = 'paper' OR p.trade_mode IS NULL)
+            ORDER BY p.created_at DESC
+        """)
+        
+        rows = cursor.fetchall()
+        conn.close()
+        
+        # 转换为OKEx API格式
+        positions = []
+        for row in rows:
+            inst_id, pos_side, open_size, avg_price, mark_price, lever, created_at, updated_time = row
+            
+            # 计算收益率
+            if pos_side == 'short':
+                profit_rate = (avg_price - mark_price) / avg_price * 100
+                upl = open_size * (avg_price - mark_price)
+            else:  # long
+                profit_rate = (mark_price - avg_price) / avg_price * 100
+                upl = open_size * (mark_price - avg_price)
+            
+            # 计算保证金
+            margin = abs(open_size) * avg_price / lever if lever > 0 else 0
+            
+            pos = {
+                'instId': inst_id,
+                'posSide': pos_side,
+                'pos': str(open_size),
+                'avgPx': str(avg_price),
+                'markPx': str(mark_price),
+                'lever': str(lever),
+                'upl': str(upl),
+                'margin': str(margin),
+                'uplRatio': str(profit_rate / 100),
+                'created_at': created_at,
+                'updated_time': updated_time
+            }
+            positions.append(pos)
+        
+        return positions
+    except Exception as e:
+        print(f"❌ 从数据库获取持仓失败: {e}")
+        import traceback
+        traceback.print_exc()
+        return []
+
+
 def get_positions():
-    """获取当前持仓"""
+    """获取当前持仓（根据配置决定是实盘还是模拟盘）"""
+    if TRADE_MODE == 'paper':
+        print(f"📝 使用模拟盘数据 (trading_decision.db)")
+        return get_positions_from_db()
+    else:
+        print(f"📝 使用实盘数据 (OKEx API)")
+        return get_positions_from_okex()
+
+
+def get_positions_from_okex():
+    """从OKEx API获取实盘持仓"""
     try:
         method = 'GET'
         request_path = '/api/v5/account/positions'
@@ -858,6 +941,8 @@ def main():
     print("=" * 60)
     print("🎯 锚点系统启动")
     print("=" * 60)
+    print(f"交易模式: {'📋 模拟盘 (paper)' if TRADE_MODE == 'paper' else '💰 实盘 (real)'}")
+    print(f"数据源: {TRADING_DB_PATH if TRADE_MODE == 'paper' else 'OKEx API'}")
     print(f"监控条件:")
     print(f"  1. 做空收益率 >= {PROFIT_TARGET}% (盈利目标)")
     print(f"  2. 做空收益率 <= {LOSS_LIMIT}% (止损警告)")
