@@ -309,6 +309,21 @@
                 grid-template-columns: 1fr;
             }
         }
+
+        /* 预警快速入口动画 */
+        @keyframes pulse {
+            0%, 100% {
+                box-shadow: 0 4px 15px rgba(239, 68, 68, 0.2);
+            }
+            50% {
+                box-shadow: 0 8px 30px rgba(239, 68, 68, 0.6);
+            }
+        }
+
+        #warning-quick-entry:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 8px 25px rgba(239, 68, 68, 0.4) !important;
+        }
     </style>
 </head>
 <body>
@@ -360,6 +375,36 @@
                 <div class="stat-label">建仓空单预警</div>
                 <div class="stat-value" id="lossLimit">--</div>
                 <div class="stat-subvalue">做空亏损触发提醒</div>
+            </div>
+        </div>
+
+        <!-- 预警快速入口 -->
+        <div id="warning-quick-entry" style="background: linear-gradient(135deg, #fff5f5 0%, #fed7d7 100%); border-left: 5px solid #ef4444; border-radius: 12px; padding: 20px; margin-bottom: 30px; box-shadow: 0 4px 15px rgba(239, 68, 68, 0.2); cursor: pointer; transition: all 0.3s;" onclick="scrollToWarningSection()">
+            <div style="display: flex; justify-content: space-between; align-items: center;">
+                <div style="display: flex; align-items: center; gap: 20px;">
+                    <div style="font-size: 48px;">⚠️</div>
+                    <div>
+                        <div style="font-size: 22px; font-weight: bold; color: #c53030; margin-bottom: 5px;">
+                            锚点单预警监控
+                        </div>
+                        <div style="font-size: 14px; color: #742a2a;">
+                            实时监控 -8%预警 | -10%触发维护 | 完整操作留痕
+                        </div>
+                    </div>
+                </div>
+                <div style="display: flex; gap: 20px; align-items: center;">
+                    <div style="text-align: center; padding: 10px 20px; background: rgba(255,255,255,0.7); border-radius: 8px;">
+                        <div style="font-size: 28px; font-weight: bold; color: #ef4444;" id="quick-critical-count">-</div>
+                        <div style="font-size: 12px; color: #742a2a;">临界预警</div>
+                    </div>
+                    <div style="text-align: center; padding: 10px 20px; background: rgba(255,255,255,0.7); border-radius: 8px;">
+                        <div style="font-size: 28px; font-weight: bold; color: #f59e0b;" id="quick-warning-count">-</div>
+                        <div style="font-size: 12px; color: #742a2a;">普通预警</div>
+                    </div>
+                    <div style="padding: 12px 24px; background: #ef4444; color: white; border-radius: 8px; font-weight: bold; font-size: 14px;">
+                        点击查看详情 →
+                    </div>
+                </div>
             </div>
         </div>
 
@@ -968,6 +1013,35 @@
             document.getElementById('warning-critical-count').textContent = criticalCount;
             document.getElementById('warning-normal-count').textContent = warningCount;
             document.getElementById('warning-safe-count').textContent = totalAnchors - warnings.length;
+            
+            // 更新快速入口的统计
+            document.getElementById('quick-critical-count').textContent = criticalCount;
+            document.getElementById('quick-warning-count').textContent = warningCount;
+            
+            // 如果有预警，让快速入口闪烁提示
+            const quickEntry = document.getElementById('warning-quick-entry');
+            if (criticalCount > 0) {
+                quickEntry.style.animation = 'pulse 2s infinite';
+            } else {
+                quickEntry.style.animation = 'none';
+            }
+        }
+
+        // 滚动到预警模块
+        function scrollToWarningSection() {
+            const warningSection = document.querySelector('#anchor-warnings-container');
+            if (warningSection) {
+                warningSection.closest('.card').scrollIntoView({ 
+                    behavior: 'smooth', 
+                    block: 'start'
+                });
+                // 高亮效果
+                const card = warningSection.closest('.card');
+                card.style.boxShadow = '0 0 30px rgba(239, 68, 68, 0.5)';
+                setTimeout(() => {
+                    card.style.boxShadow = '0 4px 20px rgba(0, 0, 0, 0.1)';
+                }, 2000);
+            }
         }
 
         // 渲染预警列表
