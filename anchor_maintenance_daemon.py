@@ -23,12 +23,12 @@ ANCHOR_DB = '/home/user/webapp/anchor_system.db'
 
 # 交易模式配置
 # 可选值: 'paper' (模拟交易) 或 'live' (实盘交易)
-TRADE_MODE = 'paper'  # 默认使用模拟交易
+TRADE_MODE = 'live'  # 默认使用实盘交易
 
 class AnchorMaintenanceDaemon:
     """锚点单自动维护守护进程"""
     
-    def __init__(self, trade_mode='paper'):
+    def __init__(self, trade_mode='live'):
         """初始化"""
         self.trading_db = TRADING_DB
         self.anchor_db = ANCHOR_DB
