@@ -12098,13 +12098,25 @@ def get_anchor_profit_records():
 
 @app.route('/api/anchor-system/current-positions')
 def get_current_positions():
-    """获取当前持仓情况"""
+    """获取当前持仓情况 - 从 position_opens 表读取锚点单"""
     try:
-        import sys
-        sys.path.append('/home/user/webapp')
-        from anchor_system import get_positions, calculate_profit_rate
+        import sqlite3
         
-        positions = get_positions()
+        # 从 position_opens 表读取锚点单持仓
+        db_path = '/home/user/webapp/trading_decision.db'
+        conn = sqlite3.connect(db_path, timeout=10.0)
+        cursor = conn.cursor()
+        
+        cursor.execute('''
+            SELECT inst_id, pos_side, open_size, open_price,
+                   mark_price, profit_rate, upl, lever, margin
+            FROM position_opens
+            WHERE is_anchor = 1
+            ORDER BY created_at DESC
+        ''')
+        
+        positions = cursor.fetchall()
+        conn.close()
         
         if not positions:
             return jsonify({
@@ -12115,16 +12127,15 @@ def get_current_positions():
         
         position_list = []
         for pos in positions:
-            inst_id = pos.get('instId')
-            pos_side = pos.get('posSide')
-            pos_size = float(pos.get('pos', 0))
-            avg_price = float(pos.get('avgPx', 0))
-            mark_price = float(pos.get('markPx', 0))
-            lever = float(pos.get('lever', 0))
-            upl = float(pos.get('upl', 0))
-            margin = float(pos.get('margin', 0))
+            inst_id, pos_side, open_size, open_price, mark_price, profit_rate, upl, lever, margin = pos
             
-            profit_rate = calculate_profit_rate(pos)
+            # 如果没有标记价格，使用开仓价格
+            if not mark_price or mark_price == 0:
+                mark_price = open_price
+            
+            # 如果没有收益率，计算一个默认值
+            if not profit_rate or profit_rate == 0:
+                profit_rate = 0.0
             
             # 判断状态
             status = '监控中'
@@ -12139,12 +12150,12 @@ def get_current_positions():
             position_list.append({
                 'inst_id': inst_id,
                 'pos_side': pos_side,
-                'pos_size': abs(pos_size),
-                'avg_price': avg_price,
+                'pos_size': abs(open_size) if open_size else 0,
+                'avg_price': open_price if open_price else 0,
                 'mark_price': mark_price,
-                'lever': lever,
-                'upl': upl,
-                'margin': margin,
+                'lever': lever if lever else 10,
+                'upl': upl if upl else 0,
+                'margin': margin if margin else 0,
                 'profit_rate': profit_rate,
                 'status': status,
                 'status_class': status_class
