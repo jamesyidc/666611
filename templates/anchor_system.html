@@ -601,16 +601,16 @@
                     renderRecordsTable(recordsData.records);
                 }
 
-                // 加载当前持仓情况
-                const positionsRes = await fetch('/api/anchor-system/current-positions?trade_mode=paper');
+                // 加载当前持仓情况（实盘模式）
+                const positionsRes = await fetch('/api/anchor-system/current-positions?trade_mode=real');
                 const positionsData = await positionsRes.json();
                 
                 if (positionsData.success) {
                     renderCurrentPositions(positionsData.positions);
                 }
 
-                // 加载当前预警
-                const warningsRes = await fetch('/api/anchor-system/warnings?trade_mode=paper');
+                // 加载当前预警（实盘模式）
+                const warningsRes = await fetch('/api/anchor-system/warnings?trade_mode=real');
                 const warningsData = await warningsRes.json();
                 
                 console.log('🚨 预警数据加载:', warningsData);

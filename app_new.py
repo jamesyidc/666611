@@ -12329,6 +12329,12 @@ def get_current_positions():
             if pos_value == 0:
                 continue
             
+            # 只显示数据库中标记为锚点单的持仓
+            db_record = db_positions_dict.get((inst_id, pos_side))
+            if not db_record:
+                # 如果数据库中没有此持仓记录，说明不是锚点单，跳过
+                continue
+            
             # 计算数据
             okex_avg_price = float(pos.get('avgPx', 0))
             mark_price = float(pos.get('markPx', 0))
@@ -12336,8 +12342,7 @@ def get_current_positions():
             upl = float(pos.get('upl', 0))
             margin = float(pos.get('margin', 0))
             
-            # 优先使用数据库中的开仓价格（维护后的平均价格）
-            db_record = db_positions_dict.get((inst_id, pos_side))
+            # 使用数据库中的开仓价格（维护后的平均价格）
             if db_record:
                 avg_price = float(db_record['open_price'])
                 # 重新计算收益率（使用维护后的开仓价格）
