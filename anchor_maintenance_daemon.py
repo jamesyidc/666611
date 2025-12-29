@@ -238,7 +238,7 @@ class AnchorMaintenanceDaemon:
             return None
     
     def execute_maintenance(self, maintenance: Dict, decision_id: int) -> bool:
-        """执行维护操作：补仓10倍 + 平掉95%"""
+        """执行维护操作：补仓10倍 + 平仓到剩余1U"""
         try:
             inst_id = maintenance['inst_id']
             pos_side = maintenance['pos_side']
@@ -285,12 +285,19 @@ class AnchorMaintenanceDaemon:
             add_id = cursor.lastrowid
             print(f"  1️⃣  补仓记录 #{add_id}: {add_size:.4f} @ {current_price:.4f}")
             
-            # 2. 记录平仓（95%）
+            # 2. 记录平仓（保留1U）
             # 计算平仓数量：补仓后总量 = 原持仓 + 10倍补仓 = 11倍原持仓
-            # 平掉95%实际是平掉原持仓的 10.45倍（因为保留5%，即0.55倍原持仓）
+            # 保留1U保证金对应的持仓量
             total_after_add = open_size * 11  # 补仓后总量
-            close_size = total_after_add * 0.95  # 平掉95%
-            remain_size = total_after_add * 0.05  # 保留5%
+            total_margin_after_add = total_after_add * current_price / 10  # 10x杠杆，总保证金
+            
+            # 计算保留1U对应的持仓量
+            target_remaining_margin = 1.0  # 目标保留1U
+            remain_size = (target_remaining_margin * 10) / current_price  # 1U保证金在10x杠杆下对应的持仓量
+            
+            # 平仓数量 = 总量 - 保留量
+            close_size = total_after_add - remain_size
+            close_percent = (close_size / total_after_add) * 100  # 计算平仓百分比
             
             cursor.execute('''
             INSERT INTO position_closes (
@@ -315,8 +322,8 @@ class AnchorMaintenanceDaemon:
             ))
             
             close_id = cursor.lastrowid
-            print(f"  2️⃣  平仓记录 #{close_id}: {close_size:.4f} @ {current_price:.4f} (95%)")
-            print(f"  3️⃣  保留持仓: {remain_size:.4f} (5%)")
+            print(f"  2️⃣  平仓记录 #{close_id}: {close_size:.4f} @ {current_price:.4f} ({close_percent:.1f}%)")
+            print(f"  3️⃣  保留持仓: {remain_size:.4f} (≈1U保证金)")
             
             # 3. 记录维护日志（用于前端显示）
             # 步骤1：补仓
@@ -401,7 +408,7 @@ class AnchorMaintenanceDaemon:
                 remain_size,
                 remain_size * current_price / 10,
                 f"亏损{maintenance['profit_rate']:.2f}%触发维护",
-                f"平仓95%：{total_after_add:.4f} × 0.95 = {close_size:.4f}，保留5% = {remain_size:.4f}",
+                f"平仓{close_percent:.1f}%：{total_after_add:.4f} 张中平掉 {close_size:.4f} 张，保留1U ≈ {remain_size:.4f} 张",
                 'executed',
                 now,
                 now
@@ -410,7 +417,7 @@ class AnchorMaintenanceDaemon:
             log_id_2 = cursor.lastrowid
             print(f"  4️⃣  维护日志 #{log_id_1}, #{log_id_2}: 已记录")
             
-            # 4. **关键步骤：更新 position_opens 表，将持仓量改为剩余的5%**
+            # 4. **关键步骤：更新 position_opens 表，将持仓量改为剩余的1U对应量**
             cursor.execute('''
             UPDATE position_opens
             SET open_size = ?,
