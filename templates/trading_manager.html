@@ -502,9 +502,14 @@
             
             <!-- 锚点单维护日志 -->
             <div class="card" style="margin-top: 20px; background: #f8f9fa;">
-                <h2 style="color: #333;">📋 锚点单维护日志</h2>
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+                    <h2 style="color: #333; margin: 0;">📋 锚点单维护日志</h2>
+                    <div style="color: #666; font-size: 13px;" id="maintenance-last-check">
+                        ⏰ 最后检测: 加载中...
+                    </div>
+                </div>
                 <p style="color: #666; margin-bottom: 15px; font-size: 0.95em;">
-                    📊 记录锚点单维护的完整决策过程和执行结果
+                    📊 记录锚点单维护的完整决策过程和执行结果 | ⏱️ 每30秒自动检测一次
                 </p>
                 <div id="anchor-maintenance-logs" class="loading">加载中...</div>
             </div>
@@ -2068,6 +2073,18 @@
         
         // 加载锚点单维护日志
         function loadAnchorMaintenanceLogs() {
+            // 更新最后检测时间
+            const now = new Date();
+            const timeStr = now.toLocaleString('zh-CN', { 
+                year: 'numeric', 
+                month: '2-digit', 
+                day: '2-digit',
+                hour: '2-digit', 
+                minute: '2-digit', 
+                second: '2-digit' 
+            });
+            document.getElementById('maintenance-last-check').innerHTML = `⏰ 最后检测: ${timeStr}`;
+            
             fetch('/api/trading/anchor-maintenance/logs?limit=10')
                 .then(res => res.json())
                 .then(data => {
@@ -2104,7 +2121,10 @@
                                             ${stepBadge}
                                             ${statusBadge}
                                         </div>
-                                        <div style="color:#666;font-size:13px;">${log.created_at}</div>
+                                        <div style="color:#666;font-size:13px;">
+                                            <div>📝 记录时间: ${log.created_at}</div>
+                                            <div>⏰ 执行时间: ${log.executed_at}</div>
+                                        </div>
                                     </div>
                                     
                                     <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:10px;font-size:14px;">

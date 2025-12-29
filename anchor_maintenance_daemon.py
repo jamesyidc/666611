@@ -492,13 +492,16 @@ class AnchorMaintenanceDaemon:
     def scan_and_check(self):
         """扫描并检查所有锚点单"""
         try:
+            # 记录扫描开始时间
+            scan_time = datetime.now(BEIJING_TZ).strftime('%Y-%m-%d %H:%M:%S')
+            
             # 获取所有锚点单
             positions = self.get_anchor_positions()
             
             if not positions:
                 return
             
-            print(f"\n🔍 扫描锚点单: {len(positions)}个")
+            print(f"\n🔍 扫描锚点单: {len(positions)}个 (检测时间: {scan_time})")
             
             maintenance_count = 0
             warning_count = 0
