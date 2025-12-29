@@ -232,14 +232,13 @@ def get_position_opens():
                 record['current_price'] = pd['current_price']
                 record['price_update_time'] = pd['record_time']
                 
-                # 计算盈亏率（考虑10x杠杆）
+                # 计算盈亏率（不考虑杠杆，直接显示价格变化百分比）
                 if pd['current_price']:
-                    leverage = 10
                     if record['pos_side'] == 'short':
                         price_change = (record['open_price'] - pd['current_price']) / record['open_price']
                     else:
                         price_change = (pd['current_price'] - record['open_price']) / record['open_price']
-                    record['profit_rate'] = round(price_change * leverage * 100, 2)
+                    record['profit_rate'] = round(price_change * 100, 2)
                 else:
                     record['profit_rate'] = None
             else:
