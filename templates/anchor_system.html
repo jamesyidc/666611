@@ -489,6 +489,7 @@
             </div>
         </div>
 
+
         <!-- 历史监控记录 -->
         <div class="card">
             <div class="card-header">
@@ -879,32 +880,6 @@
 
         // 扫描锚点预警
         function scanAnchorWarnings() {
-            const btn = event.target;
-            const originalText = btn.innerHTML;
-            btn.innerHTML = '🔄 扫描中...';
-            btn.disabled = true;
-
-            fetch('/api/trading/anchor-warning/scan', {
-                method: 'POST'
-            })
-            .then(response => response.json())
-            .then(data => {
-                if (data.success) {
-                    alert(`✅ 扫描完成\n\n扫描锚点单: ${data.total_scanned}个\n活跃预警: ${data.warnings_count}个`);
-                    refreshAnchorWarnings();
-                    refreshWarningLogs();
-                } else {
-                    alert(`❌ 扫描失败: ${data.error || '未知错误'}`);
-                }
-            })
-            .catch(err => {
-                alert(`❌ 请求失败: ${err.message}`);
-            })
-            .finally(() => {
-                btn.innerHTML = originalText;
-                btn.disabled = false;
-            });
-        }
-
+    </script>
 </body>
 </html>
