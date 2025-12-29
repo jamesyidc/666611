@@ -993,9 +993,14 @@
         }
         
         // 加载锚点单记录
-        function loadAnchors() {
-            // 显示加载指示器
-            document.getElementById('anchors-content').innerHTML = '<div class="loading-indicator"><div class="loading-spinner"></div>加载中...</div>';
+        // 🚀 平滑数据更新：只更新变化的数据，不重新渲染整个表格
+        function loadAnchors(silent = false) {
+            const contentDiv = document.getElementById('anchors-content');
+            
+            // 首次加载显示加载指示器
+            if (!silent && (!contentDiv.querySelector('table') || contentDiv.innerHTML.includes('加载中'))) {
+                contentDiv.innerHTML = '<div class="loading-indicator"><div class="loading-spinner"></div>加载中...</div>';
+            }
             
             // 🚀 减少一次加载量，提升响应速度
             fetch('/api/trading/positions/opens?is_anchor=1&limit=20')
@@ -1013,7 +1018,7 @@
                         }
                         
                         if (data.records.length === 0) {
-                            document.getElementById('anchors-content').innerHTML = `
+                            contentDiv.innerHTML = `
                                 <div class="empty-state">
                                     <p style="font-size: 1.2em; margin-bottom: 10px;">暂无锚点单记录</p>
                                     <p style="color: #666; font-size: 0.9em;">锚点单会在出现逃顶信号时自动触发</p>
@@ -1023,70 +1028,155 @@
                             return;
                         }
                         
-                        const rows = data.records.map(r => {
-                            // 使用后端计算的盈亏率（已考虑10x杠杆）
-                            const profitRate = r.profit_rate !== null && r.profit_rate !== undefined ? 
-                                r.profit_rate.toFixed(2) : 'N/A';
-                            const profitClass = parseFloat(profitRate) >= 0 ? 'profit-positive' : 'profit-negative';
-                            
-                            return `
-                                <tr style="background: ${r.has_adds ? '#fef3c7' : 'white'};">
-                                    <td>${r.timestamp}</td>
-                                    <td><strong style="color: #d97706;">${r.inst_id}</strong></td>
-                                    <td><span class="pos-side-${r.pos_side}">🔽 ${r.pos_side === 'short' ? '做空' : '做多'}</span></td>
-                                    <td>${r.open_price.toFixed(4)}</td>
-                                    <td>${r.current_price ? r.current_price.toFixed(4) : 'N/A'}</td>
-                                    <td><span class="${profitClass}">${profitRate}%</span></td>
-                                    <td>${r.open_size.toFixed(2)} USDT</td>
-                                    <td>${r.total_adds || 0}</td>
-                                    <td>${r.total_size ? r.total_size.toFixed(2) : r.open_size.toFixed(2)} USDT</td>
-                                    <td>${r.granularity || 'small'}</td>
-                                    <td><span style="color: #f59e0b;">⚓ 锚点单</span></td>
-                                    <td>
-                                        <button class="btn btn-danger" style="padding: 5px 10px; font-size: 0.85em;" 
-                                                onclick="closeAnchorPosition(${r.id}, '${r.inst_id}', 1.0)">
-                                            平仓保留1U
-                                        </button>
-                                    </td>
-                                </tr>
-                            `;
-                        }).join('');
+                        // 检查表格是否已存在
+                        const existingTable = contentDiv.querySelector('table tbody');
                         
-                        const html = `
-                            <div style="margin-bottom: 15px; padding: 10px; background: #fef3c7; border-radius: 5px;">
-                                <p style="margin: 0; color: #92400e; font-size: 0.9em;">
-                                    📌 共 <strong>${data.records.length}</strong> 个锚点单 | 
-                                    ⚠️ 只有锚点单才能触发补仓 | 
-                                    🔒 锚点单在逃顶信号时触发，用于防护资金
-                                </p>
-                            </div>
-                            <table>
-                                <thead>
-                                    <tr>
-                                        <th>时间</th>
-                                        <th>币种</th>
-                                        <th>方向</th>
-                                        <th>开仓价</th>
-                                        <th>当前价</th>
-                                        <th>盈亏率</th>
-                                        <th>初始开仓额</th>
-                                        <th>补仓次数</th>
-                                        <th>当前总额</th>
-                                        <th>颗粒度</th>
-                                        <th>类型</th>
-                                        <th>操作</th>
-                                    </tr>
-                                </thead>
-                                <tbody>${rows}</tbody>
-                            </table>
-                        `;
-                        
-                        document.getElementById('anchors-content').innerHTML = html;
+                        if (!existingTable) {
+                            // 首次加载：创建完整表格
+                            renderAnchorsTable(data.records);
+                        } else {
+                            // 后续更新：只更新数据单元格（平滑更新）
+                            updateAnchorsData(data.records);
+                        }
                     }
                 })
                 .catch(err => {
-                    document.getElementById('anchors-content').innerHTML = `<div class="alert alert-danger">加载失败: ${err.message}</div>`;
+                    if (!silent) {
+                        contentDiv.innerHTML = `<div class="alert alert-danger">加载失败: ${err.message}</div>`;
+                    }
                 });
+        }
+        
+        // 渲染完整表格（首次加载）
+        function renderAnchorsTable(records) {
+            const rows = records.map((r, index) => {
+                const profitRate = r.profit_rate !== null && r.profit_rate !== undefined ? 
+                    r.profit_rate.toFixed(2) : 'N/A';
+                const profitClass = parseFloat(profitRate) >= 0 ? 'profit-positive' : 'profit-negative';
+                
+                return `
+                    <tr data-inst-id="${r.inst_id}" data-row-index="${index}" style="background: ${r.has_adds ? '#fef3c7' : 'white'};">
+                        <td>${r.timestamp}</td>
+                        <td><strong style="color: #d97706;">${r.inst_id}</strong></td>
+                        <td><span class="pos-side-${r.pos_side}">🔽 ${r.pos_side === 'short' ? '做空' : '做多'}</span></td>
+                        <td class="data-open-price">${r.open_price.toFixed(4)}</td>
+                        <td class="data-current-price">${r.current_price ? r.current_price.toFixed(4) : 'N/A'}</td>
+                        <td class="data-profit-rate"><span class="${profitClass}">${profitRate}%</span></td>
+                        <td>${r.open_size.toFixed(2)} USDT</td>
+                        <td class="data-total-adds">${r.total_adds || 0}</td>
+                        <td class="data-total-size">${r.total_size ? r.total_size.toFixed(2) : r.open_size.toFixed(2)} USDT</td>
+                        <td>${r.granularity || 'small'}</td>
+                        <td><span style="color: #f59e0b;">⚓ 锚点单</span></td>
+                        <td>
+                            <button class="btn btn-danger" style="padding: 5px 10px; font-size: 0.85em;" 
+                                    onclick="closeAnchorPosition(${r.id}, '${r.inst_id}', 1.0)">
+                                平仓保留1U
+                            </button>
+                        </td>
+                    </tr>
+                `;
+            }).join('');
+            
+            const html = `
+                <div style="margin-bottom: 15px; padding: 10px; background: #fef3c7; border-radius: 5px;">
+                    <p style="margin: 0; color: #92400e; font-size: 0.9em;">
+                        📌 共 <strong id="anchor-count">${records.length}</strong> 个锚点单 | 
+                        ⚠️ 只有锚点单才能触发补仓 | 
+                        🔒 锚点单在逃顶信号时触发，用于防护资金
+                    </p>
+                </div>
+                <table id="anchors-table">
+                    <thead>
+                        <tr>
+                            <th>时间</th>
+                            <th>币种</th>
+                            <th>方向</th>
+                            <th>开仓价</th>
+                            <th>当前价</th>
+                            <th>盈亏率</th>
+                            <th>初始开仓额</th>
+                            <th>补仓次数</th>
+                            <th>当前总额</th>
+                            <th>颗粒度</th>
+                            <th>类型</th>
+                            <th>操作</th>
+                        </tr>
+                    </thead>
+                    <tbody>${rows}</tbody>
+                </table>
+            `;
+            
+            document.getElementById('anchors-content').innerHTML = html;
+        }
+        
+        // 平滑更新数据（只更新变化的单元格）
+        function updateAnchorsData(records) {
+            const tbody = document.querySelector('#anchors-table tbody');
+            if (!tbody) return;
+            
+            // 更新总数
+            const countEl = document.getElementById('anchor-count');
+            if (countEl) countEl.textContent = records.length;
+            
+            records.forEach((r, index) => {
+                const row = tbody.querySelector(`tr[data-inst-id="${r.inst_id}"]`);
+                if (!row) return; // 如果行不存在，跳过（可能是新记录）
+                
+                // 只更新可能变化的数据单元格
+                
+                // 1. 当前价
+                const currentPriceCell = row.querySelector('.data-current-price');
+                if (currentPriceCell && r.current_price) {
+                    const newPrice = r.current_price.toFixed(4);
+                    if (currentPriceCell.textContent !== newPrice) {
+                        // 添加闪烁动画提示数据更新
+                        currentPriceCell.textContent = newPrice;
+                        currentPriceCell.style.transition = 'background-color 0.3s';
+                        currentPriceCell.style.backgroundColor = '#fef3c7';
+                        setTimeout(() => {
+                            currentPriceCell.style.backgroundColor = '';
+                        }, 300);
+                    }
+                }
+                
+                // 2. 盈亏率
+                const profitRateCell = row.querySelector('.data-profit-rate');
+                if (profitRateCell && r.profit_rate !== null && r.profit_rate !== undefined) {
+                    const profitRate = r.profit_rate.toFixed(2);
+                    const profitClass = parseFloat(profitRate) >= 0 ? 'profit-positive' : 'profit-negative';
+                    const currentProfit = profitRateCell.querySelector('span').textContent.replace('%', '');
+                    
+                    if (currentProfit !== profitRate) {
+                        profitRateCell.innerHTML = `<span class="${profitClass}">${profitRate}%</span>`;
+                        // 添加闪烁动画
+                        profitRateCell.style.transition = 'background-color 0.3s';
+                        profitRateCell.style.backgroundColor = profitClass === 'profit-positive' ? '#d1fae5' : '#fee2e2';
+                        setTimeout(() => {
+                            profitRateCell.style.backgroundColor = '';
+                        }, 300);
+                    }
+                }
+                
+                // 3. 补仓次数
+                const totalAddsCell = row.querySelector('.data-total-adds');
+                if (totalAddsCell) {
+                    const newAdds = r.total_adds || 0;
+                    if (totalAddsCell.textContent !== newAdds.toString()) {
+                        totalAddsCell.textContent = newAdds;
+                        // 补仓次数变化时高亮整行
+                        row.style.background = '#fef3c7';
+                    }
+                }
+                
+                // 4. 当前总额
+                const totalSizeCell = row.querySelector('.data-total-size');
+                if (totalSizeCell && r.total_size) {
+                    const newSize = r.total_size.toFixed(2) + ' USDT';
+                    if (totalSizeCell.textContent !== newSize) {
+                        totalSizeCell.textContent = newSize;
+                    }
+                }
+            });
         }
         
         // 加载锚点单决策日志
@@ -1549,6 +1639,16 @@
         window.onload = () => {
             loadConfig();
             window.configLoaded = true;  // 标记已加载
+            
+            // 🚀 启动锚点单数据自动刷新（每30秒，静默更新）
+            window.anchorAutoRefresh = setInterval(() => {
+                // 只在锚点单Tab激活时自动刷新
+                const anchorsTab = document.getElementById('anchors-tab');
+                if (anchorsTab && anchorsTab.classList.contains('active')) {
+                    loadAnchors(true);  // silent = true，静默更新
+                }
+            }, 30000); // 30秒刷新一次
+            
             // 隐藏页面加载器
             setTimeout(() => {
                 const loader = document.getElementById('page-loader');
@@ -1557,6 +1657,13 @@
                     setTimeout(() => loader.style.display = 'none', 300);
                 }
             }, 500);
+        };
+        
+        // 页面卸载时清理定时器
+        window.onbeforeunload = () => {
+            if (window.anchorAutoRefresh) {
+                clearInterval(window.anchorAutoRefresh);
+            }
         };
         
         // 🚀 数据缓存机制，避免频繁请求
