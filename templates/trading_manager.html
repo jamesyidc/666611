@@ -51,6 +51,7 @@
             <button class="tab" onclick="switchTabOptimized('statistics')">📊 统计数据</button>
             <button class="tab" onclick="switchTabOptimized('stop-profit-loss')">💰 止盈止损</button>
             <button class="tab" onclick="switchTabOptimized('anchors')">⚓ 锚点单</button>
+            <button class="tab" onclick="switchTabOptimized('correction')">🔧 纠错系统</button>
             <button class="tab" onclick="switchTabOptimized('orders')">📋 挂单记录</button>
             <button class="tab" onclick="switchTabOptimized('positions')">📈 开仓记录</button>
             <button class="tab" onclick="switchTabOptimized('adds')">➕ 补仓记录</button>
@@ -506,6 +507,61 @@
                     📊 记录锚点单维护的完整决策过程和执行结果
                 </p>
                 <div id="anchor-maintenance-logs" class="loading">加载中...</div>
+            </div>
+        </div>
+        
+        <!-- 纠错系统 -->
+        <div id="correction-tab" class="tab-content">
+            <div class="card" style="background: linear-gradient(135deg, #fef3c7 0%, #fed7aa 100%); border-left: 4px solid #ea580c;">
+                <h2 style="color: #c2410c;">🔧 锚点单纠错系统</h2>
+                <p style="color: #7c2d12; margin-bottom: 15px; font-size: 0.95em;">
+                    ⚠️ 检测极端盈利的锚点单（盈利≥100%且开仓>15天），自动纠错并重置
+                </p>
+                
+                <!-- 纠错规则说明 -->
+                <div style="background: white; padding: 15px; border-radius: 8px; margin-bottom: 20px;">
+                    <h3 style="color: #ea580c; margin-top: 0;">📋 纠错规则</h3>
+                    <ul style="color: #666; line-height: 1.8;">
+                        <li><strong>触发条件</strong>: 锚点单盈利 ≥ 100%（10x杠杆）且开仓时间 > 15天</li>
+                        <li><strong>检测原因</strong>: 极端盈利通常意味着开仓价格过时，不能反映当前市场</li>
+                        <li><strong>纠错操作</strong>:
+                            <ol style="margin: 10px 0;">
+                                <li>删除旧的锚点单</li>
+                                <li>平掉所有相关持仓（包括由此产生的多单）</li>
+                                <li>使用当前价格重新创建新锚点单</li>
+                            </ol>
+                        </li>
+                        <li><strong>示例</strong>: TAO空单从627U跌到226U（+640%盈利，超过100%阈值）</li>
+                    </ul>
+                </div>
+                
+                <!-- 扫描按钮 -->
+                <div style="margin-bottom: 20px;">
+                    <button class="btn btn-warning" onclick="scanExtremeAnchors()" style="font-size: 16px; padding: 10px 20px;">
+                        🔍 扫描极端锚点单
+                    </button>
+                    <button class="btn btn-danger" onclick="correctAllAnchors()" style="font-size: 16px; padding: 10px 20px; margin-left: 10px;">
+                        🔧 一键纠错全部
+                    </button>
+                    <span id="scan-status" style="margin-left: 15px; color: #666;"></span>
+                </div>
+                
+                <!-- 扫描结果 -->
+                <div id="extreme-anchors-result" style="display: none; margin-top: 20px;">
+                    <h3 style="color: #c2410c;">🚨 扫描结果</h3>
+                    <div id="extreme-anchors-list"></div>
+                </div>
+            </div>
+            
+            <!-- 纠错执行日志 -->
+            <div class="card" style="margin-top: 20px; background: #f8f9fa;">
+                <h2 style="color: #333;">📋 纠错执行日志</h2>
+                <p style="color: #666; margin-bottom: 15px; font-size: 0.95em;">
+                    📊 记录纠错系统的执行历史和结果
+                </p>
+                <div id="correction-logs">
+                    <div class="loading">暂无日志</div>
+                </div>
             </div>
         </div>
         
@@ -2305,6 +2361,161 @@
             })
             .catch(err => {
                 alert(`❌ 请求失败: ${err.message}`);
+            });
+        }
+        
+        // ==================== 纠错系统函数 ====================
+        
+        /**
+         * 扫描极端盈利的锚点单
+         */
+        function scanExtremeAnchors() {
+            const statusEl = document.getElementById('scan-status');
+            statusEl.textContent = '扫描中...';
+            statusEl.style.color = '#f59e0b';
+            
+            fetch('/api/trading/anchor-correction/scan', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'}
+            })
+            .then(resp => resp.json())
+            .then(data => {
+                if (data.success) {
+                    statusEl.textContent = `✅ 扫描完成：找到 ${data.total} 个极端锚点单`;
+                    statusEl.style.color = '#10b981';
+                    
+                    // 显示结果
+                    displayExtremeAnchors(data.anchors);
+                } else {
+                    statusEl.textContent = `❌ 扫描失败: ${data.error}`;
+                    statusEl.style.color = '#ef4444';
+                }
+            })
+            .catch(err => {
+                statusEl.textContent = `❌ 请求失败: ${err.message}`;
+                statusEl.style.color = '#ef4444';
+            });
+        }
+        
+        /**
+         * 显示极端锚点单列表
+         */
+        function displayExtremeAnchors(anchors) {
+            const resultDiv = document.getElementById('extreme-anchors-result');
+            const listDiv = document.getElementById('extreme-anchors-list');
+            
+            if (!anchors || anchors.length === 0) {
+                resultDiv.style.display = 'none';
+                return;
+            }
+            
+            resultDiv.style.display = 'block';
+            
+            let html = '<table class="data-table"><thead><tr>';
+            html += '<th>币种</th><th>方向</th><th>开仓价</th><th>当前价</th><th>收益率</th>';
+            html += '<th>开仓天数</th><th>关联持仓</th><th>操作</th>';
+            html += '</tr></thead><tbody>';
+            
+            anchors.forEach(anchor => {
+                html += '<tr>';
+                html += `<td>${anchor.inst_id}</td>`;
+                html += `<td><span class="badge ${anchor.pos_side === 'long' ? 'badge-success' : 'badge-danger'}">${anchor.pos_side}</span></td>`;
+                html += `<td>${anchor.open_price.toFixed(4)}</td>`;
+                html += `<td>${anchor.current_price.toFixed(4)}</td>`;
+                html += `<td style="color: ${anchor.profit_rate > 0 ? '#10b981' : '#ef4444'}; font-weight: bold;">${anchor.profit_rate.toFixed(2)}%</td>`;
+                html += `<td>${anchor.days}天</td>`;
+                html += `<td>${anchor.related_positions_count}个</td>`;
+                html += `<td><button class="btn btn-sm btn-danger" onclick="correctSingleAnchor('${anchor.inst_id}')">🔧 纠错</button></td>`;
+                html += '</tr>';
+            });
+            
+            html += '</tbody></table>';
+            listDiv.innerHTML = html;
+        }
+        
+        /**
+         * 纠错单个锚点单
+         */
+        function correctSingleAnchor(instId) {
+            if (!confirm(`确认要纠错 ${instId} 吗？\n\n将执行以下操作：\n1. 删除旧锚点单\n2. 平掉所有相关持仓\n3. 重新创建新锚点单`)) {
+                return;
+            }
+            
+            const statusEl = document.getElementById('scan-status');
+            statusEl.textContent = `纠错中: ${instId}...`;
+            statusEl.style.color = '#f59e0b';
+            
+            fetch('/api/trading/anchor-correction/correct-single', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({inst_id: instId})
+            })
+            .then(resp => resp.json())
+            .then(data => {
+                if (data.success) {
+                    const result = data.result;
+                    statusEl.textContent = `✅ 纠错完成: ${result.inst_id}（关闭${result.closed_count}个持仓）`;
+                    statusEl.style.color = '#10b981';
+                    
+                    // 重新扫描
+                    setTimeout(() => scanExtremeAnchors(), 1000);
+                    
+                    // 刷新锚点单列表
+                    if (window.loadAnchors) loadAnchors();
+                } else {
+                    statusEl.textContent = `❌ 纠错失败: ${data.error}`;
+                    statusEl.style.color = '#ef4444';
+                    alert(`纠错失败: ${data.error}`);
+                }
+            })
+            .catch(err => {
+                statusEl.textContent = `❌ 请求失败: ${err.message}`;
+                statusEl.style.color = '#ef4444';
+                alert(`请求失败: ${err.message}`);
+            });
+        }
+        
+        /**
+         * 一键纠错全部极端锚点单
+         */
+        function correctAllAnchors() {
+            if (!confirm('确认要纠错所有极端盈利的锚点单吗？\n\n将批量执行纠错操作，包括：\n1. 删除所有旧锚点单\n2. 平掉所有相关持仓\n3. 重新创建新锚点单')) {
+                return;
+            }
+            
+            const statusEl = document.getElementById('scan-status');
+            statusEl.textContent = '批量纠错中...';
+            statusEl.style.color = '#f59e0b';
+            
+            fetch('/api/trading/anchor-correction/correct-all', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'}
+            })
+            .then(resp => resp.json())
+            .then(data => {
+                if (data.success) {
+                    const result = data.result;
+                    statusEl.textContent = `✅ 批量纠错完成: 成功${result.corrected}个，失败${result.failed}个`;
+                    statusEl.style.color = '#10b981';
+                    
+                    // 显示详细结果
+                    alert(`批量纠错完成！\n\n总计: ${result.total}个\n成功: ${result.corrected}个\n失败: ${result.failed}个`);
+                    
+                    // 重新扫描
+                    setTimeout(() => scanExtremeAnchors(), 1000);
+                    
+                    // 刷新锚点单列表
+                    if (window.loadAnchors) loadAnchors();
+                } else {
+                    statusEl.textContent = `❌ 批量纠错失败: ${data.error}`;
+                    statusEl.style.color = '#ef4444';
+                    alert(`批量纠错失败: ${data.error}`);
+                }
+            })
+            .catch(err => {
+                statusEl.textContent = `❌ 请求失败: ${err.message}`;
+                statusEl.style.color = '#ef4444';
+                alert(`请求失败: ${err.message}`);
             });
         }
     </script>

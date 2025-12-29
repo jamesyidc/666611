@@ -2180,3 +2180,105 @@ def check_long_position_open_conditions():
         import traceback
         traceback.print_exc()
         return jsonify({'success': False, 'error': str(e)})
+
+# ==================== 锚点单纠错系统 API ====================
+
+@trading_bp.route('/anchor-correction/scan', methods=['POST'])
+def scan_extreme_anchors():
+    """扫描极端盈利的锚点单"""
+    try:
+        from anchor_correction_system import AnchorCorrectionSystem
+        
+        correction = AnchorCorrectionSystem()
+        extreme_anchors = correction.scan_extreme_anchors()
+        
+        # 格式化返回数据
+        result = []
+        for item in extreme_anchors:
+            anchor = item['anchor']
+            result.append({
+                'id': anchor['id'],
+                'inst_id': anchor['inst_id'],
+                'pos_side': anchor['pos_side'],
+                'open_price': anchor['open_price'],
+                'current_price': item['current_price'],
+                'profit_rate': round(item['profit_rate'], 2),
+                'days': item['days'],
+                'created_at': anchor['created_at'],
+                'related_positions_count': len(item['related_positions']),
+                'related_positions': item['related_positions']
+            })
+        
+        return jsonify({
+            'success': True,
+            'total': len(result),
+            'anchors': result
+        })
+        
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        return jsonify({'success': False, 'error': str(e)})
+
+@trading_bp.route('/anchor-correction/correct-all', methods=['POST'])
+def correct_all_extreme_anchors():
+    """纠错所有极端盈利的锚点单"""
+    try:
+        from anchor_correction_system import AnchorCorrectionSystem
+        
+        correction = AnchorCorrectionSystem()
+        result = correction.correct_all()
+        
+        return jsonify({
+            'success': True,
+            'result': result
+        })
+        
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        return jsonify({'success': False, 'error': str(e)})
+
+@trading_bp.route('/anchor-correction/correct-single', methods=['POST'])
+def correct_single_anchor():
+    """纠错单个锚点单"""
+    try:
+        from anchor_correction_system import AnchorCorrectionSystem
+        
+        data = request.get_json()
+        inst_id = data.get('inst_id')
+        
+        if not inst_id:
+            return jsonify({'success': False, 'error': '缺少inst_id参数'})
+        
+        correction = AnchorCorrectionSystem()
+        
+        # 扫描找到该币种
+        extreme_anchors = correction.scan_extreme_anchors()
+        target_anchor = None
+        
+        for item in extreme_anchors:
+            if item['anchor']['inst_id'] == inst_id:
+                target_anchor = item
+                break
+        
+        if not target_anchor:
+            return jsonify({
+                'success': False,
+                'error': f'{inst_id} 未找到或不符合纠错条件'
+            })
+        
+        # 执行纠错
+        result = correction.correct_anchor(target_anchor)
+        
+        return jsonify({
+            'success': True,
+            'result': result
+        })
+        
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        return jsonify({'success': False, 'error': str(e)})
+
+print('✅ 锚点单纠错系统API已添加')
