@@ -232,10 +232,108 @@ class AnchorMaintenanceDaemon:
             conn.close()
             
             print(f"✅ 记录维护触发决策 #{decision_id}: {maintenance['inst_id']} 亏损{maintenance['profit_rate']:.2f}%")
-            return True
+            return decision_id
             
         except Exception as e:
             print(f"❌ 记录维护决策失败: {e}")
+            return None
+    
+    def execute_maintenance(self, maintenance: Dict, decision_id: int) -> bool:
+        """执行维护操作：补仓10倍 + 平掉95%"""
+        try:
+            inst_id = maintenance['inst_id']
+            pos_side = maintenance['pos_side']
+            open_size = maintenance['open_size']
+            open_price = maintenance['open_price']
+            current_price = maintenance['current_price']
+            
+            print(f"\n🔧 开始执行维护: {inst_id}")
+            
+            conn = sqlite3.connect(self.trading_db, timeout=10.0)
+            cursor = conn.cursor()
+            now = datetime.now(BEIJING_TZ).strftime('%Y-%m-%d %H:%M:%S')
+            
+            # 1. 记录补仓（10倍原持仓）
+            add_size = open_size * 10
+            cursor.execute('''
+            INSERT INTO position_adds (
+                inst_id,
+                pos_side,
+                add_size,
+                add_price,
+                add_percent,
+                profit_rate_trigger,
+                level,
+                total_size_after,
+                status,
+                timestamp,
+                created_at
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ''', (
+                inst_id,
+                pos_side,
+                add_size,
+                current_price,
+                1000.0,  # 10倍 = 1000%
+                maintenance['profit_rate'],
+                0,  # 维护补仓level=0
+                open_size * 11,  # 补仓后总量
+                'executed',  # 状态为已执行
+                now,
+                now
+            ))
+            
+            add_id = cursor.lastrowid
+            print(f"  1️⃣  补仓记录 #{add_id}: {add_size:.4f} @ {current_price:.4f}")
+            
+            # 2. 记录平仓（95%）
+            # 计算平仓数量：补仓后总量 = 原持仓 + 10倍补仓 = 11倍原持仓
+            # 平掉95%实际是平掉原持仓的 10.45倍（因为保留5%，即0.55倍原持仓）
+            total_after_add = open_size * 11  # 补仓后总量
+            close_size = total_after_add * 0.95  # 平掉95%
+            remain_size = total_after_add * 0.05  # 保留5%
+            
+            cursor.execute('''
+            INSERT INTO position_closes (
+                inst_id,
+                pos_side,
+                close_size,
+                close_price,
+                close_reason,
+                profit_rate,
+                unrealized_pnl,
+                created_at
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+            ''', (
+                inst_id,
+                pos_side,
+                close_size,
+                current_price,
+                f"维护平仓95% (亏损{maintenance['profit_rate']:.2f}%触发)",
+                maintenance['profit_rate'],
+                0.0,  # 未实现盈亏待计算
+                now
+            ))
+            
+            close_id = cursor.lastrowid
+            print(f"  2️⃣  平仓记录 #{close_id}: {close_size:.4f} @ {current_price:.4f} (95%)")
+            print(f"  3️⃣  保留持仓: {remain_size:.4f} (5%)")
+            
+            # 3. 更新决策状态为已执行
+            cursor.execute('''
+            UPDATE trading_decisions
+            SET executed = 1
+            WHERE id = ?
+            ''', (decision_id,))
+            
+            conn.commit()
+            conn.close()
+            
+            print(f"✅ 维护执行完成: {inst_id}")
+            return True
+            
+        except Exception as e:
+            print(f"❌ 执行维护失败: {e}")
             return False
     
     def log_maintenance_alert(self, maintenance: Dict):
@@ -294,8 +392,14 @@ class AnchorMaintenanceDaemon:
                     if alert_level == 'critical':
                         # 触发维护
                         self.log_maintenance_alert(check_result)
-                        if self.record_maintenance_trigger(check_result):
+                        decision_id = self.record_maintenance_trigger(check_result)
+                        if decision_id:
                             maintenance_count += 1
+                            # 立即执行维护
+                            if self.execute_maintenance(check_result, decision_id):
+                                print(f"✅ {check_result['inst_id']} 维护执行成功")
+                            else:
+                                print(f"❌ {check_result['inst_id']} 维护执行失败")
                     elif alert_level == 'warning':
                         # 提前监控预警
                         self.log_warning_alert(check_result)
