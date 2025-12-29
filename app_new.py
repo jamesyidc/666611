@@ -12516,6 +12516,62 @@ def simulated_trades():
     except Exception as e:
         return f"Error loading simulated trades: {str(e)}", 500
 
+@app.route('/api/anchor-system/warnings')
+def get_anchor_warnings():
+    """获取当前活跃的锚点预警"""
+    try:
+        import sqlite3
+        
+        # 获取交易模式
+        trade_mode = request.args.get('trade_mode', 'paper')
+        
+        DB_PATH = '/home/user/webapp/trading_decision.db'
+        conn = sqlite3.connect(DB_PATH, timeout=10.0)
+        conn.row_factory = sqlite3.Row
+        cursor = conn.cursor()
+        
+        # 查询活跃预警
+        cursor.execute('''
+            SELECT inst_id, pos_side, open_price, current_price, profit_rate, 
+                   open_size, warning_level, alert_message, status, created_at, trade_mode
+            FROM anchor_warning_monitor
+            WHERE status = 'active' AND trade_mode = ?
+            ORDER BY profit_rate ASC
+        ''', (trade_mode,))
+        
+        warnings = cursor.fetchall()
+        conn.close()
+        
+        warning_list = []
+        for row in warnings:
+            warning_list.append({
+                'inst_id': row['inst_id'],
+                'pos_side': row['pos_side'],
+                'open_price': float(row['open_price']),
+                'current_price': float(row['current_price']) if row['current_price'] else 0.0,
+                'profit_rate': float(row['profit_rate']),
+                'open_size': float(row['open_size']),
+                'warning_level': row['warning_level'],
+                'alert_message': row['alert_message'],
+                'status': row['status'],
+                'created_at': row['created_at'],
+                'trade_mode': row['trade_mode']
+            })
+        
+        return jsonify({
+            'success': True,
+            'warnings': warning_list,
+            'total': len(warning_list),
+            'trade_mode': trade_mode
+        })
+    except Exception as e:
+        import traceback
+        return jsonify({
+            'success': False,
+            'error': str(e),
+            'traceback': traceback.format_exc()
+        })
+
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=5000, debug=False)
 

@@ -298,6 +298,40 @@
             color: #a0aec0;
         }
 
+        /* 预警样式 */
+        .warning-badge {
+            padding: 4px 12px;
+            border-radius: 6px;
+            font-size: 12px;
+            font-weight: 600;
+            display: inline-block;
+        }
+
+        .warning-badge.critical {
+            background: #fed7d7;
+            color: #c53030;
+        }
+
+        .warning-badge.warning {
+            background: #feebc8;
+            color: #dd6b20;
+        }
+
+        .warning-badge.info {
+            background: #bee3f8;
+            color: #2c5282;
+        }
+
+        .profit-rate.warning-level {
+            color: #dd6b20;
+            font-weight: 600;
+        }
+
+        .profit-rate.critical-level {
+            color: #c53030;
+            font-weight: 600;
+        }
+
         @media (max-width: 1024px) {
             .main-grid {
                 grid-template-columns: 1fr;
@@ -391,6 +425,39 @@
                 </div>
                 <div class="alert-list" id="alertList">
                     <div class="loading">加载中...</div>
+                </div>
+            </div>
+
+            <!-- 当前预警 -->
+            <div class="card">
+                <div class="card-header">
+                    <div class="card-title">
+                        <span>⚠️</span>
+                        当前预警 (亏损 >= -8%)
+                    </div>
+                    <div class="update-time" id="warningsUpdateTime" style="font-size: 14px; color: #718096;">
+                        最后更新: --
+                    </div>
+                </div>
+                <div class="table-container">
+                    <table id="warningsTable">
+                        <thead>
+                            <tr>
+                                <th>币种</th>
+                                <th>方向</th>
+                                <th>开仓价</th>
+                                <th>当前价</th>
+                                <th>盈亏率</th>
+                                <th>持仓量</th>
+                                <th>预警级别</th>
+                                <th>预警消息</th>
+                                <th>创建时间</th>
+                            </tr>
+                        </thead>
+                        <tbody id="warningsBody">
+                            <tr><td colspan="9" class="loading">加载中...</td></tr>
+                        </tbody>
+                    </table>
                 </div>
             </div>
         </div>
@@ -535,11 +602,21 @@
                 }
 
                 // 加载当前持仓情况
-                const positionsRes = await fetch('/api/anchor-system/current-positions');
+                const positionsRes = await fetch('/api/anchor-system/current-positions?trade_mode=paper');
                 const positionsData = await positionsRes.json();
                 
                 if (positionsData.success) {
                     renderCurrentPositions(positionsData.positions);
+                }
+
+                // 加载当前预警
+                const warningsRes = await fetch('/api/anchor-system/warnings?trade_mode=paper');
+                const warningsData = await warningsRes.json();
+                
+                console.log('🚨 预警数据加载:', warningsData);
+                
+                if (warningsData.success) {
+                    renderWarnings(warningsData.warnings);
                 }
 
                 // 更新时间
@@ -630,6 +707,54 @@
                             ${item.status}
                         </span>
                     </td>
+                </tr>
+            `).join('');
+        }
+
+        // 渲染预警表
+        function renderWarnings(data) {
+            const tbody = document.getElementById('warningsBody');
+            const updateTime = document.getElementById('warningsUpdateTime');
+            
+            // 更新时间
+            const now = new Date();
+            updateTime.textContent = `最后更新: ${now.toLocaleString('zh-CN')}`;
+            
+            if (data.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="9" class="empty">✅ 当前无预警</td></tr>';
+                return;
+            }
+
+            console.log('⚠️ 渲染预警数据:', data);
+
+            tbody.innerHTML = data.map(item => `
+                <tr>
+                    <td style="font-weight: 600;">${item.inst_id || '--'}</td>
+                    <td>
+                        <span class="badge ${item.pos_side === 'short' ? 'badge-short' : 'badge-long'}">
+                            ${item.pos_side === 'short' ? '做空' : '做多'}
+                        </span>
+                    </td>
+                    <td>$${item.open_price.toFixed(4)}</td>
+                    <td>$${item.current_price.toFixed(4)}</td>
+                    <td>
+                        <span class="profit-rate ${
+                            item.warning_level === 'critical' ? 'critical-level' : 
+                            item.warning_level === 'warning' ? 'warning-level' : ''
+                        }">
+                            ${item.profit_rate.toFixed(2)}%
+                        </span>
+                    </td>
+                    <td>${item.open_size.toFixed(4)}</td>
+                    <td>
+                        <span class="warning-badge ${item.warning_level}">
+                            ${item.warning_level === 'critical' ? '🔴 临界' : 
+                              item.warning_level === 'warning' ? '🟡 预警' : 
+                              '🔵 信息'}
+                        </span>
+                    </td>
+                    <td style="max-width: 300px; white-space: normal;">${item.alert_message}</td>
+                    <td style="font-size: 12px; color: #718096;">${item.created_at}</td>
                 </tr>
             `).join('');
         }
