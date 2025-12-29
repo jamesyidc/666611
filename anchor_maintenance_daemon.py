@@ -129,11 +129,11 @@ class AnchorMaintenanceDaemon:
             return False
     
     def calculate_profit_rate(self, open_price: float, current_price: float, pos_side: str) -> float:
-        """计算收益率"""
+        """计算收益率（含10x杠杆）"""
         if pos_side == 'long':
-            return (current_price - open_price) / open_price * 100
+            return (current_price - open_price) / open_price * 10 * 100
         else:  # short
-            return (open_price - current_price) / open_price * 100
+            return (open_price - current_price) / open_price * 10 * 100
     
     def check_single_position(self, position: Dict) -> Optional[Dict]:
         """检查单个锚点单是否需要维护"""
@@ -190,11 +190,10 @@ class AnchorMaintenanceDaemon:
                 profit_rate,
                 current_price,
                 reason,
-                decision_data,
                 executed,
                 timestamp,
                 created_at
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             ''', (
                 maintenance['inst_id'],
                 maintenance['pos_side'],
@@ -207,7 +206,6 @@ class AnchorMaintenanceDaemon:
                 maintenance['profit_rate'],
                 maintenance['current_price'],
                 f"锚点单亏损{maintenance['profit_rate']:.2f}%，触发维护：补仓10倍+平掉95%",
-                json.dumps(maintenance, ensure_ascii=False),
                 0,  # 待执行
                 now,
                 now
