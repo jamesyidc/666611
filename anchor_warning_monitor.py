@@ -21,12 +21,13 @@ ANCHOR_DB = '/home/user/webapp/anchor_system.db'
 class AnchorWarningMonitor:
     """锚点单预警监控"""
     
-    def __init__(self):
+    def __init__(self, trade_mode='paper'):
         """初始化"""
         self.trading_db = TRADING_DB
         self.anchor_db = ANCHOR_DB
         self.warning_threshold = -8.0  # 预警阈值
         self.critical_threshold = -10.0  # 临界阈值
+        self.trade_mode = trade_mode  # paper 或 live
         self.init_database()
     
     def init_database(self):
@@ -109,11 +110,13 @@ class AnchorWarningMonitor:
                 open_price,
                 open_percent,
                 total_positions,
+                mark_price,
+                profit_rate,
                 timestamp,
                 created_at
             FROM position_opens
-            WHERE is_anchor = 1
-            ''')
+            WHERE is_anchor = 1 AND (trade_mode = ? OR trade_mode IS NULL)
+            ''', (self.trade_mode,))
             
             positions = [dict(row) for row in cursor.fetchall()]
             conn.close()
@@ -124,9 +127,28 @@ class AnchorWarningMonitor:
             print(f"❌ 获取锚点单失败: {e}")
             return []
     
-    def get_current_price(self, inst_id: str) -> Optional[float]:
-        """从 OKEx API 获取实时价格"""
+    def get_current_price(self, inst_id: str, pos_side: str = 'short') -> Optional[float]:
+        """获取当前价格（模拟盘从数据库读取，实盘从OKEx API获取）"""
         try:
+            # 模拟盘：从数据库读取 mark_price
+            if self.trade_mode == 'paper':
+                conn = sqlite3.connect(self.trading_db, timeout=10.0)
+                cursor = conn.cursor()
+                cursor.execute('''
+                SELECT mark_price FROM position_opens
+                WHERE inst_id = ? AND pos_side = ? AND is_anchor = 1 AND (trade_mode = ? OR trade_mode IS NULL)
+                ORDER BY updated_time DESC
+                LIMIT 1
+                ''', (inst_id, pos_side, self.trade_mode))
+                
+                result = cursor.fetchone()
+                conn.close()
+                
+                if result and result[0]:
+                    return float(result[0])
+                return None
+            
+            # 实盘：从 OKEx API 获取
             import sys
             sys.path.append('/home/user/webapp')
             from anchor_system import get_positions
@@ -150,11 +172,11 @@ class AnchorWarningMonitor:
             return None
     
     def calculate_profit_rate(self, open_price: float, current_price: float, pos_side: str) -> float:
-        """计算收益率（10x杠杆）"""
+        """计算收益率（不含杠杆，数据库中已按10x计算）"""
         if pos_side == 'long':
-            profit_rate = (current_price - open_price) / open_price * 10 * 100
+            profit_rate = (current_price - open_price) / open_price * 100
         else:  # short
-            profit_rate = (open_price - current_price) / open_price * 10 * 100
+            profit_rate = (open_price - current_price) / open_price * 100
         return profit_rate
     
     def check_existing_warning(self, inst_id: str, pos_side: str) -> Optional[Dict]:
@@ -206,8 +228,8 @@ class AnchorWarningMonitor:
             INSERT INTO anchor_warning_monitor (
                 inst_id, pos_side, open_price, current_price, profit_rate,
                 open_size, open_percent, warning_level, alert_message,
-                status, created_at, updated_at
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                status, created_at, updated_at, trade_mode
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             ''', (
                 position['inst_id'],
                 position['pos_side'],
@@ -220,7 +242,8 @@ class AnchorWarningMonitor:
                 alert_message,
                 'active',
                 now,
-                now
+                now,
+                self.trade_mode
             ))
             
             warning_id = cursor.lastrowid
@@ -388,13 +411,18 @@ class AnchorWarningMonitor:
                 pos_side = position['pos_side']
                 open_price = float(position['open_price'])
                 
-                # 获取当前价格
-                current_price = self.get_current_price(inst_id)
-                if not current_price:
-                    continue
-                
-                # 计算收益率
-                profit_rate = self.calculate_profit_rate(open_price, current_price, pos_side)
+                # 优先使用数据库中的 mark_price 和 profit_rate
+                if position.get('mark_price') and position.get('profit_rate') is not None:
+                    current_price = float(position['mark_price'])
+                    profit_rate = float(position['profit_rate'])
+                else:
+                    # 获取当前价格
+                    current_price = self.get_current_price(inst_id, pos_side)
+                    if not current_price:
+                        continue
+                    
+                    # 计算收益率
+                    profit_rate = self.calculate_profit_rate(open_price, current_price, pos_side)
                 
                 # 检查是否需要预警（亏损超过-8%）
                 if profit_rate <= self.warning_threshold:
