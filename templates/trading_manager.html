@@ -1054,6 +1054,9 @@
                     r.profit_rate.toFixed(2) : 'N/A';
                 const profitClass = parseFloat(profitRate) >= 0 ? 'profit-positive' : 'profit-negative';
                 
+                // 🔧 修复：计算当前保证金（10x杠杆）
+                const currentMargin = r.current_price ? (r.open_size * r.current_price / 10) : (r.open_size * r.open_price / 10);
+                
                 return `
                     <tr data-inst-id="${r.inst_id}" data-row-index="${index}" style="background: ${r.has_adds ? '#fef3c7' : 'white'};">
                         <td>${r.timestamp}</td>
@@ -1062,9 +1065,9 @@
                         <td class="data-open-price">${r.open_price.toFixed(4)}</td>
                         <td class="data-current-price">${r.current_price ? r.current_price.toFixed(4) : 'N/A'}</td>
                         <td class="data-profit-rate"><span class="${profitClass}">${profitRate}%</span></td>
-                        <td>${r.open_size.toFixed(2)} USDT</td>
+                        <td>${r.open_size.toFixed(2)} 张</td>
                         <td class="data-total-adds">${r.total_adds || 0}</td>
-                        <td class="data-total-size">${r.total_size ? r.total_size.toFixed(2) : r.open_size.toFixed(2)} USDT</td>
+                        <td class="data-total-size">${currentMargin.toFixed(4)} USDT</td>
                         <td>${r.granularity || 'small'}</td>
                         <td><span style="color: #f59e0b;">⚓ 锚点单</span></td>
                         <td>
@@ -1168,12 +1171,13 @@
                     }
                 }
                 
-                // 4. 当前总额
+                // 4. 当前总额（保证金）
                 const totalSizeCell = row.querySelector('.data-total-size');
-                if (totalSizeCell && r.total_size) {
-                    const newSize = r.total_size.toFixed(2) + ' USDT';
-                    if (totalSizeCell.textContent !== newSize) {
-                        totalSizeCell.textContent = newSize;
+                if (totalSizeCell && r.current_price) {
+                    const currentMargin = r.open_size * r.current_price / 10;
+                    const newMargin = currentMargin.toFixed(4) + ' USDT';
+                    if (totalSizeCell.textContent !== newMargin) {
+                        totalSizeCell.textContent = newMargin;
                     }
                 }
             });

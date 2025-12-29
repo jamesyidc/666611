@@ -242,16 +242,18 @@ def get_position_opens():
                 record['profit_rate'] = None
                 record['price_update_time'] = None
             
-            # 如果是锚点单，额外查询补仓次数和总金额
+            # 如果是锚点单，额外查询补仓次数
+            # ⚠️ 重要：维护后 open_size 已经是最终持仓量，不需要再加 position_adds
             if record['is_anchor']:
                 cursor.execute('''
-                SELECT COUNT(*), COALESCE(SUM(add_size), 0)
+                SELECT COUNT(*)
                 FROM position_adds
                 WHERE inst_id = ? AND pos_side = ?
                 ''', (record['inst_id'], record['pos_side']))
-                adds_data = cursor.fetchone()
-                record['total_adds'] = adds_data[0] if adds_data else 0
-                record['total_size'] = record['open_size'] + (adds_data[1] if adds_data else 0)
+                adds_count = cursor.fetchone()[0]
+                record['total_adds'] = adds_count if adds_count else 0
+                # 使用 open_size 作为当前总额（维护后已更新）
+                record['total_size'] = record['open_size']
                 record['has_adds'] = record['total_adds'] > 0
             
             records.append(record)
