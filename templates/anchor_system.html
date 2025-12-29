@@ -310,28 +310,49 @@
             }
         }
 
-        /* 预警快速入口动画 */
-        @keyframes pulse {
+        /* 预警快速入口超强动画 */
+        @keyframes glow {
             0%, 100% {
-                box-shadow: 0 4px 15px rgba(239, 68, 68, 0.2);
+                box-shadow: 0 10px 40px rgba(255, 0, 0, 0.6), 0 0 50px rgba(255, 0, 0, 0.4);
             }
             50% {
+                box-shadow: 0 15px 60px rgba(255, 0, 0, 0.9), 0 0 80px rgba(255, 0, 0, 0.7);
+            }
+        }
+
+        @keyframes shake {
+            0%, 100% { transform: rotate(0deg); }
+            25% { transform: rotate(-15deg); }
+            75% { transform: rotate(15deg); }
+        }
+
+        @keyframes pulse {
+            0%, 100% {
+                transform: scale(1);
+                box-shadow: 0 4px 15px rgba(0,0,0,0.3);
+            }
+            50% {
+                transform: scale(1.05);
                 box-shadow: 0 8px 30px rgba(239, 68, 68, 0.6);
             }
         }
 
         #warning-quick-entry:hover {
-            transform: translateY(-3px);
-            box-shadow: 0 8px 25px rgba(239, 68, 68, 0.4) !important;
+            transform: translateY(-5px) scale(1.02);
+            box-shadow: 0 20px 60px rgba(255, 0, 0, 0.8), 0 0 100px rgba(255, 0, 0, 0.6) !important;
         }
     </style>
 </head>
 <body>
     <div class="container">
+        <!-- 版本检测标记 -->
+        <div id="page-version" data-version="2025-12-29-v2" style="display: none;"></div>
+        
         <div class="header">
             <h1>
                 <span>🎯</span>
                 锚点系统
+                <span style="background: #10b981; color: white; font-size: 12px; padding: 4px 8px; border-radius: 4px; margin-left: 10px;">v2 预警已启用</span>
             </h1>
             <div class="subtitle">
                 <span>OKEx实盘持仓监控</span>
@@ -378,31 +399,41 @@
             </div>
         </div>
 
-        <!-- 预警快速入口 -->
-        <div id="warning-quick-entry" style="background: linear-gradient(135deg, #fff5f5 0%, #fed7d7 100%); border-left: 5px solid #ef4444; border-radius: 12px; padding: 20px; margin-bottom: 30px; box-shadow: 0 4px 15px rgba(239, 68, 68, 0.2); cursor: pointer; transition: all 0.3s;" onclick="scrollToWarningSection()">
+        <!-- 🔥🔥🔥 预警快速入口 - 超级醒目版本 🔥🔥🔥 -->
+        <div id="warning-quick-entry" style="
+            background: linear-gradient(135deg, #ff0000 0%, #ff6b6b 50%, #ff0000 100%); 
+            border: 5px solid #ffffff;
+            border-radius: 20px; 
+            padding: 25px; 
+            margin: 30px 0; 
+            box-shadow: 0 10px 40px rgba(255, 0, 0, 0.6), 0 0 50px rgba(255, 0, 0, 0.4); 
+            cursor: pointer; 
+            transition: all 0.3s;
+            animation: glow 2s ease-in-out infinite;
+        " onclick="scrollToWarningSection()">
             <div style="display: flex; justify-content: space-between; align-items: center;">
-                <div style="display: flex; align-items: center; gap: 20px;">
-                    <div style="font-size: 48px;">⚠️</div>
+                <div style="display: flex; align-items: center; gap: 25px;">
+                    <div style="font-size: 64px; animation: shake 1s infinite;">⚠️</div>
                     <div>
-                        <div style="font-size: 22px; font-weight: bold; color: #c53030; margin-bottom: 5px;">
-                            锚点单预警监控
+                        <div style="font-size: 28px; font-weight: bold; color: #ffffff; margin-bottom: 8px; text-shadow: 2px 2px 4px rgba(0,0,0,0.5);">
+                            🚨 锚点单预警监控系统 🚨
                         </div>
-                        <div style="font-size: 14px; color: #742a2a;">
-                            实时监控 -8%预警 | -10%触发维护 | 完整操作留痕
+                        <div style="font-size: 16px; color: #ffffff; font-weight: bold; text-shadow: 1px 1px 2px rgba(0,0,0,0.5);">
+                            ✅ 实时监控 -8%预警 | ⚡ -10%触发维护 | 📋 完整操作留痕
                         </div>
                     </div>
                 </div>
                 <div style="display: flex; gap: 20px; align-items: center;">
-                    <div style="text-align: center; padding: 10px 20px; background: rgba(255,255,255,0.7); border-radius: 8px;">
-                        <div style="font-size: 28px; font-weight: bold; color: #ef4444;" id="quick-critical-count">-</div>
-                        <div style="font-size: 12px; color: #742a2a;">临界预警</div>
+                    <div style="text-align: center; padding: 15px 25px; background: rgba(255,255,255,0.95); border-radius: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.3);">
+                        <div style="font-size: 36px; font-weight: bold; color: #ef4444;" id="quick-critical-count">-</div>
+                        <div style="font-size: 14px; color: #742a2a; font-weight: bold;">临界预警</div>
                     </div>
-                    <div style="text-align: center; padding: 10px 20px; background: rgba(255,255,255,0.7); border-radius: 8px;">
-                        <div style="font-size: 28px; font-weight: bold; color: #f59e0b;" id="quick-warning-count">-</div>
-                        <div style="font-size: 12px; color: #742a2a;">普通预警</div>
+                    <div style="text-align: center; padding: 15px 25px; background: rgba(255,255,255,0.95); border-radius: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.3);">
+                        <div style="font-size: 36px; font-weight: bold; color: #f59e0b;" id="quick-warning-count">-</div>
+                        <div style="font-size: 14px; color: #742a2a; font-weight: bold;">普通预警</div>
                     </div>
-                    <div style="padding: 12px 24px; background: #ef4444; color: white; border-radius: 8px; font-weight: bold; font-size: 14px;">
-                        点击查看详情 →
+                    <div style="padding: 15px 30px; background: #ffffff; color: #ef4444; border-radius: 12px; font-weight: bold; font-size: 18px; box-shadow: 0 4px 15px rgba(0,0,0,0.3); animation: pulse 1.5s infinite;">
+                        👉 点击查看详情 👈
                     </div>
                 </div>
             </div>
@@ -928,6 +959,38 @@
         // 窗口大小变化时调整图表
         window.addEventListener('resize', () => {
             profitChart.resize();
+        });
+
+        // ============================================================
+        // 版本检测和预警模块检查
+        // ============================================================
+        
+        // 检查预警模块是否存在
+        window.addEventListener('DOMContentLoaded', function() {
+            console.log('🔍 页面版本检测开始...');
+            
+            const warningEntry = document.getElementById('warning-quick-entry');
+            const pageVersion = document.getElementById('page-version');
+            
+            if (!warningEntry) {
+                console.error('❌ 预警模块未找到！浏览器缓存了旧版本');
+                // 显示强制刷新提示
+                const alertDiv = document.createElement('div');
+                alertDiv.innerHTML = `
+                    <div style="position: fixed; top: 0; left: 0; right: 0; background: #ef4444; color: white; padding: 15px; text-align: center; z-index: 99999; font-size: 16px; font-weight: bold;">
+                        ⚠️ 检测到浏览器缓存，正在自动刷新页面...
+                    </div>
+                `;
+                document.body.insertBefore(alertDiv, document.body.firstChild);
+                
+                // 3秒后强制刷新
+                setTimeout(() => {
+                    location.reload(true);
+                }, 3000);
+            } else {
+                console.log('✅ 预警模块已加载');
+                console.log('✅ 页面版本:', pageVersion ? pageVersion.dataset.version : 'unknown');
+            }
         });
 
         // ============================================================
