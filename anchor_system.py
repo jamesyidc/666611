@@ -103,8 +103,7 @@ def get_positions_from_db():
                 ON p.inst_id = amp.inst_id 
                 AND p.pos_side = amp.pos_side 
                 AND (p.trade_mode = amp.trade_mode OR (p.trade_mode IS NULL AND amp.trade_mode = 'paper'))
-            WHERE p.is_anchor = 1 
-            AND (p.trade_mode = 'paper' OR p.trade_mode IS NULL)
+            WHERE (p.trade_mode = 'paper' OR p.trade_mode IS NULL)
             ORDER BY p.created_at DESC
         """)
         

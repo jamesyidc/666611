@@ -12272,13 +12272,14 @@ def get_current_positions():
                 p.lever, 
                 p.margin,
                 amp.original_open_price,
-                amp.maintenance_count
+                amp.maintenance_count,
+                p.is_anchor
             FROM position_opens p
             LEFT JOIN anchor_maintenance_prices amp 
                 ON p.inst_id = amp.inst_id 
                 AND p.pos_side = amp.pos_side 
                 AND p.trade_mode = amp.trade_mode
-            WHERE p.is_anchor = 1 AND p.trade_mode = ?
+            WHERE p.trade_mode = ?
         ''', (trade_mode,))
         
         db_positions = cursor.fetchall()
@@ -12311,7 +12312,8 @@ def get_current_positions():
                     'margin': float(row['margin']) if row['margin'] else 0.0,
                     'profit_rate': profit_rate,
                     'status': status,
-                    'status_class': status_class
+                    'status_class': status_class,
+                    'is_anchor': int(row['is_anchor']) if row['is_anchor'] else 0
                 })
             
             return jsonify({
@@ -12345,11 +12347,8 @@ def get_current_positions():
             if pos_value == 0:
                 continue
             
-            # 只显示数据库中标记为锚点单的持仓
+            # 查找数据库记录（可能是锚点单，也可能不是）
             db_record = db_positions_dict.get((inst_id, pos_side))
-            if not db_record:
-                # 如果数据库中没有此持仓记录，说明不是锚点单，跳过
-                continue
             
             # 计算数据
             okex_avg_price = float(pos.get('avgPx', 0))
@@ -12358,9 +12357,10 @@ def get_current_positions():
             upl = float(pos.get('upl', 0))
             margin = float(pos.get('margin', 0))
             
-            # 使用数据库中的开仓价格（维护后的平均价格）
+            # 如果数据库中有记录，使用数据库的开仓价格（可能是维护后的）
             if db_record:
                 avg_price = float(db_record['open_price'])
+                is_anchor = int(db_record['is_anchor']) if db_record['is_anchor'] else 0
                 # 计算相对保证金的收益率（考虑杠杆）
                 # 方法：未实现盈亏 / 保证金 * 100
                 if margin > 0:
@@ -12372,8 +12372,9 @@ def get_current_positions():
                     else:  # long
                         profit_rate = ((mark_price - avg_price) / avg_price) * lever * 100
             else:
-                # 如果数据库中没有，使用 OKEx 的价格
+                # 如果数据库中没有，使用 OKEx 的价格，标记为非锚点单
                 avg_price = okex_avg_price
+                is_anchor = 0
                 profit_rate = calculate_profit_rate(pos)
             
             # 判断状态
@@ -12397,7 +12398,8 @@ def get_current_positions():
                 'margin': margin,
                 'profit_rate': profit_rate,
                 'status': status,
-                'status_class': status_class
+                'status_class': status_class,
+                'is_anchor': is_anchor
             })
         
         return jsonify({

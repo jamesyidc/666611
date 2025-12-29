@@ -31,7 +31,7 @@
     "loss_limit": -10.0,
     "check_interval": 60,
     "alert_cooldown": 30,
-    "only_short_positions": true,
+    "only_short_positions": false,
     "trade_mode": "real"
   },
   "telegram": {
