@@ -96,20 +96,41 @@ class PositionSyncer:
                 
                 # 检查数据库中是否存在
                 if position_key in db_positions:
-                    # 更新现有持仓
-                    cursor.execute('''
-                        UPDATE position_opens
-                        SET mark_price = ?,
-                            profit_rate = ?,
-                            upl = ?,
-                            open_size = ?,
-                            margin = ?,
-                            lever = ?,
-                            updated_time = ?
-                        WHERE inst_id = ? AND pos_side = ?
-                    ''', (mark_price, profit_rate, upl, pos_size, margin, lever,
-                          datetime.now(BEIJING_TZ).strftime('%Y-%m-%d %H:%M:%S'),
-                          inst_id, pos_side))
+                    # 检查是否为锚点单
+                    cursor.execute('SELECT is_anchor FROM position_opens WHERE inst_id = ? AND pos_side = ?',
+                                   (inst_id, pos_side))
+                    is_anchor_row = cursor.fetchone()
+                    is_anchor = is_anchor_row[0] if is_anchor_row else 0
+                    
+                    if is_anchor:
+                        # 锚点单：只更新市场价格、盈亏、保证金等信息，不覆盖 open_price 和 open_size
+                        cursor.execute('''
+                            UPDATE position_opens
+                            SET mark_price = ?,
+                                profit_rate = ?,
+                                upl = ?,
+                                margin = ?,
+                                lever = ?,
+                                updated_time = ?
+                            WHERE inst_id = ? AND pos_side = ?
+                        ''', (mark_price, profit_rate, upl, margin, lever,
+                              datetime.now(BEIJING_TZ).strftime('%Y-%m-%d %H:%M:%S'),
+                              inst_id, pos_side))
+                    else:
+                        # 非锚点单：正常更新所有字段
+                        cursor.execute('''
+                            UPDATE position_opens
+                            SET mark_price = ?,
+                                profit_rate = ?,
+                                upl = ?,
+                                open_size = ?,
+                                margin = ?,
+                                lever = ?,
+                                updated_time = ?
+                            WHERE inst_id = ? AND pos_side = ?
+                        ''', (mark_price, profit_rate, upl, pos_size, margin, lever,
+                              datetime.now(BEIJING_TZ).strftime('%Y-%m-%d %H:%M:%S'),
+                              inst_id, pos_side))
                     updated_count += 1
                 else:
                     # 新增持仓（使用原表结构）
