@@ -938,8 +938,8 @@
             const profit60 = shortPositions.filter(item => item.profit_rate >= 60).length;
             const profit50 = shortPositions.filter(item => item.profit_rate >= 50).length;
             const profit40 = shortPositions.filter(item => item.profit_rate >= 40).length;
-            const profitBelow20 = shortPositions.filter(item => item.profit_rate <= 20).length;
-            const profitBelow10 = shortPositions.filter(item => item.profit_rate <= 10).length;
+            const profitBelow20 = shortPositions.filter(item => item.profit_rate > 0 && item.profit_rate <= 20).length;
+            const profitBelow10 = shortPositions.filter(item => item.profit_rate > 0 && item.profit_rate <= 10).length;
             const lossCount = shortPositions.filter(item => item.profit_rate < 0).length;
             const lossBelow10 = shortPositions.filter(item => item.profit_rate <= -10).length;
             
