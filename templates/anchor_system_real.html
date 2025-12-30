@@ -408,6 +408,34 @@
             </div>
         </div>
 
+        <!-- 空单盈利分级统计 -->
+        <div class="stats-grid" style="margin-top: 20px;">
+            <div class="stat-card" style="border: 2px solid #dc2626; background: linear-gradient(135deg, #fee2e2 0%, #fecaca 100%);">
+                <div class="stat-icon">🔥</div>
+                <div class="stat-label" style="color: #991b1b;">空单盈利≥70%</div>
+                <div class="stat-value" id="profit70Plus" style="color: #dc2626; font-size: 42px; font-weight: 800;">--</div>
+                <div class="stat-subvalue" style="color: #991b1b;" id="profit70Increase">1小时内: --</div>
+            </div>
+            <div class="stat-card" style="border: 2px solid #ea580c; background: linear-gradient(135deg, #ffedd5 0%, #fed7aa 100%);">
+                <div class="stat-icon">⚡</div>
+                <div class="stat-label" style="color: #9a3412;">空单盈利≥60%</div>
+                <div class="stat-value" id="profit60Plus" style="color: #ea580c; font-size: 42px; font-weight: 800;">--</div>
+                <div class="stat-subvalue" style="color: #9a3412;" id="profit60Increase">1小时内: --</div>
+            </div>
+            <div class="stat-card" style="border: 2px solid #f59e0b; background: linear-gradient(135deg, #fef3c7 0%, #fde68a 100%);">
+                <div class="stat-icon">💫</div>
+                <div class="stat-label" style="color: #92400e;">空单盈利≥50%</div>
+                <div class="stat-value" id="profit50Plus" style="color: #f59e0b; font-size: 42px; font-weight: 800;">--</div>
+                <div class="stat-subvalue" style="color: #92400e;" id="profit50Increase">1小时内: --</div>
+            </div>
+            <div class="stat-card" style="border: 2px solid #10b981; background: linear-gradient(135deg, #d1fae5 0%, #a7f3d0 100%);">
+                <div class="stat-icon">✨</div>
+                <div class="stat-label" style="color: #065f46;">空单盈利≥40%</div>
+                <div class="stat-value" id="profit40Plus" style="color: #10b981; font-size: 42px; font-weight: 800;">--</div>
+                <div class="stat-subvalue" style="color: #065f46;" id="profit40Increase">1小时内: --</div>
+            </div>
+        </div>
+
         <!-- 主要内容 -->
         <div class="main-grid">
             <!-- 收益率趋势图 -->
@@ -713,8 +741,17 @@
             }
         }
 
+        // 存储历史盈利数据用于计算1小时内增量
+        let profitHistoryData = {
+            profit70: [],
+            profit60: [],
+            profit50: [],
+            profit40: [],
+            lastUpdate: null
+        };
+
         // 更新操作提示状态栏
-        function updateOperationStatusBar(profitAbove40Count) {
+        function updateOperationStatusBar(stats) {
             const statusBar = document.getElementById('operationStatusBar');
             const statusIcon = document.getElementById('statusIcon');
             const statusTitle = document.getElementById('statusTitle');
@@ -722,8 +759,14 @@
             
             if (!statusBar || !statusIcon || !statusTitle || !statusHint) return;
             
-            // 根据空单盈利≥40%的数量决定显示内容
-            if (profitAbove40Count >= 8) {
+            // 新的触发规则
+            // 触底反弹：profit70 >= 1 AND profit60 >= 2 AND profit50 >= 5 AND profit40 >= 8
+            const isBottomRebound = stats.profit70 >= 1 && stats.profit60 >= 2 && stats.profit50 >= 5 && stats.profit40 >= 8;
+            
+            // 多转空：profit70 == 0 AND profit50 >= 1 AND profit40 >= 3
+            const isLongToShort = stats.profit70 === 0 && stats.profit50 >= 1 && stats.profit40 >= 3;
+            
+            if (isBottomRebound) {
                 // 显示：触底反弹 - 禁止空单
                 statusBar.style.display = 'block';
                 statusBar.style.background = 'linear-gradient(135deg, #48bb78 0%, #38a169 100%)';
@@ -733,8 +776,8 @@
                 statusTitle.style.color = '#ffffff';
                 statusHint.textContent = '操作提示：禁止空单';
                 statusHint.style.color = '#e6fffa';
-                console.log('✅ 状态栏: 触底反弹 (盈利空单数量:', profitAbove40Count, ')');
-            } else if (profitAbove40Count >= 3) {
+                console.log('✅ 状态栏: 触底反弹', stats);
+            } else if (isLongToShort) {
                 // 显示：多转空 - 禁止多单
                 statusBar.style.display = 'block';
                 statusBar.style.background = 'linear-gradient(135deg, #f56565 0%, #e53e3e 100%)';
@@ -744,11 +787,11 @@
                 statusTitle.style.color = '#ffffff';
                 statusHint.textContent = '操作提示：禁止多单';
                 statusHint.style.color = '#fed7d7';
-                console.log('⚠️ 状态栏: 多转空 (盈利空单数量:', profitAbove40Count, ')');
+                console.log('⚠️ 状态栏: 多转空', stats);
             } else {
                 // 隐藏状态栏
                 statusBar.style.display = 'none';
-                console.log('ℹ️ 状态栏隐藏 (盈利空单数量:', profitAbove40Count, ')');
+                console.log('ℹ️ 状态栏隐藏', stats);
             }
         }
 
@@ -832,16 +875,78 @@
             if (data.length === 0) {
                 tbody.innerHTML = '<tr><td colspan="11" class="empty">当前无持仓</td></tr>';
                 statsDiv.innerHTML = '';
+                // 清空盈利统计显示
+                document.getElementById('profit70Plus').textContent = '0';
+                document.getElementById('profit60Plus').textContent = '0';
+                document.getElementById('profit50Plus').textContent = '0';
+                document.getElementById('profit40Plus').textContent = '0';
+                document.getElementById('profit70Increase').textContent = '1小时内: --';
+                document.getElementById('profit60Increase').textContent = '1小时内: --';
+                document.getElementById('profit50Increase').textContent = '1小时内: --';
+                document.getElementById('profit40Increase').textContent = '1小时内: --';
                 return;
             }
 
-            // 统计做空持仓
+            // 统计做空持仓各盈利级别
             const shortPositions = data.filter(item => item.pos_side === 'short');
-            const profitAbove40 = shortPositions.filter(item => item.profit_rate >= 40).length;
+            const profit70 = shortPositions.filter(item => item.profit_rate >= 70).length;
+            const profit60 = shortPositions.filter(item => item.profit_rate >= 60).length;
+            const profit50 = shortPositions.filter(item => item.profit_rate >= 50).length;
+            const profit40 = shortPositions.filter(item => item.profit_rate >= 40).length;
             const lossBelow10 = shortPositions.filter(item => item.profit_rate <= -10).length;
             
-            // 更新操作提示状态栏
-            updateOperationStatusBar(profitAbove40);
+            // 更新顶部统计卡片
+            document.getElementById('profit70Plus').textContent = profit70;
+            document.getElementById('profit60Plus').textContent = profit60;
+            document.getElementById('profit50Plus').textContent = profit50;
+            document.getElementById('profit40Plus').textContent = profit40;
+            
+            // 计算1小时内增量
+            const now = Date.now();
+            const oneHourAgo = now - 60 * 60 * 1000;
+            
+            // 保存当前数据到历史
+            if (!profitHistoryData.lastUpdate || now - profitHistoryData.lastUpdate > 60000) {
+                // 每分钟记录一次
+                profitHistoryData.profit70.push({ time: now, count: profit70 });
+                profitHistoryData.profit60.push({ time: now, count: profit60 });
+                profitHistoryData.profit50.push({ time: now, count: profit50 });
+                profitHistoryData.profit40.push({ time: now, count: profit40 });
+                profitHistoryData.lastUpdate = now;
+                
+                // 清理超过1小时的数据
+                profitHistoryData.profit70 = profitHistoryData.profit70.filter(d => d.time > oneHourAgo);
+                profitHistoryData.profit60 = profitHistoryData.profit60.filter(d => d.time > oneHourAgo);
+                profitHistoryData.profit50 = profitHistoryData.profit50.filter(d => d.time > oneHourAgo);
+                profitHistoryData.profit40 = profitHistoryData.profit40.filter(d => d.time > oneHourAgo);
+            }
+            
+            // 计算增量
+            function calcIncrease(historyArray, currentCount) {
+                if (historyArray.length < 2) return '--';
+                const oldestData = historyArray[0];
+                const increase = currentCount - oldestData.count;
+                if (increase > 0) {
+                    return `+${increase}`;
+                } else if (increase < 0) {
+                    return `${increase}`;
+                } else {
+                    return '0';
+                }
+            }
+            
+            document.getElementById('profit70Increase').textContent = `1小时内: ${calcIncrease(profitHistoryData.profit70, profit70)}`;
+            document.getElementById('profit60Increase').textContent = `1小时内: ${calcIncrease(profitHistoryData.profit60, profit60)}`;
+            document.getElementById('profit50Increase').textContent = `1小时内: ${calcIncrease(profitHistoryData.profit50, profit50)}`;
+            document.getElementById('profit40Increase').textContent = `1小时内: ${calcIncrease(profitHistoryData.profit40, profit40)}`;
+            
+            // 更新操作提示状态栏（使用新规则）
+            updateOperationStatusBar({
+                profit70: profit70,
+                profit60: profit60,
+                profit50: profit50,
+                profit40: profit40
+            });
             
             // 更新统计信息
             statsDiv.innerHTML = `
@@ -853,7 +958,7 @@
                                  font-size: 13px;
                                  font-weight: 600;
                                  box-shadow: 0 2px 4px rgba(72, 187, 120, 0.3);">
-                        🎯 盈利≥40%: ${profitAbove40}
+                        🎯 盈利≥40%: ${profit40}
                     </span>
                     <span style="background: linear-gradient(135deg, ${lossBelow10 > 0 ? '#f56565' : '#a0aec0'} 0%, ${lossBelow10 > 0 ? '#e53e3e' : '#718096'} 100%); 
                                  color: white; 
@@ -869,7 +974,7 @@
 
             // 调试日志
             console.log('🔍 渲染当前持仓数据:', data);
-            console.log('📊 做空统计: 盈利≥40%:', profitAbove40, '亏损≤-10%:', lossBelow10);
+            console.log('📊 做空统计: ≥70%:', profit70, '≥60%:', profit60, '≥50%:', profit50, '≥40%:', profit40, '≤-10%:', lossBelow10);
             if (data.length > 0) {
                 console.log('📊 第一条数据 pos_size:', data[0].pos_size, 'type:', typeof data[0].pos_size);
             }
