@@ -493,6 +493,17 @@
             </div>
         </div>
 
+        <!-- 操作提示状态栏 -->
+        <div id="operationStatusBar" style="display: none; margin-bottom: 20px; padding: 20px; border-radius: 12px; text-align: center; box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);">
+            <div style="display: flex; align-items: center; justify-content: center; gap: 20px;">
+                <div style="font-size: 32px;" id="statusIcon">📊</div>
+                <div style="text-align: left;">
+                    <div style="font-size: 24px; font-weight: 700; margin-bottom: 5px;" id="statusTitle">--</div>
+                    <div style="font-size: 16px; font-weight: 600;" id="statusHint">--</div>
+                </div>
+            </div>
+        </div>
+
         <!-- 当前持仓情况 -->
         <div class="card">
             <div class="card-header">
@@ -685,6 +696,45 @@
             }
         }
 
+        // 更新操作提示状态栏
+        function updateOperationStatusBar(profitAbove40Count) {
+            const statusBar = document.getElementById('operationStatusBar');
+            const statusIcon = document.getElementById('statusIcon');
+            const statusTitle = document.getElementById('statusTitle');
+            const statusHint = document.getElementById('statusHint');
+            
+            if (!statusBar || !statusIcon || !statusTitle || !statusHint) return;
+            
+            // 根据空单盈利≥40%的数量决定显示内容
+            if (profitAbove40Count >= 8) {
+                // 显示：触底反弹 - 禁止空单
+                statusBar.style.display = 'block';
+                statusBar.style.background = 'linear-gradient(135deg, #48bb78 0%, #38a169 100%)';
+                statusBar.style.border = '3px solid #2f855a';
+                statusIcon.textContent = '📈';
+                statusTitle.textContent = '触底反弹';
+                statusTitle.style.color = '#ffffff';
+                statusHint.textContent = '操作提示：禁止空单';
+                statusHint.style.color = '#e6fffa';
+                console.log('✅ 状态栏: 触底反弹 (盈利空单数量:', profitAbove40Count, ')');
+            } else if (profitAbove40Count >= 3) {
+                // 显示：多转空 - 禁止多单
+                statusBar.style.display = 'block';
+                statusBar.style.background = 'linear-gradient(135deg, #f56565 0%, #e53e3e 100%)';
+                statusBar.style.border = '3px solid #c53030';
+                statusIcon.textContent = '🔄';
+                statusTitle.textContent = '多转空';
+                statusTitle.style.color = '#ffffff';
+                statusHint.textContent = '操作提示：禁止多单';
+                statusHint.style.color = '#fed7d7';
+                console.log('⚠️ 状态栏: 多转空 (盈利空单数量:', profitAbove40Count, ')');
+            } else {
+                // 隐藏状态栏
+                statusBar.style.display = 'none';
+                console.log('ℹ️ 状态栏隐藏 (盈利空单数量:', profitAbove40Count, ')');
+            }
+        }
+
         // 仅更新持续时间列（不重新渲染整个表格）
         function updateDurations() {
             const tbody = document.getElementById('recordsBody');
@@ -772,6 +822,9 @@
             const shortPositions = data.filter(item => item.pos_side === 'short');
             const profitAbove40 = shortPositions.filter(item => item.profit_rate >= 40).length;
             const lossBelow10 = shortPositions.filter(item => item.profit_rate <= -10).length;
+            
+            // 更新操作提示状态栏
+            updateOperationStatusBar(profitAbove40);
             
             // 更新统计信息
             statsDiv.innerHTML = `
