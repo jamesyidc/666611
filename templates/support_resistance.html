@@ -1148,11 +1148,21 @@
         
         <!-- 全局趋势图 -->
         <div class="timeline-section">
-            <!-- 24小时逃顶统计 -->
-            <div style="text-align: center; margin-bottom: 20px; padding: 20px; background: linear-gradient(135deg, rgba(239, 68, 68, 0.15) 0%, rgba(220, 38, 38, 0.15) 100%); border-radius: 12px; border: 2px solid rgba(239, 68, 68, 0.3);">
-                <div style="font-size: 16px; color: rgba(255,255,255,0.8); margin-bottom: 8px;">📍 24小时逃顶信号统计</div>
-                <div id="escape24hCount" style="font-size: 42px; font-weight: 700; color: #ef4444; text-shadow: 0 2px 8px rgba(239, 68, 68, 0.5); letter-spacing: 2px;">-</div>
-                <div style="font-size: 14px; color: rgba(255,255,255,0.6); margin-top: 5px;">个逃顶信号（最近24小时）</div>
+            <!-- 逃顶信号统计（左右并排）-->
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-bottom: 20px;">
+                <!-- 24小时逃顶统计 -->
+                <div style="text-align: center; padding: 20px; background: linear-gradient(135deg, rgba(239, 68, 68, 0.15) 0%, rgba(220, 38, 38, 0.15) 100%); border-radius: 12px; border: 2px solid rgba(239, 68, 68, 0.3);">
+                    <div style="font-size: 16px; color: rgba(255,255,255,0.8); margin-bottom: 8px;">📍 24小时逃顶信号统计</div>
+                    <div id="escape24hCount" style="font-size: 42px; font-weight: 700; color: #ef4444; text-shadow: 0 2px 8px rgba(239, 68, 68, 0.5); letter-spacing: 2px;">-</div>
+                    <div style="font-size: 14px; color: rgba(255,255,255,0.6); margin-top: 5px;">个逃顶信号（最近24小时）</div>
+                </div>
+                
+                <!-- 2小时逃顶统计 -->
+                <div style="text-align: center; padding: 20px; background: linear-gradient(135deg, rgba(249, 115, 22, 0.15) 0%, rgba(234, 88, 12, 0.15) 100%); border-radius: 12px; border: 2px solid rgba(249, 115, 22, 0.3);">
+                    <div style="font-size: 16px; color: rgba(255,255,255,0.8); margin-bottom: 8px;">⚡ 2小时逃顶信号统计</div>
+                    <div id="escape2hCount" style="font-size: 42px; font-weight: 700; color: #f97316; text-shadow: 0 2px 8px rgba(249, 115, 22, 0.5); letter-spacing: 2px;">-</div>
+                    <div style="font-size: 14px; color: rgba(255,255,255,0.6); margin-top: 5px;">个逃顶信号（最近2小时）</div>
+                </div>
             </div>
             
             <div class="timeline-header">
@@ -2626,11 +2636,16 @@
                 sellListEl.innerHTML = html;
             }
             
+            // 统计2小时内的逃顶信号
+            const twoHoursAgo = new Date(beijingNow.getTime() - 2 * 3600 * 1000);
+            const sellSignals2h = sellSignals.filter(signal => signal.time >= twoHoursAgo);
+            
             console.log('📊 24小时信号列表已更新（左右分列）:', {
                 总信号数: signalMarkPoints.length,
                 最近24小时: buySignals.length + sellSignals.length,
                 抄底: buySignals.length,
-                逃顶: sellSignals.length
+                逃顶24h: sellSignals.length,
+                逃顶2h: sellSignals2h.length
             });
             
             // 更新24小时逃顶统计数字
@@ -2647,6 +2662,23 @@
                 } else {
                     escape24hCountEl.style.color = '#ef4444';
                     escape24hCountEl.style.textShadow = '0 2px 8px rgba(239, 68, 68, 0.5)';
+                }
+            }
+            
+            // 更新2小时逃顶统计数字
+            const escape2hCountEl = document.getElementById('escape2hCount');
+            if (escape2hCountEl) {
+                escape2hCountEl.textContent = sellSignals2h.length;
+                // 根据数量动态调整颜色（橙色系）
+                if (sellSignals2h.length === 0) {
+                    escape2hCountEl.style.color = '#6b7280';
+                    escape2hCountEl.style.textShadow = '0 2px 8px rgba(107, 114, 128, 0.5)';
+                } else if (sellSignals2h.length >= 3) {
+                    escape2hCountEl.style.color = '#ea580c';
+                    escape2hCountEl.style.textShadow = '0 2px 8px rgba(234, 88, 12, 0.8)';
+                } else {
+                    escape2hCountEl.style.color = '#f97316';
+                    escape2hCountEl.style.textShadow = '0 2px 8px rgba(249, 115, 22, 0.5)';
                 }
             }
         }
