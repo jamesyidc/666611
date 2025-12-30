@@ -400,6 +400,12 @@
                 <div class="stat-value" id="lossLimit">--</div>
                 <div class="stat-subvalue">做空亏损触发提醒</div>
             </div>
+            <div class="stat-card" style="border: 2px solid #f59e0b; background: linear-gradient(135deg, #fef3c7 0%, #fde68a 100%);">
+                <div class="stat-icon">🔢</div>
+                <div class="stat-label" style="color: #92400e;">当前计次</div>
+                <div class="stat-value" id="currentCount" style="color: #b45309; font-size: 48px; font-weight: 800;">--</div>
+                <div class="stat-subvalue" style="color: #92400e;">最新15分钟数据</div>
+            </div>
         </div>
 
         <!-- 主要内容 -->
@@ -591,6 +597,17 @@
                     document.getElementById('totalAlerts').textContent = statusData.status.total_alerts;
                     document.getElementById('profitTarget').textContent = '+' + statusData.status.config.profit_target + '%';
                     document.getElementById('lossLimit').textContent = statusData.status.config.loss_limit + '%';
+                }
+
+                // 加载最新计次数据
+                const countRes = await fetch('/api/latest');
+                const countData = await countRes.json();
+                
+                if (countData && countData.count !== undefined) {
+                    document.getElementById('currentCount').textContent = countData.count;
+                    console.log('✅ 计次数据加载:', countData.count);
+                } else {
+                    document.getElementById('currentCount').textContent = '0';
                 }
 
                 // 加载监控记录
