@@ -1148,6 +1148,13 @@
         
         <!-- 全局趋势图 -->
         <div class="timeline-section">
+            <!-- 24小时逃顶统计 -->
+            <div style="text-align: center; margin-bottom: 20px; padding: 20px; background: linear-gradient(135deg, rgba(239, 68, 68, 0.15) 0%, rgba(220, 38, 38, 0.15) 100%); border-radius: 12px; border: 2px solid rgba(239, 68, 68, 0.3);">
+                <div style="font-size: 16px; color: rgba(255,255,255,0.8); margin-bottom: 8px;">📍 24小时逃顶信号统计</div>
+                <div id="escape24hCount" style="font-size: 42px; font-weight: 700; color: #ef4444; text-shadow: 0 2px 8px rgba(239, 68, 68, 0.5); letter-spacing: 2px;">-</div>
+                <div style="font-size: 14px; color: rgba(255,255,255,0.6); margin-top: 5px;">个逃顶信号（最近24小时）</div>
+            </div>
+            
             <div class="timeline-header">
                 <div>
                     <h2 style="font-size: 20px; margin-bottom: 5px;">📈 全局趋势图（所有历史数据）</h2>
@@ -2625,6 +2632,23 @@
                 抄底: buySignals.length,
                 逃顶: sellSignals.length
             });
+            
+            // 更新24小时逃顶统计数字
+            const escape24hCountEl = document.getElementById('escape24hCount');
+            if (escape24hCountEl) {
+                escape24hCountEl.textContent = sellSignals.length;
+                // 根据数量动态调整颜色
+                if (sellSignals.length === 0) {
+                    escape24hCountEl.style.color = '#6b7280';
+                    escape24hCountEl.style.textShadow = '0 2px 8px rgba(107, 114, 128, 0.5)';
+                } else if (sellSignals.length >= 5) {
+                    escape24hCountEl.style.color = '#dc2626';
+                    escape24hCountEl.style.textShadow = '0 2px 8px rgba(220, 38, 38, 0.8)';
+                } else {
+                    escape24hCountEl.style.color = '#ef4444';
+                    escape24hCountEl.style.textShadow = '0 2px 8px rgba(239, 68, 68, 0.5)';
+                }
+            }
         }
         
         
