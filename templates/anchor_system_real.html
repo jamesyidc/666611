@@ -474,6 +474,7 @@
                 <table id="recordsTable">
                     <thead>
                         <tr>
+                            <th>编号</th>
                             <th>币种</th>
                             <th>方向</th>
                             <th>类型</th>
@@ -486,7 +487,7 @@
                         </tr>
                     </thead>
                     <tbody id="recordsBody">
-                        <tr><td colspan="9" class="loading">加载中...</td></tr>
+                        <tr><td colspan="10" class="loading">加载中...</td></tr>
                     </tbody>
                 </table>
             </div>
@@ -510,6 +511,7 @@
                 <table id="currentPositionTable">
                     <thead>
                         <tr>
+                            <th>编号</th>
                             <th>币种</th>
                             <th>方向</th>
                             <th>持仓量</th>
@@ -708,16 +710,29 @@
             const tbody = document.getElementById('recordsBody');
             
             if (data.length === 0) {
-                tbody.innerHTML = '<tr><td colspan="9" class="empty">暂无历史记录</td></tr>';
+                tbody.innerHTML = '<tr><td colspan="10" class="empty">暂无历史记录</td></tr>';
                 return;
             }
             
+            // 币种编号映射
+            const coinNumbers = {
+                'CFX-USDT-SWAP': 'NO.1',
+                'FIL-USDT-SWAP': 'NO.2',
+                'CRO-USDT-SWAP': 'NO.3',
+                'UNI-USDT-SWAP': 'NO.4',
+                'CRV-USDT-SWAP': 'NO.5',
+                'LDO-USDT-SWAP': 'NO.6'
+            };
+            
             tbody.innerHTML = data.map(item => {
                 // 计算持续时间
-                const durationHtml = calculateDuration(item.timestamp)
+                const durationHtml = calculateDuration(item.timestamp);
+                // 获取编号
+                const coinNumber = coinNumbers[item.inst_id] || '--';
                 
                 return `
                 <tr>
+                    <td style="font-weight: 700; color: #667eea;">${coinNumber}</td>
                     <td>${item.inst_id || '--'}</td>
                     <td>
                         <span class="badge ${item.pos_side === 'short' ? 'badge-short' : 'badge-long'}">
@@ -748,7 +763,7 @@
             const statsDiv = document.getElementById('positionStats');
             
             if (data.length === 0) {
-                tbody.innerHTML = '<tr><td colspan="10" class="empty">当前无持仓</td></tr>';
+                tbody.innerHTML = '<tr><td colspan="11" class="empty">当前无持仓</td></tr>';
                 statsDiv.innerHTML = '';
                 return;
             }
@@ -789,8 +804,21 @@
                 console.log('📊 第一条数据 pos_size:', data[0].pos_size, 'type:', typeof data[0].pos_size);
             }
 
-            tbody.innerHTML = data.map(item => `
+            // 币种编号映射
+            const coinNumbers = {
+                'CFX-USDT-SWAP': 'NO.1',
+                'FIL-USDT-SWAP': 'NO.2',
+                'CRO-USDT-SWAP': 'NO.3',
+                'UNI-USDT-SWAP': 'NO.4',
+                'CRV-USDT-SWAP': 'NO.5',
+                'LDO-USDT-SWAP': 'NO.6'
+            };
+            
+            tbody.innerHTML = data.map(item => {
+                const coinNumber = coinNumbers[item.inst_id] || '--';
+                return `
                 <tr>
+                    <td style="font-weight: 700; color: #667eea;">${coinNumber}</td>
                     <td style="font-weight: 600;">${item.inst_id || '--'}</td>
                     <td>
                         <span class="badge ${item.pos_side === 'short' ? 'badge-short' : 'badge-long'}">
@@ -818,7 +846,8 @@
                         </span>
                     </td>
                 </tr>
-            `).join('');
+            `;
+            }).join('');
         }
 
         // 渲染预警表
