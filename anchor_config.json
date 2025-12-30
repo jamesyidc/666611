@@ -35,8 +35,8 @@
     "trade_mode": "real"
   },
   "telegram": {
-    "bot_token": "",
-    "chat_id": ""
+    "bot_token": "8437045462:AAFePnwdC21cqeWhZISMQHGGgjmroVqE2H0",
+    "chat_id": "-1003227444260"
   },
   "database": {
     "path": "/home/user/webapp/anchor_system.db"
